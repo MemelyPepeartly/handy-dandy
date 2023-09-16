@@ -1,58 +1,47 @@
 {
   "compilerOptions": {
-    "allowUnusedLabels": false,
-    "baseUrl": ".",
+    "target": "ES2019",
+    "module": "CommonJS",
+    "moduleResolution": "node",
     "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
-    "lib": [
-      "dom",
-      "dom.iterable",
-      "esnext"
-    ],
-    "module": "ESNext",
-    "noFallthroughCasesInSwitch": true,
-    "noImplicitOverride": true,
-    "noImplicitReturns": true,
-    "outDir": "dist",
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "strict": true,
     "paths": {
       "@actor": [
-        "types/src/module/actor/index.js"
+        "../types/src/module/actor/index.js"
       ],
       "@actor/*": [
-        "types/src/module/actor/*"
+        "../types/src/module/actor/*"
       ],
       "@item": [
-        "types/src/module/item/index.js"
+        "../types/src/module/item/index.js"
       ],
       "@item/*": [
-        "types/src/module/item/*"
+        "../types/src/module/item/*"
       ],
       "@module/*": [
-        "types/src/module/*"
+        "../types/src/module/*"
       ],
       "@scene": [
-        "types/src/module/scene/index.js"
+        "../types/src/module/scene/index.js"
       ],
       "@scene/*": [
-        "types/src/module/scene/*"
+        "../types/src/module/scene/*"
       ],
       "@scripts/*": [
-        "types/src/scripts/*"
+        "../types/src/scripts/*"
       ],
       "@system/*": [
-        "types/src/module/system/*"
+        "../types/src/module/system/*"
       ],
       "@util": [
-        "types/src/util/index.js"
+        "../types/src/util/index.js"
       ],
       "@util/*": [
-        "types/src/util/*"
+        "../types/src/util/*"
       ]
     },
-    "rootDir": ".",
-    "skipLibCheck": true,
-    "sourceMap": true,
-    "target": "es2022",
     "typeRoots": [
       "node_modules/@types",
       "types/types/foundry"
@@ -61,13 +50,13 @@
       "jquery",
       "node",
       "tooltipster"
-    ],
-    "useDefineForClassFields": true
-  },
-  "watchOptions": {
-    "excludeDirectories": [
-            "packs/data/",
-      "static/packs/"
     ]
-  }
+  },
+  "include": [
+    "src/**/*.ts",
+    "gulpfile.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
 }
