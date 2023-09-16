@@ -8,7 +8,7 @@
       "discord": "Memely#0001"
     }
   ],
-  "version": "0.0.6",
+  "version": "0.0.7",
   "minimumCoreVersion": "11",
   "compatibleCoreVersion": "11",
   "manifestPlusVersion": "1.0.0",
@@ -42,7 +42,8 @@
   "esmodules": [
     "scripts/handy-dandy.js",
     "scripts/hooks.js",
-    "scripts/utils.js"
+    "scripts/utils.js",
+    "const.js"
   ],
   "styles": [
     "styles/module.css"
