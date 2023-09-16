@@ -1,3 +1,5 @@
+import { MODULENAME } from "./const";
+
 declare var game: any;
 
 export function logTrace(...args) {
@@ -55,5 +57,5 @@ function log(logLevel = 2, ...args) {
 }
 
 export function pushNotification(message: any, type: string = "info") {
-    game.socket.emit("module." + "handy-dandy", { operation: "notification", args: [type, message] });
+    game.socket.emit("module." + MODULENAME, { operation: "notification", args: [type, message] });
 }

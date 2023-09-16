@@ -20,6 +20,4 @@ Hooks.once("init", async (_actor: ActorPF2e) => {
 
 Hooks.on("ready", () => {
     logInfo("ready hook called");
-
-    game.settings.get(MODULENAME, "GPTApiKey");
 });
