@@ -1,12 +1,14 @@
 import { ActorPF2e } from '@actor';
+import { logInfo } from './utils';
+import { MODULENAME } from './const';
 declare var Hooks: any;
 declare var game: any;
 
 // Initialize module
 Hooks.once("init", async (_actor: ActorPF2e) => {
-    console.log('My Module Test', _actor);
+    logInfo("Initializing handy-dandy");
 
-    game.settings.register("handy-dandy", "GPTApiKey", {
+    game.settings.register(MODULENAME, "GPTApiKey", {
         name: "GPT API Key",
         hint: "Insert your GPT API Key here",
         scope: "client",
@@ -17,7 +19,7 @@ Hooks.once("init", async (_actor: ActorPF2e) => {
 });
 
 Hooks.on("ready", () => {
-    console.log('My Module Test Ready');
+    logInfo("ready hook called");
 
-    console.log(game.actors);
+    game.settings.get(MODULENAME, "GPTApiKey");
 });
