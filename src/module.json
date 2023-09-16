@@ -12,9 +12,9 @@
   "minimumCoreVersion": "11",
   "compatibleCoreVersion": "11",
   "manifestPlusVersion": "1.0.0",
-  "url": "",
-  "manifest": "",
-  "download": "",
+  "url": "https://github.com/MemelyPepeartly/Handy-Dandy",
+  "manifest": "https://github.com/MemelyPepeartly/Handy-Dandy/releases/download/latest/module.json",
+  "download": "https://github.com/MemelyPepeartly/Handy-Dandy/releases/download/latest/ponyfinder-foundryvtt-module.zip",
   "type": "module",
   "includes": [
     "./assets/**",
