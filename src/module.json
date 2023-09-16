@@ -1,7 +1,7 @@
 {
-  "name": "",
-  "title": "",
-  "description": "", 
+  "name": "handy-dandy",
+  "title": "Handy Dandy",
+  "description": "A handy module", 
   "authors": [
     {
       "name": "Memely",
@@ -54,7 +54,7 @@
   ],
   "packFolders": [
     {
-      "name": "FolderName",
+      "name": "Handy Dandy",
       "sorting": "m",
       "ownership": {
         "PLAYER": "OBSERVER",
@@ -62,7 +62,7 @@
       },
       "folders": [
         {
-          "name": "SecondLevelFolderName",
+          "name": "Packs",
           "sorting": "m",
           "ownership": {
             "PLAYER": "OBSERVER",
