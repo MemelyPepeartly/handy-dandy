@@ -1,20 +1,23 @@
 {
   "name": "handy-dandy",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "description": "A handy m odule",
   "private": true,
+  "type": "module",
   "scripts": {
-    "build": "gulp build",
-    "test": "gulp test-build"
+    "build": "gulp build --gulpfile gulpfile.cjs",
+    "test": "gulp test-build --gulpfile gulpfile.cjs"
   },
   "author": "Memely",
   "devDependencies": {
     "del": "^7.1.0",
+    "foundry-types": "file:types/types/foundry",
     "gulp": "^4.0.2",
     "gulp-typescript": "^6.0.0-alpha.1",
     "js-yaml": "^4.1.0",
     "merge-stream": "^2.0.0",
     "nedb": "^1.8.0",
+    "through2": "^4.0.2",
     "ts-node": "^10.9.1",
     "typescript": "^5.2.2"
   }

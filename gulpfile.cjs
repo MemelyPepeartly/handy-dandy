@@ -1,12 +1,23 @@
-import gulp from 'gulp';
-import ts from 'gulp-typescript';
-import through2 from 'through2';
-import yaml from 'js-yaml';
-import Datastore from 'nedb';
-import fs from 'fs';
-import path from 'path';
-import mergeStream from 'merge-stream';
-import del from 'del';
+const gulp = require('gulp');
+const ts = require('gulp-typescript');
+const through2 = require('through2');
+const yaml = require('js-yaml');
+const Datastore = require('nedb');
+const fs = require('fs');
+const path = require('path');
+const mergeStream = require('merge-stream');
+
+// Dynamic import for 'del' package
+let del;
+
+async function initializeDel() {
+  del = (await import('del')).default;
+}
+
+// Initialize del before using it
+initializeDel().catch(err => {
+  console.error('Failed to initialize del:', err);
+});
 
 const project = ts.createProject('tsconfig.json');
 const MODULE = JSON.parse(fs.readFileSync("src/module.json").toString());
@@ -15,19 +26,15 @@ const PACK_SRC = "src/packs";
 const DIST_DIR = "dist";
 const FOUNDRY_DIR = "AppData\\Local\\FoundryVTT\\Data\\modules\\handy-dandy";
 
-
-
-
 gulp.task('compile', () => {
   compilePacks();
-
   return gulp.src('src/**/*.ts')
     .pipe(project())
     .pipe(gulp.dest('dist/'));
 });
 
 gulp.task('copy', async () => {
-  return new Promise<void>((resolve) => {
+  return new Promise((resolve) => {
     gulp.src('README.md').pipe(gulp.dest("dist/"));
     gulp.src("src/module.json").pipe(gulp.dest('dist/'));
     gulp.src("src/lang/**").pipe(gulp.dest('dist/lang/'));
@@ -38,28 +45,31 @@ gulp.task('copy', async () => {
   });
 });
 
-// Local FoundryVTT testing tasks
-gulp.task('clean-foundry', () => {
+gulp.task('clean-foundry', async () => {
+  if (!del) {
+    console.error('del is not initialized');
+    return;
+  }
   return del([`${FOUNDRY_DIR}/**`, `!${FOUNDRY_DIR}`]);
 });
+
 gulp.task('copy-to-foundry', () => {
   return gulp.src('dist/**/*')
     .pipe(gulp.dest(FOUNDRY_DIR));
 });
 
-
 function compilePacks() {
-  const folders = fs.readdirSync(PACK_SRC).filter((file: any) => {
+  const folders = fs.readdirSync(PACK_SRC).filter((file) => {
     return fs.statSync(path.join(PACK_SRC, file)).isDirectory();
   });
 
-  const packs = folders.map((folder: any) => {
+  const packs = folders.map((folder) => {
     const db = new Datastore({
-      filename: path.resolve(__dirname, DIST_DIR, "packs", `${folder}`),
+      filename: path.resolve(__dirname, DIST_DIR, "packs", folder),
       autoload: true
     });
 
-    return gulp.src(path.join(PACK_SRC, folder, "**.json")).pipe(through2.obj((file: any, enc: any, cb: any) => {
+    return gulp.src(path.join(PACK_SRC, folder, "**.json")).pipe(through2.obj((file, enc, cb) => {
       let json = yaml.loadAll(file.contents.toString());
       db.insert(json);
       cb(null, file);

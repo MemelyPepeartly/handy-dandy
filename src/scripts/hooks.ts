@@ -1,6 +1,6 @@
 import { ActorPF2e } from "@actor";
-import { ActorSheetPF2e } from "@actor/sheet/base";
-import { logInfo } from "./utils";
+import { ActorSheetPF2e } from "@actor/sheet/base.js";
+import { logInfo } from "./utils.ts";
 
 /**
  * Hook that opens when the actor sheet is rendered

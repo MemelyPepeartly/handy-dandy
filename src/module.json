@@ -8,7 +8,7 @@
       "discord": "Memely#0001"
     }
   ],
-  "version": "0.0.8",
+  "version": "0.0.9",
   "minimumCoreVersion": "11",
   "compatibleCoreVersion": "11",
   "manifestPlusVersion": "1.0.0",
@@ -71,42 +71,11 @@
             "PLAYER": "OBSERVER",
             "ASSISTANT": "OWNER"
           },
-          "packs": [
-            "item-pack-name"]
+          "packs": []
         }
       ],
       "packs": []
     }
   ],
-  "packs": [
-    {
-      "name": "item-pack-name",
-      "label": "User-Friendly Item Pack Name",
-      "path": "packs/item-pack-name.db",
-      "type": "Item",
-      "system": "pf2e"
-    },
-    {
-      "name": "actor-pack-name",
-      "label": "User-Friendly Actor Pack Name",
-      "path": "packs/actor-pack-name.db",
-      "type": "Actor",
-      "system": "pf2e"
-    }
-  ],
-  "flags": {
-    "custom-name-here": {
-        "pf2e-homebrew": {
-            "creatureTraits": {
-                "custom-creature-trait": "Custom Creature Trait"
-            },
-            "featTraits": {
-                "custom-feat-trait": "Custom Feat Trait"
-            },
-            "languages": {
-                "custom-language": "Custom Language"
-            }
-        }
-    }
-  }
+  "packs": []
 }

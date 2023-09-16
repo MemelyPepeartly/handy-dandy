@@ -1,4 +1,4 @@
-import { MODULENAME } from "./const";
+import { MODULENAME } from "./const.ts";
 
 declare var game: any;
 

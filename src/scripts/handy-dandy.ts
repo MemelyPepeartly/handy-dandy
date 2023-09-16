@@ -1,6 +1,7 @@
-import { ActorPF2e } from '@actor';
-import { logInfo } from './utils';
-import { MODULENAME } from './const';
+import { ActorPF2e } from "@actor";
+import { MODULENAME } from "./const.ts";
+import { logInfo } from "./utils.ts";
+
 declare var Hooks: any;
 declare var game: any;
 
