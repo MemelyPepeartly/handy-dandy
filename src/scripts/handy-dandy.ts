@@ -1,5 +1,6 @@
 import { ActorPF2e } from '@actor';
 declare var Hooks: any;
+declare var game: any;
 
 // Initialize module
 Hooks.once("init", async (_actor: ActorPF2e) => {
@@ -18,5 +19,5 @@ Hooks.once("init", async (_actor: ActorPF2e) => {
 Hooks.on("ready", () => {
     console.log('My Module Test Ready');
 
-    console.log(game.actors.filter((actor: ActorPF2e) => actor.type === "npc"));
+    console.log(game.actors);
 });
