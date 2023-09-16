@@ -40,7 +40,7 @@
     }
   ],
   "esmodules": [
-    "scripts/module.js"
+    "scripts/handy-dandy.js"
   ],
   "styles": [
     "styles/module.css"
