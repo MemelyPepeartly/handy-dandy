@@ -1,0 +1,73 @@
+{
+  "compilerOptions": {
+    "allowUnusedLabels": false,
+    "baseUrl": ".",
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
+    "module": "ESNext",
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "outDir": "dist",
+    "paths": {
+      "@actor": [
+        "types/src/module/actor/index.js"
+      ],
+      "@actor/*": [
+        "types/src/module/actor/*"
+      ],
+      "@item": [
+        "types/src/module/item/index.js"
+      ],
+      "@item/*": [
+        "types/src/module/item/*"
+      ],
+      "@module/*": [
+        "types/src/module/*"
+      ],
+      "@scene": [
+        "types/src/module/scene/index.js"
+      ],
+      "@scene/*": [
+        "types/src/module/scene/*"
+      ],
+      "@scripts/*": [
+        "types/src/scripts/*"
+      ],
+      "@system/*": [
+        "types/src/module/system/*"
+      ],
+      "@util": [
+        "types/src/util/index.js"
+      ],
+      "@util/*": [
+        "types/src/util/*"
+      ]
+    },
+    "rootDir": ".",
+    "skipLibCheck": true,
+    "sourceMap": true,
+    "target": "es2022",
+    "typeRoots": [
+      "node_modules/@types",
+      "types/types/foundry"
+    ],
+    "types": [
+      "jquery",
+      "node",
+      "tooltipster"
+    ],
+    "useDefineForClassFields": true
+  },
+  "watchOptions": {
+    "excludeDirectories": [
+            "packs/data/",
+      "static/packs/"
+    ]
+  }
+}

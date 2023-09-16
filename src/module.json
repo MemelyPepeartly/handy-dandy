@@ -1,0 +1,109 @@
+{
+  "name": "",
+  "title": "",
+  "description": "", 
+  "authors": [
+    {
+      "name": "Memely",
+      "discord": "Memely#0001"
+    }
+  ],
+  "version": "0.0.1",
+  "minimumCoreVersion": "11",
+  "compatibleCoreVersion": "11",
+  "manifestPlusVersion": "1.0.0",
+  "url": "",
+  "manifest": "",
+  "download": "",
+  "type": "module",
+  "includes": [
+    "./assets/**",
+    "./lang/**",
+    "./scripts/**",
+    "./styles/**",
+    "./packs/**",
+    "./module.json",
+    "./README.md"
+  ],
+  "media": [
+    {
+      "type": "icon",
+      "location": ""
+    }, 
+    {
+      "type": "cover",
+      "location": ""
+    },
+    {
+      "type": "screenshot",
+      "location": ""
+    }
+  ],
+  "esmodules": [
+    "scripts/module.js"
+  ],
+  "styles": [
+    "styles/module.css"
+  ],
+  "languages": [
+    {
+      "lang": "en",
+      "name": "English",
+      "path": "lang/en.json"
+    }
+  ],
+  "packFolders": [
+    {
+      "name": "FolderName",
+      "sorting": "m",
+      "ownership": {
+        "PLAYER": "OBSERVER",
+        "ASSISTANT": "OWNER"
+      },
+      "folders": [
+        {
+          "name": "SecondLevelFolderName",
+          "sorting": "m",
+          "ownership": {
+            "PLAYER": "OBSERVER",
+            "ASSISTANT": "OWNER"
+          },
+          "packs": [
+            "item-pack-name"]
+        }
+      ],
+      "packs": []
+    }
+  ],
+  "packs": [
+    {
+      "name": "item-pack-name",
+      "label": "User-Friendly Item Pack Name",
+      "path": "packs/item-pack-name.db",
+      "type": "Item",
+      "system": "pf2e"
+    },
+    {
+      "name": "actor-pack-name",
+      "label": "User-Friendly Actor Pack Name",
+      "path": "packs/actor-pack-name.db",
+      "type": "Actor",
+      "system": "pf2e"
+    }
+  ],
+  "flags": {
+    "custom-name-here": {
+        "pf2e-homebrew": {
+            "creatureTraits": {
+                "custom-creature-trait": "Custom Creature Trait"
+            },
+            "featTraits": {
+                "custom-feat-trait": "Custom Feat Trait"
+            },
+            "languages": {
+                "custom-language": "Custom Language"
+            }
+        }
+    }
+  }
+}
