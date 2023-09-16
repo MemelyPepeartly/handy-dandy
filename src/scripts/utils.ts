@@ -20,6 +20,11 @@ export function logError(...args) {
     log(4, ...args);
 }
 
+/**
+ * Creates a log message with a provided log level that determines the color of the log message.
+ * @param logLevel default is 2 (info)
+ * @param args extra arguments to pass to the console
+ */
 function log(logLevel = 2, ...args) {
     let number = 2;
     // if (phase >= Phase.READY) {
