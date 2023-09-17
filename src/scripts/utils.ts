@@ -1,6 +1,4 @@
-import { MODULENAME } from "./const.ts";
-
-declare var game: any;
+import { MODULENAME } from "./const.js";
 
 export function logTrace(...args) {
     log(0, ...args);
@@ -57,5 +55,5 @@ function log(logLevel = 2, ...args) {
 }
 
 export function pushNotification(message: any, type: string = "info") {
-    game.socket.emit("module." + MODULENAME, { operation: "notification", args: [type, message] });
+    //Game..emit("module." + MODULENAME, { operation: "notification", args: [type, message] });
 }

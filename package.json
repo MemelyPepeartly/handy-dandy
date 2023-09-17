@@ -1,6 +1,6 @@
 {
   "name": "handy-dandy",
-  "version": "0.0.9",
+  "version": "0.1.0",
   "description": "A handy m odule",
   "private": true,
   "type": "module",
@@ -10,8 +10,8 @@
   },
   "author": "Memely",
   "devDependencies": {
+    "@league-of-foundry-developers/foundry-vtt-types": "^9.280.0",
     "del": "^7.1.0",
-    "foundry-types": "file:types/types/foundry",
     "gulp": "^4.0.2",
     "gulp-typescript": "^6.0.0-alpha.1",
     "js-yaml": "^4.1.0",

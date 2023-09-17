@@ -1,15 +1,11 @@
-import { ActorPF2e } from "@actor";
-import { MODULENAME } from "./const.ts";
-import { logInfo } from "./utils.ts";
-
-declare var Hooks: any;
-declare var game: any;
+import { MODULENAME } from "./const.js";
+import { logInfo } from "./utils.js";
 
 // Initialize module
-Hooks.once("init", async (_actor: ActorPF2e) => {
-    logInfo("Initializing handy-dandy");
+Hooks.once("init", async (_actor: Actor) => {
+    logInfo("Handy Dandy | Initializing handy-dandy");
 
-    game.settings.register(MODULENAME, "GPTApiKey", {
+    (game as Game).settings.register(MODULENAME, "GPTApiKey", {
         name: "GPT API Key",
         hint: "Insert your GPT API Key here",
         scope: "client",
@@ -20,7 +16,5 @@ Hooks.once("init", async (_actor: ActorPF2e) => {
 });
 
 Hooks.on("ready", () => {
-    logInfo("ready hook called");
-
-    game.settings.get(MODULENAME, "GPTApiKey");
+    logInfo("Handy Dandy | Ready hook called");
 });
