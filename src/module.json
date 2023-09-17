@@ -43,18 +43,12 @@
     "scripts/handy-dandy.js",
     "scripts/hooks.js",
     "scripts/utils.js",
-    "const.js"
+    "scripts/const.js"
   ],
   "styles": [
     "styles/module.css"
   ],
-  "languages": [
-    {
-      "lang": "en",
-      "name": "English",
-      "path": "lang/en.json"
-    }
-  ],
+  "languages": [],
   "packFolders": [
     {
       "name": "Handy Dandy",

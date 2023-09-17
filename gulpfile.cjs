@@ -6,6 +6,7 @@ const Datastore = require('nedb');
 const fs = require('fs');
 const path = require('path');
 const mergeStream = require('merge-stream');
+const os = require('os');
 
 // Dynamic import for 'del' package
 let del;
@@ -24,7 +25,8 @@ const MODULE = JSON.parse(fs.readFileSync("src/module.json").toString());
 const STATIC_FILES = ["src/module.json", "src/assets/**/*"];
 const PACK_SRC = "src/packs";
 const DIST_DIR = "dist";
-const FOUNDRY_DIR = "AppData\\Local\\FoundryVTT\\Data\\modules\\handy-dandy";
+const USER_HOME = os.homedir();
+const FOUNDRY_DIR = path.join(USER_HOME, "AppData\\Local\\FoundryVTT\\Data\\modules\\handy-dandy");
 
 gulp.task('compile', () => {
   compilePacks();
@@ -37,7 +39,6 @@ gulp.task('copy', async () => {
   return new Promise((resolve) => {
     gulp.src('README.md').pipe(gulp.dest("dist/"));
     gulp.src("src/module.json").pipe(gulp.dest('dist/'));
-    gulp.src("src/lang/**").pipe(gulp.dest('dist/lang/'));
     gulp.src("src/scripts/**").pipe(gulp.dest('dist/scripts/'));
     gulp.src("src/styles/**").pipe(gulp.dest('dist/styles/'));
     gulp.src("src/assets/**").pipe(gulp.dest('dist/assets/'));
