@@ -1,12 +1,12 @@
 {
   "id": "<%= projectName %>",
   "title": "<%= projectLabel %>",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "compatibility": {
     "minimum": "11",
     "verified": "11"
   },
-  "description": "A handy module", 
+  "description": "A handy module",
   "authors": [
     {
       "name": "Memely",
@@ -14,19 +14,9 @@
     }
   ],
   "url": "https://github.com/MemelyPepeartly/Handy-Dandy",
-  "manifest": "https://github.com/MemelyPepeartly/Handy-Dandy/releases/latest/download/module.json",
-  "download": "https://github.com/MemelyPepeartly/Handy-Dandy/releases/latest/download/ponyfinder-foundryvtt-module.zip",
+  "manifest": "https://github.com/MemelyPepeartly/Handy-Dandy/releases/download/latest/module.json",
+  "download": "https://github.com/MemelyPepeartly/Handy-Dandy/releases/download/v0.2.0/module.zip",
   "bugs": "",
-  "type": "module",
-  "includes": [
-    "./assets/**",
-    "./lang/**",
-    "./scripts/**",
-    "./styles/**",
-    "./packs/**",
-    "./module.json",
-    "./README.md"
-  ],
   "esmodules": [
     "scripts/handy-dandy.js",
     "scripts/hooks.js",
@@ -36,34 +26,12 @@
   "styles": [
     "styles/module.css"
   ],
-  "packFolders": [
-    {
-      "name": "Handy Dandy",
-      "sorting": "m",
-      "ownership": {
-        "PLAYER": "OBSERVER",
-        "ASSISTANT": "OWNER"
-      },
-      "folders": [
-        {
-          "name": "Packs",
-          "sorting": "m",
-          "ownership": {
-            "PLAYER": "OBSERVER",
-            "ASSISTANT": "OWNER"
-          },
-          "packs": []
-        }
-      ],
-      "packs": []
-    }
-  ],
-  "packs": [],
   "languages": [],
+  "packs": [],
   "relationships": {
     "requires": [],
-    "recommends": [],
-    "systems": []
+    "systems": [],
+    "recommends": []
   },
   "socket": false
 }
