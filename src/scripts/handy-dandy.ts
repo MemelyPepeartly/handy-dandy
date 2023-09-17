@@ -3,7 +3,7 @@ import { logInfo } from "./utils.js";
 
 // Initialize module
 Hooks.once("init", async (_actor: Actor) => {
-    logInfo("Handy Dandy | Initializing handy-dandy");
+    logInfo("Handy Dandy | Initializing handy-dandy settings");
 
     (game as Game).settings.register(MODULENAME, "GPTApiKey", {
         name: "GPT API Key",
@@ -13,6 +13,10 @@ Hooks.once("init", async (_actor: Actor) => {
         type: String,
         default: ""
     });
+});
+
+Hooks.on('init', () => {
+  
 });
 
 Hooks.on("ready", () => {
