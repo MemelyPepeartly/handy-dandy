@@ -1,7 +1,7 @@
 {
   "id": "<%= projectName %>",
   "title": "<%= projectLabel %>",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "compatibility": {
     "minimum": "11",
     "verified": "11"
@@ -15,7 +15,7 @@
   ],
   "url": "https://github.com/MemelyPepeartly/Handy-Dandy",
   "manifest": "https://github.com/MemelyPepeartly/Handy-Dandy/releases/download/latest/module.json",
-  "download": "https://github.com/MemelyPepeartly/Handy-Dandy/releases/download/v0.2.1/module.zip",
+  "download": "https://github.com/MemelyPepeartly/Handy-Dandy/releases/download/v0.2.2/module.zip",
   "bugs": "",
   "esmodules": [
     "scripts/handy-dandy.js",
