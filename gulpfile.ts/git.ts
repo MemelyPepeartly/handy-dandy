@@ -8,6 +8,8 @@ import { args } from './args';
 export class Git {
   public async updateManifestForGithub({source, externalManifest}: {source: boolean, externalManifest: boolean}): Promise<void> {
     const packageJson = fs.readJSONSync('package.json');
+    chalk.white(packageJson);
+    
     const manifest = foundryManifest.getManifest();
     if (!manifest) {
       throw new Error(chalk.red('Manifest JSON not found in the ./src folder'));
@@ -18,6 +20,7 @@ export class Git {
       if (out.stdout) {
         const lines = out.stdout.split('\n');
         if (lines.length === 1) {
+          chalk.white(lines);
           remoteName = lines[0];
         }
       }
