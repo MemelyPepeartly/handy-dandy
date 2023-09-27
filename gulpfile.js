@@ -30,6 +30,10 @@ gulp.task('build', (done) => {
     const assets = gulp.src('src/**/*.{png,jpg,gif,css}')
         .pipe(gulp.dest('build'));
 
+    // Copy HBS files
+    const hbs = gulp.src('src/templates/*.hbs')
+        .pipe(gulp.dest('build/templates'));
+
     // After TS and assets are processed, process module.json
     function processModuleJson() {
         return gulp.src('./src/module.json')
@@ -42,7 +46,7 @@ gulp.task('build', (done) => {
     }
 
     // Use merge to handle multiple streams and call done when all streams are finished
-    merge(js, assets)
+    merge(js, assets, hbs)
         .on('finish', () => {
             processModuleJson().on('end', done);
         });

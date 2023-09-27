@@ -1,7 +1,7 @@
 {
   "name": "handy-dandy",
   "version": "0.3.1",
-  "main": "handy-dandy.js",
+  "main": "hooks.js",
   "scripts": {
     "build": "gulp build",
     "test": "gulp test"
@@ -20,6 +20,7 @@
     "gulp": "^4.0.2",
     "gulp-template": "^5.0.0",
     "gulp-typescript": "^6.0.0-alpha.1",
+    "handlebars": "^4.7.8",
     "json-stringify-pretty-compact": "^2.0.0",
     "merge-stream": "^2.0.0",
     "open": "^8.4.0",
