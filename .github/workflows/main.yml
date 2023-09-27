@@ -1,78 +1,47 @@
-name: Module CI/CD
+name: CI/CD
 
 on:
-    push:
-        branches:
-            - main
+  push:
+    branches:
+      - main
 
-jobs: 
-  build:
+jobs:
+  build-and-release:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
-    
-    - uses: actions/setup-node@v1
-      with:
-        node-version: 16
-        
-    - run: npm install
+      - name: Checkout code
+        uses: actions/checkout@v2
+      
+      - name: Setup Node
+        uses: actions/setup-node@v2
+        with:
+          node-version: '14' # or your preferred version
 
-    - name: Check if version has changed
-      id: version_check
-      run: node ./check-version.js
-      continue-on-error: true
-    
-    - name: Build Files
-      if: steps.version_check.outcome == 'success'
-      shell: bash
-      id: build-files
-      run: npm run build
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Check if version has changed
+        id: check_version
+        run: node ./check-version.js || exit 0
+        continue-on-error: true
+
+      - name: Build Project
+        if: steps.check_version.outcome == 'success'
+        run: npm run build
       
-    - name: Get Version
-      if: steps.version_check.outcome == 'success'
-      shell: bash
-      id: get-version
-      run: echo "version=$(node ./.github/get-version.js)" >> $GITHUB_ENV
-    
-    - name: Zip Files
-      if: steps.version_check.outcome == 'success'
-      working-directory: dist
-      run: zip -r ../module.zip ${{ steps.get-version.outputs.version }}
+      - name: Get Version from package.json
+        id: get_version
+        run: echo "::set-output name=version::$(node -p "require('./package.json').version")"
       
-    - name: Substitute Manifest and Download Links For Versioned Ones
-      if: steps.version_check.outcome == 'success'
-      id: sub_manifest_link_latest
-      uses: microsoft/variable-substitution@v1
-      with:
-        files: './dist/module.json'
-      env:
-        version: ${{ steps.get-version.outputs.version }}
-        url: https://github.com/${{ github.repository }}
-        manifest: https://github.com/${{ github.repository }}/releases/latest/download/module.json
-        download: https://github.com/${{ github.repository }}/releases/latest/download/module.zip
-    
-    - name: Update Latest Release
-      if: steps.version_check.outcome == 'success'
-      id: create_latest_release
-      uses: ncipollo/release-action@v1
-      with:
-        allowUpdates: true
-        name: Latest
-        draft: false
-        prerelease: false
-        token: ${{ secrets.GITHUB_TOKEN }}
-        artifacts: './dist/module.json, ./module.zip'
-        tag: latest
-    
-    - name: Create Version Release
-      if: steps.version_check.outcome == 'success'
-      id: create_version_release
-      uses: ncipollo/release-action@v1
-      with:
-        allowUpdates: true
-        name: Release ${{ steps.get-version.outputs.version }}
-        draft: false
-        prerelease: false
-        token: ${{ secrets.GITHUB_TOKEN }}
-        artifacts: './dist/module.json,./module.zip'
-        tag: ${{ steps.get-version.outputs.version }}
+      - name: Create Release and Upload Assets
+        if: steps.check_version.outcome == 'success'
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            ./build/module.json
+            ./build/*
+          tag_name: ${{ steps.get_version.outputs.version }}
+          name: Release ${{ steps.get_version.outputs.version }}
+          body: Description of the release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
