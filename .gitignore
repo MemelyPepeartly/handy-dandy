@@ -1,36 +1,25 @@
-/*
-!/.gitignore
-!/.npmignore
-!/.github
-!/gulpfile.ts
-!/config.json
-!/package.json
-!/package-lock.json
-!/tsconfig.json
-!/LICENSE
-!/README.md
-!/TODO.md
-!/lib-find-the-path
-!/.gitmodules
-!/.eslintrc.json
+# Node modules
+node_modules/
 
-!/types
+# Build artifacts
+dist/
+build/
+out/
 
-!/src
-/src/*
-# Gulp copies these files
-!/src/module.json
-!/src/assets
-!/src/lang
-!/src/packs
-!/src/scripts
-!/src/styles
-!/src/styles-component
-!/src/templates
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
+# IDE - Visual Studio Code
+.vscode/
 
-!/.vscode
-/.vscode/*
-!/.vscode/extensions.json
+# OS generated
+.DS_Store
+Thumbs.db
 
-!/docs
+# Environment Configuration
+.env
+
+# TypeScript Cache
+*.tsbuildinfo
