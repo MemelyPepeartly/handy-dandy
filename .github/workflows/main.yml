@@ -1,83 +1,78 @@
-name: Create Release
+name: Module CI/CD
 
 on:
-  push:
-    branches:
-      - main # Trigger only on a push to main
+    push:
+        branches:
+            - main
 
-jobs:
-  build_and_release:
+jobs: 
+  build:
     runs-on: ubuntu-latest
-    
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
-      
-    - name: Setup Node.js
-      uses: actions/setup-node@v2
+    - uses: actions/checkout@v2
+    
+    - uses: actions/setup-node@v1
       with:
-        node-version: '14'
+        node-version: 16
         
-    - name: Cache Node.js modules
-      uses: actions/cache@v2
-      with:
-        path: ~/.npm
-        key: ${{ runner.OS }}-node-${{ hashFiles('**/package-lock.json') }}
-        restore-keys: |
-          ${{ runner.OS }}-node-
-          
-    - name: Install dependencies
-      run: npm ci
-      
+    - run: npm install
+    
     - name: Check if version has changed
-      id: check_version
-      run: |
-        git fetch --prune --unshallow
-        VERSION_CHANGED=$(git diff ${{ github.event.before }} HEAD -- package.json | grep '"version":')
-        if [ "$VERSION_CHANGED" != "" ]; then
-          echo "::set-output name=version_changed::true"
-        fi
-        
-    - name: Build
-      if: steps.check_version.outputs.version_changed == 'true'
+      id: version_check
+      run: node ../check-version.js
+      continue-on-error: true
+    
+    - name: Build Files
+      if: steps.version_check.outcome == 'success'
+      shell: bash
+      id: build-files
       run: npm run build
       
-    - name: Create Release and Upload Assets
-      if: steps.check_version.outputs.version_changed == 'true'
-      id: create_release
-      uses: gh-actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Get Version
+      if: steps.version_check.outcome == 'success'
+      shell: bash
+      id: get-version
+      run: echo "version=$(node ./.github/get-version.js)" >> $GITHUB_ENV
+    
+    - name: Zip Files
+      if: steps.version_check.outcome == 'success'
+      working-directory: dist
+      run: zip -r ../module.zip ${{ steps.get-version.outputs.version }}
+      
+    - name: Substitute Manifest and Download Links For Versioned Ones
+      if: steps.version_check.outcome == 'success'
+      id: sub_manifest_link_latest
+      uses: microsoft/variable-substitution@v1
       with:
-        tag_name: v${{ steps.get_version.outputs.VERSION }}
-        release_name: Release ${{ steps.get_version.outputs.VERSION }}
-        body: |
-          Changes in this Release
-          - ...
-          
-    - name: Zip build files
-      if: steps.check_version.outputs.version_changed == 'true'
-      run: |
-        zip -r build.zip build/
-        
-    - name: Upload Release Asset
-      if: steps.check_version.outputs.version_changed == 'true'
-      uses: actions/upload-release-asset@v1
+        files: './dist/module.json'
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        version: ${{ steps.get-version.outputs.version }}
+        url: https://github.com/${{ github.repository }}
+        manifest: https://github.com/${{ github.repository }}/releases/latest/download/module.json
+        download: https://github.com/${{ github.repository }}/releases/latest/download/module.zip
+    
+    - name: Update Latest Release
+      if: steps.version_check.outcome == 'success'
+      id: create_latest_release
+      uses: ncipollo/release-action@v1
       with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./build.zip
-        asset_name: build.zip
-        asset_content_type: application/zip
-        
-    - name: Upload module.json as Asset
-      if: steps.check_version.outputs.version_changed == 'true'
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        allowUpdates: true
+        name: Latest
+        draft: false
+        prerelease: false
+        token: ${{ secrets.GITHUB_TOKEN }}
+        artifacts: './dist/module.json, ./module.zip'
+        tag: latest
+    
+    - name: Create Version Release
+      if: steps.version_check.outcome == 'success'
+      id: create_version_release
+      uses: ncipollo/release-action@v1
       with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./build/module.json
-        asset_name: module.json
-        asset_content_type: application/json
+        allowUpdates: true
+        name: Release ${{ steps.get-version.outputs.version }}
+        draft: false
+        prerelease: false
+        token: ${{ secrets.GITHUB_TOKEN }}
+        artifacts: './dist/module.json,./module.zip'
+        tag: ${{ steps.get-version.outputs.version }}
