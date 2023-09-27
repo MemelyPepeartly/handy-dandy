@@ -17,9 +17,9 @@ jobs:
         
     - run: npm install
 
-    - name: List files in present working directory
-      run: ls ./handy-dandy
-    
+    - name: List all directories and files
+      run: ls -R
+      
     - name: Check if version has changed
       id: version_check
       run: node ../check-version.js
