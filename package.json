@@ -1,6 +1,6 @@
 {
   "name": "handy-dandy",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "main": "handy-dandy.js",
   "scripts": {
     "build": "gulp build",

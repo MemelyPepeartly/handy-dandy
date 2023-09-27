@@ -20,16 +20,10 @@ jobs:
         with:
           node-version: '20' 
 
-      - name: Check if version has changed
-        id: check_version
-        run: node ./check-version.js || exit 0
-        continue-on-error: true
-
       - name: Install Dependencies
         run: npm install
 
       - name: Build Project
-        if: steps.check_version.outcome == 'success'
         run: npm run build
       
       - name: Get Version from package.json
@@ -37,14 +31,12 @@ jobs:
         run: echo "::set-output name=version::$(node -p "require('./package.json').version")"
       
       - name: Zip Build Directory
-        if: steps.check_version.outcome == 'success'
         run: |
           cd build
           zip -r ../module.zip ./*
       
       
       - name: Update Latest Release
-        if: steps.check_version.outcome == 'success'
         id: update_latest_release
         uses: ncipollo/release-action@v1
         with:
@@ -57,7 +49,6 @@ jobs:
           tag: latest
       
       - name: Create Version Release
-        if: steps.check_version.outcome == 'success'
         id: create_version_release
         uses: ncipollo/release-action@v1
         with:
