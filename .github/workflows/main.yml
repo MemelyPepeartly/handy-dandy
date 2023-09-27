@@ -15,7 +15,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v2
         with:
-          node-version: '20' # or your preferred version
+          node-version: '16' 
 
       - name: Install Dependencies
         run: npm install
@@ -33,15 +33,32 @@ jobs:
         id: get_version
         run: echo "::set-output name=version::$(node -p "require('./package.json').version")"
       
-      - name: Create Release and Upload Assets
+      - name: Zip Build Directory
         if: steps.check_version.outcome == 'success'
-        uses: softprops/action-gh-release@v1
+        run: zip -r build.zip ./build
+      
+      - name: Update Latest Release
+        if: steps.check_version.outcome == 'success'
+        id: update_latest_release
+        uses: ncipollo/release-action@v1
         with:
-          files: |
-            ./build/module.json
-            ./build/*
-          tag_name: ${{ steps.get_version.outputs.version }}
+          allowUpdates: true
+          name: Latest
+          draft: false
+          prerelease: false
+          token: ${{ secrets.GITHUB_TOKEN }}
+          artifacts: './build/module.json,./build.zip'
+          tag: latest
+      
+      - name: Create Version Release
+        if: steps.check_version.outcome == 'success'
+        id: create_version_release
+        uses: ncipollo/release-action@v1
+        with:
+          allowUpdates: true
           name: Release ${{ steps.get_version.outputs.version }}
-          body: Description of the release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          draft: false
+          prerelease: false
+          token: ${{ secrets.GITHUB_TOKEN }}
+          artifacts: './build/module.json,./build.zip'
+          tag: ${{ steps.get_version.outputs.version }}
