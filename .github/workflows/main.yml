@@ -38,7 +38,7 @@ jobs:
       
       - name: Zip Build Directory
         if: steps.check_version.outcome == 'success'
-        run: zip -r build.zip ./build
+        run: zip -r module.zip ./build
       
       - name: Update Latest Release
         if: steps.check_version.outcome == 'success'
@@ -50,7 +50,7 @@ jobs:
           draft: false
           prerelease: false
           token: ${{ secrets.GITHUB_TOKEN }}
-          artifacts: './build/module.json,./build.zip'
+          artifacts: './build/module.json,./module.zip'
           tag: latest
       
       - name: Create Version Release
@@ -63,5 +63,5 @@ jobs:
           draft: false
           prerelease: false
           token: ${{ secrets.GITHUB_TOKEN }}
-          artifacts: './build/module.json,./build.zip'
+          artifacts: './build/module.json,./module.zip'
           tag: ${{ steps.get_version.outputs.version }}
