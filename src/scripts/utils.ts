@@ -54,6 +54,6 @@ function log(logLevel = 2, ...args) {
     }
 }
 
-export function pushNotification(message: any, type: string = "info") {
-    //Game..emit("module." + MODULENAME, { operation: "notification", args: [type, message] });
+export function pushNotification(message: any, type: "info" | "error" | "warning" = "info") {
+    ui.notifications.notify(`${MODULENAME} | ${message}`, type);
 }

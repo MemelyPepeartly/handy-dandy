@@ -1,4 +1,4 @@
-import { logInfo } from "./utils";
+import { logInfo } from "./utils.js";
 
 /**
  * Hook that opens when the actor sheet is rendered
