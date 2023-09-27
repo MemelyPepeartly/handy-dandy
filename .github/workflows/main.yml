@@ -1,70 +1,83 @@
-name: Module CI/CD
+name: Create Release
 
-on: 
+on:
   push:
-    tags:
-      - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
+    branches:
+      - main # Trigger only on a push to main
 
-# Required to create new releases (in some repos?)
-# https://github.com/ncipollo/release-action/issues/208
-permissions:
-  contents: write
-
-jobs: 
-  build:
+jobs:
+  build_and_release:
     runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2
-
-    - name: Install dependancies
-      shell: bash
-      id: install-dependancies
-      run: npm ci
-
-    - name: Build
-      shell: bash
-      id: build
-      run: npm run build
-
-    # This manifest points to the latest, allowing foundry to find the latest version when updating (this should be in the zipped package)
-    - name: Create package manifest
-      shell: bash
-      id: create-package-manifest
-      run: npm run updateZipManifestForGithub
-
-    # create a zip file with all files required by the module to add to the release
-    - name: Package
-      shell: bash
-      id: package
-      run: npm run package
-
-    # This manifest points to itself, allowing to download a specific version
-    - name: Create external manifest
-      shell: bash
-      id: create-external-manifest
-      run: npm run updateExternalManifestForGithub
-
-    # Update the 'latest' release
-    - name: Update Latest Release
-      id: create-latest-release
-      uses: ncipollo/release-action@v1
-      with:
-        allowUpdates: true
-        name: Latest
-        draft: false
-        prerelease: false
-        token: ${{ secrets.GITHUB_TOKEN }}
-        artifacts: './dist/module.json, ./package/module.zip'
-        tag: latest
     
-    # Create a release for this specific version
-    - name: Create Version Release
-      id: create-version-release
-      uses: ncipollo/release-action@v1
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v2
       with:
-        allowUpdates: true # set this to false if you want to prevent updating existing releases
-        name: Release ${{ github.ref_name }}
-        draft: false
-        prerelease: false
-        token: ${{ secrets.GITHUB_TOKEN }}
-        artifacts: './dist/module.json, ./package/module.zip'
+        node-version: '14'
+        
+    - name: Cache Node.js modules
+      uses: actions/cache@v2
+      with:
+        path: ~/.npm
+        key: ${{ runner.OS }}-node-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.OS }}-node-
+          
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Check if version has changed
+      id: check_version
+      run: |
+        git fetch --prune --unshallow
+        VERSION_CHANGED=$(git diff ${{ github.event.before }} HEAD -- package.json | grep '"version":')
+        if [ "$VERSION_CHANGED" != "" ]; then
+          echo "::set-output name=version_changed::true"
+        fi
+        
+    - name: Build
+      if: steps.check_version.outputs.version_changed == 'true'
+      run: npm run build
+      
+    - name: Create Release and Upload Assets
+      if: steps.check_version.outputs.version_changed == 'true'
+      id: create_release
+      uses: gh-actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ steps.get_version.outputs.VERSION }}
+        release_name: Release ${{ steps.get_version.outputs.VERSION }}
+        body: |
+          Changes in this Release
+          - ...
+          
+    - name: Zip build files
+      if: steps.check_version.outputs.version_changed == 'true'
+      run: |
+        zip -r build.zip build/
+        
+    - name: Upload Release Asset
+      if: steps.check_version.outputs.version_changed == 'true'
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./build.zip
+        asset_name: build.zip
+        asset_content_type: application/zip
+        
+    - name: Upload module.json as Asset
+      if: steps.check_version.outputs.version_changed == 'true'
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./build/module.json
+        asset_name: module.json
+        asset_content_type: application/json
