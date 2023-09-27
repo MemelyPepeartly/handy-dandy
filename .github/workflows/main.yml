@@ -38,7 +38,10 @@ jobs:
       
       - name: Zip Build Directory
         if: steps.check_version.outcome == 'success'
-        run: zip -r module.zip ./build
+        run: |
+          cd build
+          zip -r ../module.zip ./*
+      
       
       - name: Update Latest Release
         if: steps.check_version.outcome == 'success'
