@@ -16,6 +16,9 @@ jobs:
         node-version: 16
         
     - run: npm install
+
+    - name: List files in present working directory
+      run: ls ..
     
     - name: Check if version has changed
       id: version_check
