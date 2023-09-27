@@ -21,7 +21,11 @@
     "scripts/handy-dandy.js",
     "scripts/hooks.js",
     "scripts/utils.js",
-    "scripts/const.js"
+    "scripts/const.js",
+
+    "scripts/ai/index.js",
+    "scripts/ai/models.js",
+    "scripts/ai/operations.js"
   ],
   "styles": [
     "styles/module.css"
