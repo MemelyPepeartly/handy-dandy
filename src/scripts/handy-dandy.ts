@@ -1,31 +1,28 @@
-import { MODULENAME } from "./const.js";
-import { logInfo, pushNotification } from "./utils.js";
-
-// Initialize module
-Hooks.once("init", async (_actor: Actor) => {
-    logInfo("Handy Dandy | Initializing handy-dandy settings");
-
-    // Register custom module settings
-    (game as Game).settings.register(MODULENAME, "GPTApiKey", {
-        name: "GPT API Key",
-        hint: "Insert your GPT API Key here",
-        scope: "client",
-        config: true,
-        type: String,
-        default: ""
-    });
-});
-
-Hooks.on('init', () => {
-    logInfo("Handy Dandy | Init hook called");
-});
-
-Hooks.on("ready", () => {
-    logInfo("Handy Dandy | Ready hook called");
-
-    pushNotification("Handy Dandy is ready to go!");
-});
-
-Hooks.on("renderActorSheet", (sheet: ActorSheet, $html: JQuery) => {
-    logInfo("Handy Dandy | renderActorSheet hook called", sheet, $html);
-});
+export class HandyDandy extends FormApplication {
+  
+    static get defaultOptions() {
+      const options = super.defaultOptions;
+      options.id = 'handy-dandy'; // Use a unique id
+      options.template = 'modules/handy-dandy/templates/handy-dandy-form.hbs'; // Set the relative path to your template
+      options.title = 'Handy Dandy'; // Set a title for your form application
+      return options;
+    }
+    
+    async _updateObject(event: Event, formData: any): Promise<any> {
+      event.preventDefault();
+      
+      // Logic to handle form submission.
+      // Use formData to access the submitted form data.
+      
+      // Here you might want to process the formData and call whatever logic or
+      // FoundryVTT API methods you need to implement the desired behavior.
+    }
+    
+    activateListeners(html: JQuery): void {
+      super.activateListeners(html);
+      
+      // Here you can set up any event listeners you need for your form, 
+      // like custom button clicks, etc.
+    }
+  }
+  
