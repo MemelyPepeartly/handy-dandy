@@ -1,6 +1,3 @@
-Certainly! Below is an example of a README.md file that you can use as a starting point for your Handy Dandy FoundryVTT module. The README provides a concise yet detailed introduction, installation guide, usage instructions, and a feature list for potential users. Feel free to modify and expand upon it to suit your needs.
-
-```markdown
 # Handy Dandy FoundryVTT Module 🎲🤖
 
 Handy Dandy is a module designed to enhance your FoundryVTT experience by integrating advanced GPT capabilities. It simplifies the creation of unique abilities for monsters, descriptions, and embeds macro scripting directly into your Foundry elements, saving you time you could be using for literally anything else.
