@@ -1,8 +1,15 @@
 const { execSync } = require('child_process');
 
 try {
-  // Get the difference in package.json between the last two commits
-  const diff = execSync('git diff HEAD~1..HEAD -- package.json').toString();
+  let diff;
+  try {
+    // Try to get the diff between the current commit and its parent
+    diff = execSync('git diff HEAD~1..HEAD -- package.json').toString();
+  } catch (error) {
+    // If an error occurs, assume it's because there is only one commit
+    // and compare the current commit with an empty tree
+    diff = execSync('git diff $(git hash-object -t tree /dev/null) HEAD -- package.json').toString();
+  }
 
   // Check if the version field is in the diff
   if (diff.includes('"version":')) {
