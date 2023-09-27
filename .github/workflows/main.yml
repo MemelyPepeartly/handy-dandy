@@ -14,15 +14,12 @@ jobs:
     - uses: actions/setup-node@v1
       with:
         node-version: 16
-
-    - name: List all directories and files
-      run: ls -R
         
     - run: npm install
 
     - name: Check if version has changed
       id: version_check
-      run: node ../check-version.js
+      run: node ./check-version.js
       continue-on-error: true
     
     - name: Build Files
