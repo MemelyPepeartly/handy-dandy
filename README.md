@@ -12,7 +12,7 @@ Handy Dandy is a module designed to enhance your FoundryVTT experience by integr
 ## Installation 🛠️
 
 1. **Open Foundry**: Start your FoundryVTT application and navigate to the "Add-on Modules" tab.
-2. **Install Module**: Click “Install Module” and enter this module’s URL.
+2. **Install Module**: Click “Install Module” and enter this module’s [URL](https://github.com/MemelyPepeartly/Handy-Dandy/releases/download/latest/module.json). 
 3. **Activate Module**: Once installed, don’t forget to activate the module in your world settings.
 
 > ⚠️ Please ensure you have the correct permissions and are using a compatible FoundryVTT version.
