@@ -1,5 +1,5 @@
 import { MODULENAME } from "./const.js";
-import { HandyDandy } from "./handy-dandy.js";
+import { loadHandlebarsTemplates, registerHandlebarsHelpers, registerHandlebarsPartials } from "./helpers/handlebar-helper.js";
 import { logInfo, pushNotification } from "./utils.js";
 
 // Initialize module
@@ -15,6 +15,10 @@ Hooks.once("init", async (_actor: Actor) => {
         type: String,
         default: ""
     });
+
+    await registerHandlebarsHelpers();
+    await registerHandlebarsPartials();
+    await loadHandlebarsTemplates();
 });
 
 Hooks.on('init', () => {
@@ -27,7 +31,7 @@ Hooks.on("ready", () => {
     pushNotification("Handy Dandy is ready to go!");
 });
 
-Hooks.on("renderActorSheet", (sheet: ActorSheet, $html: JQuery) => {
+Hooks.on("renderActorSheet", async (sheet: ActorSheet, $html: JQuery) => {
     logInfo("Handy Dandy | renderActorSheet hook called", sheet, $html);
 
     logInfo("renderActorSheetHook called", sheet, $html);
@@ -48,9 +52,25 @@ Hooks.on("renderActorSheet", (sheet: ActorSheet, $html: JQuery) => {
     // Add the button
     let element = $html.find(".window-header .window-title");
     let button = $(`<a class="popout" style><i class="fas fa-book"></i>Handy Dandy</a>`);
-    // On click, open the Handy Dandy app
-    button.on("click", () => {
-        new HandyDandy(actor).render(true)
+    let template = "modules/handy-dandy/templates/handy-dandy.hbs";
+    let content = await renderTemplate(template, {});
+    
+    // On click
+    button.on("click", async () => {
+        
+        new Dialog({
+            title: "Handy Dandy",
+            content: content,
+            buttons: {
+                close: {
+                    icon: '<i class="fas fa-times"></i>',
+                    label: "Close",
+                    callback: () => console.log("Closed Handy Dandy Dialog")
+                }
+            },
+            default: "close",
+            close: () => console.log("This Handy Dandy Dialog was closed")
+        }).render(true);
     })
     element.after(button);
 });
