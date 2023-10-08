@@ -1,13 +1,13 @@
-const gulp = require('gulp');
-const ts = require('gulp-typescript');
-const merge = require('merge-stream');
-const template = require('gulp-template');
-const del = require('del');
-const os = require('os');
-const path = require('path');
+import gulp from 'gulp';
+import ts from 'gulp-typescript';
+import merge from 'merge-stream';
+import template from 'gulp-template';
+import del from 'del';
+import os from 'os';
+import path from 'path';
 
 // Import package.json
-const pkg = require('./package.json');
+import pkg from './package.json' assert { type: 'json' };
 
 // Initialize TypeScript project
 const tsProject = ts.createProject('tsconfig.json');
