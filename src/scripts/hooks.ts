@@ -27,8 +27,6 @@ Hooks.on('init', () => {
 
 Hooks.on("ready", () => {
     logInfo("Handy Dandy | Ready hook called");
-
-    pushNotification("Handy Dandy is ready to go!");
 });
 
 Hooks.on("renderActorSheet", async (sheet: ActorSheet, $html: JQuery) => {
@@ -61,16 +59,8 @@ Hooks.on("renderActorSheet", async (sheet: ActorSheet, $html: JQuery) => {
         new Dialog({
             title: "Handy Dandy",
             content: content,
-            buttons: {
-                close: {
-                    icon: '<i class="fas fa-times"></i>',
-                    label: "Close",
-                    callback: () => console.log("Closed Handy Dandy Dialog")
-                }
-            },
-            default: "close",
-            close: () => console.log("This Handy Dandy Dialog was closed")
-        }).render(true);
+            buttons: {}
+        }).render(true);             
     })
     element.after(button);
 });

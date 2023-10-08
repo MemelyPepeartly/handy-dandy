@@ -23,7 +23,6 @@
     "scripts/const.js",
 
     "scripts/ai/index.js",
-    "scripts/ai/models.js",
     "scripts/ai/operations.js",
 
     "scripts/helpers/handlebar-helper.js"

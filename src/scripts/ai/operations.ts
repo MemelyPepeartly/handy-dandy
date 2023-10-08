@@ -16,8 +16,10 @@ const entity: FoundryEntity = {
   properties: {/*...*/},
 };
 
-function processAIInput(input: AIInput): AIOutput {
+export function processAIInput(input: /*AIInput*/ any): AIOutput {
   // Perform AI operations and return the result.
+
+  console.log("Input data to Handy Dandy:", input);
 
   return null;
 }
