@@ -27,6 +27,7 @@ Hooks.on('init', () => {
 
 Hooks.on("ready", () => {
     logInfo("Handy Dandy | Ready hook called");
+    
 });
 
 Hooks.on("renderActorSheet", async (sheet: ActorSheet, $html: JQuery) => {
