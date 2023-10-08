@@ -1,6 +1,7 @@
 {
   "name": "handy-dandy",
   "version": "0.4.2",
+  "type":"module",
   "scripts": {
     "build": "gulp build",
     "test": "gulp test"
@@ -8,18 +9,19 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "@league-of-foundry-developers/foundry-vtt-types": "^9.280.0",
     "@types/gulp": "^4.0.9",
     "@types/node": "^16.10.1",
     "archiver": "^5.0.0",
     "chalk": "^4.1.2",
     "del": "^6.1.1",
+    "foundry-types": "file:types/types/foundry",
     "fs-extra": "^9.0.1",
     "glob": "^7.1.7",
     "gulp": "^4.0.2",
     "gulp-template": "^5.0.0",
     "gulp-typescript": "^6.0.0-alpha.1",
     "handlebars": "^4.7.8",
+    "jquery": "^3.7.1",
     "json-stringify-pretty-compact": "^2.0.0",
     "merge-stream": "^2.0.0",
     "open": "^8.4.0",
