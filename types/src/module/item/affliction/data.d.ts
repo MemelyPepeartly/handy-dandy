@@ -1,5 +1,5 @@
 import { SaveType } from "@actor/types.ts";
-import { AbstractEffectSystemData, AbstractEffectSystemSource, DurationData, EffectAuraData, EffectContextData, EffectTraits, TimeUnit } from "@item/abstract-effect/index.ts";
+import { AbstractEffectSystemData, AbstractEffectSystemSource, EffectAuraData, EffectContextData, EffectTraits, TimeUnit } from "@item/abstract-effect/index.ts";
 import { ConditionSlug } from "@item/condition/index.ts";
 import { BaseItemSourcePF2e, ItemFlagsPF2e } from "@item/data/base.ts";
 import { DamageCategoryUnique, DamageType } from "@system/damage/index.ts";
@@ -23,7 +23,7 @@ interface AfflictionSystemSource extends AbstractEffectSystemSource {
     stage: number;
     stages: Record<string, AfflictionStageData>;
     onset?: AfflictionOnset;
-    duration: DurationData;
+    duration: AfflictionDuration;
     start: {
         value: number;
         initiative: number | null;
@@ -46,7 +46,11 @@ interface AfflictionStageData {
     damage: Record<string, AfflictionDamage>;
     conditions: Record<string, AfflictionConditionData>;
     effects: AfflictionEffectData[];
-    duration: Omit<DurationData, "expiry">;
+}
+interface AfflictionDuration {
+    value: number;
+    unit: TimeUnit | "unlimited";
+    expiry: AfflictionExpiryType | null;
 }
 interface AfflictionConditionData {
     slug: ConditionSlug;
@@ -58,4 +62,4 @@ interface AfflictionEffectData {
     uuid: ItemUUID;
 }
 type AfflictionExpiryType = "turn-end";
-export type { AfflictionExpiryType, AfflictionConditionData, AfflictionDamage, AfflictionFlags, AfflictionOnset, AfflictionSource, AfflictionStageData, AfflictionSystemData, };
+export type { AfflictionExpiryType, AfflictionDuration, AfflictionConditionData, AfflictionDamage, AfflictionFlags, AfflictionOnset, AfflictionSource, AfflictionStageData, AfflictionSystemData, };

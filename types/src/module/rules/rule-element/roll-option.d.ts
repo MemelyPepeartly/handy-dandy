@@ -9,6 +9,7 @@ import { RuleElementOptions, RuleElementPF2e, RuleElementSchema, RuleElementSour
  */
 declare class RollOptionRuleElement extends RuleElementPF2e<RollOptionSchema> {
     #private;
+    toggleable: boolean | "totm";
     constructor(source: RollOptionSource, options: RuleElementOptions);
     static defineSchema(): RollOptionSchema;
     static validateJoint(source: SourceFromSchema<RollOptionSchema>): void;
@@ -43,9 +44,9 @@ type RollOptionSchema = RuleElementSchema & {
      * The value of the roll option: either a boolean or a string resolves to a boolean If omitted, it defaults to
      * `true` unless also `togglable`, in which case to `false`.
      */
-    value: ResolvableValueField<false, false, true>;
+    value: ResolvableValueField<false, false, false>;
     /** Whether the roll option is toggleable: a checkbox will appear in interfaces (usually actor sheets) */
-    toggleable: DataUnionField<StrictStringField<"totm"> | StrictBooleanField, false, false, true>;
+    toggleable: DataUnionField<StrictStringField<"totm"> | StrictBooleanField, false, false, false>;
     /** If toggleable, the location to be found in an interface */
     placement: StringField<string, string, false, false, false>;
     /** An optional predicate to determine whether the toggle is interactable by the user */

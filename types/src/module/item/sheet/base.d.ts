@@ -7,8 +7,12 @@ import { RuleElementSource } from "@module/rules/index.ts";
 import { SheetOptions, TraitTagifyEntry } from "@module/sheet/helpers.ts";
 import type * as TinyMCE from "tinymce";
 declare class ItemSheetPF2e<TItem extends ItemPF2e> extends ItemSheet<TItem> {
-    #private;
     static get defaultOptions(): DocumentSheetOptions;
+    /** Maintain selected rule element at the sheet level (do not persist) */
+    private selectedRuleElementType;
+    /** If we are currently editing an RE, this is the index */
+    private editingRuleElementIndex;
+    private ruleElementForms;
     get editingRuleElement(): RuleElementSource | null;
     get validTraits(): Record<string, string> | null;
     /** An alternative to super.getData() for subclasses that don't need this class's `getData` */
@@ -21,8 +25,12 @@ declare class ItemSheetPF2e<TItem extends ItemPF2e> extends ItemSheet<TItem> {
         force?: boolean;
     }): Promise<void>;
     activateListeners($html: JQuery): void;
-    protected _getSubmitData(updateData?: Record<string, unknown> | null): Record<string, unknown>;
-    /** Add button to refresh from compendium if setting is enabled. */
+    /** When tabs are changed, change visibility of elements such as the sidebar */
+    protected _onChangeTab(event: MouseEvent, tabs: Tabs, active: string): void;
+    /** Internal function to update the sidebar visibility based on the current tab */
+    private updateSidebarVisibility;
+    protected _getSubmitData(updateData?: Record<string, unknown>): Record<string, unknown>;
+    /** Hide the sheet-config button unless there is more than one sheet option. */
     protected _getHeaderButtons(): ApplicationHeaderButton[];
     protected _canDragDrop(_selector: string): boolean;
     /** Tagify sets an empty input field to "" instead of "[]", which later causes the JSON parse to throw an error */
@@ -37,13 +45,14 @@ interface ItemSheetDataPF2e<TItem extends ItemPF2e> extends ItemSheetData<TItem>
     showTraits: boolean;
     /** Whether the sheet should have a sidebar at all */
     hasSidebar: boolean;
+    /** Whether the sheet should have a details tab (some item types don't have one) */
+    hasDetails: boolean;
     /** The sidebar's current title */
     sidebarTitle: string;
-    sidebarTemplate: string;
-    detailsTemplate: string;
+    sidebarTemplate?: () => string;
+    detailsTemplate?: () => string;
     item: TItem;
     data: TItem["system"];
-    fieldIdPrefix: string;
     enrichedContent: Record<string, string>;
     isPhysical: boolean;
     user: {

@@ -9,6 +9,11 @@ declare class EffectPF2e<TParent extends ActorPF2e | null = ActorPF2e | null> ex
     get level(): number;
     get traits(): Set<EffectTrait>;
     get isExpired(): boolean;
+    get totalDuration(): number;
+    get remainingDuration(): {
+        expired: boolean;
+        remaining: number;
+    };
     /** Whether this effect emits an aura */
     get isAura(): boolean;
     get isIdentified(): boolean;

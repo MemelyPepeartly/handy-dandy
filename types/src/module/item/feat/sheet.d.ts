@@ -17,6 +17,8 @@ interface FeatSheetData extends ItemSheetDataPF2e<FeatPF2e> {
     actionTypes: ConfigPF2e["PF2E"]["actionTypes"];
     actionsNumber: ConfigPF2e["PF2E"]["actionsNumber"];
     frequencies: ConfigPF2e["PF2E"]["frequencies"];
+    prerequisites: string;
+    isFeat: boolean;
     mandatoryTakeOnce: boolean;
     hasLineageTrait: boolean;
     canHaveKeyOptions: boolean;

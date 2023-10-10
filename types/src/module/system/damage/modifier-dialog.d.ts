@@ -1,17 +1,23 @@
 /// <reference types="jquery" resolution-mode="require"/>
 /// <reference types="jquery" resolution-mode="require"/>
 /// <reference types="tooltipster" />
-import { DamageCategoryUnique, DamageFormulaData, DamageRollContext, DamageType } from "./types.ts";
+import { DamageDicePF2e, ModifierPF2e } from "@actor/modifiers.ts";
+import { BaseDamageData, DamageCategoryUnique, CreateDamageFormulaParams, DamageRollContext, DamageType } from "./types.ts";
 /**
  * Dialog for excluding certain modifiers before rolling damage.
  * @category Other
  */
 declare class DamageModifierDialog extends Application {
     #private;
-    formulaData: DamageFormulaData;
-    context: DamageRollContext;
+    base: BaseDamageData[];
+    /** The modifiers which are being edited. */
+    modifiers: ModifierPF2e[];
+    /** The damage dice that are being edited. */
+    dice: DamageDicePF2e[];
     /** The base damage type of this damage roll */
     baseDamageType: DamageType;
+    /** Relevant context for this roll, like roll options. */
+    context: Partial<DamageRollContext>;
     /** Is this critical damage? */
     isCritical: boolean;
     /** Was the roll button pressed? */
@@ -26,13 +32,12 @@ declare class DamageModifierDialog extends Application {
     close(options?: {
         force?: boolean;
     }): Promise<void>;
-    protected _getHeaderButtons(): ApplicationHeaderButton[];
     /** Overriden to add some additional first-render behavior */
     protected _injectHTML($html: JQuery<HTMLElement>): void;
 }
 interface DamageDialogParams {
-    formulaData: DamageFormulaData;
-    context: DamageRollContext;
+    damage: CreateDamageFormulaParams;
+    context: Partial<DamageRollContext>;
 }
 interface BaseData {
     label: string;
@@ -42,8 +47,9 @@ interface BaseData {
     damageType: string | null;
     typeLabel: string | null;
     category: DamageCategoryUnique | string | null;
+    categoryIcon: string | null;
     show: boolean;
-    icon: string;
+    icon: string | null;
 }
 interface DialogDiceData extends BaseData {
     diceLabel: string;
@@ -55,7 +61,6 @@ interface ModifierData extends BaseData {
 }
 interface DamageDialogData {
     appId: string;
-    baseFormula: string;
     modifiers: ModifierData[];
     dice: DialogDiceData[];
     isCritical: boolean;
@@ -65,7 +70,6 @@ interface DamageDialogData {
     damageSubtypes: Pick<ConfigPF2e["PF2E"]["damageCategories"], DamageCategoryUnique>;
     rollModes: Record<RollMode, string>;
     rollMode: RollMode | "roll" | undefined;
-    showRollDialogs: boolean;
     formula: string;
 }
 export { DamageModifierDialog };

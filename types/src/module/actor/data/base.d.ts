@@ -6,14 +6,14 @@ import type { StatisticModifier } from "@actor/modifiers.ts";
 import { ActorAlliance, AttributeString, SkillLongForm } from "@actor/types.ts";
 import type { ConsumablePF2e, MeleePF2e, WeaponPF2e } from "@item";
 import { ItemSourcePF2e } from "@item/data/index.ts";
-import { MigrationRecord, Rarity, Size, ValueAndMaybeMax, ZeroToTwo } from "@module/data.ts";
+import { DocumentSchemaRecord, Rarity, Size, ValueAndMaybeMax, ZeroToTwo } from "@module/data.ts";
 import { AutoChangeEntry } from "@module/rules/rule-element/ae-like.ts";
 import { AttackRollParams, DamageRollParams, RollParameters } from "@module/system/rolls.ts";
 import type { CheckRoll } from "@system/check/roll.ts";
 import type { DamageRoll } from "@system/damage/roll.ts";
 import { StatisticTraceData } from "@system/statistic/data.ts";
 import { ActorType } from "./index.ts";
-import type { Immunity, ImmunitySource, Resistance, ResistanceSource, Weakness, WeaknessSource } from "./iwr.ts";
+import type { ImmunityData, ImmunitySource, ResistanceData, ResistanceSource, WeaknessData, WeaknessSource } from "./iwr.ts";
 /** Base interface for all actor data */
 interface BaseActorSourcePF2e<TType extends ActorType, TSystemSource extends ActorSystemSource = ActorSystemSource> extends foundry.documents.ActorSource<TType, TSystemSource, ItemSourcePF2e> {
     flags: DeepPartial<ActorFlagsPF2e>;
@@ -32,12 +32,7 @@ interface ActorSystemSource {
     attributes: ActorAttributesSource;
     traits?: ActorTraitsSource<string>;
     /** A record of this actor's current world schema version as well a log of the last migration to occur */
-    _migration: MigrationRecord;
-    /** Legacy location of `MigrationRecord` */
-    schema?: Readonly<{
-        version: number | null;
-        lastMigration: object | null;
-    }>;
+    schema: DocumentSchemaRecord;
 }
 interface ActorAttributesSource {
     hp?: ActorHitPointsSource;
@@ -71,9 +66,9 @@ interface ActorAttributes extends ActorAttributesSource {
     ac?: {
         value: number;
     };
-    immunities: Immunity[];
-    weaknesses: Weakness[];
-    resistances: Resistance[];
+    immunities: ImmunityData[];
+    weaknesses: WeaknessData[];
+    resistances: ResistanceData[];
     initiative?: InitiativeData;
     shield?: {
         raised: boolean;
@@ -214,7 +209,7 @@ interface StrikeData extends StatisticModifier {
     ready: boolean;
     /** Alias for `attack`. */
     roll?: RollFunction<AttackRollParams>;
-    /** Roll to attack with the given strike (with no MAP; see `variants` for MAPs.) */
+    /** Roll to attack with the given strike (with no MAP penalty; see `variants` for MAP penalties.) */
     attack?: RollFunction<AttackRollParams>;
     /** Roll normal (non-critical) damage for this weapon. */
     damage?: DamageRollFunction;

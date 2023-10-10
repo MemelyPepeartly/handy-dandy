@@ -80,8 +80,8 @@ declare const RUNE_DATA: {
     armor: {
         property: {
             shadow: ArmorPropertyRuneData<"shadow">;
-            ethereal: ArmorPropertyRuneData<"ethereal">;
             portable: ArmorPropertyRuneData<"portable">;
+            ethereal: ArmorPropertyRuneData<"ethereal">;
             acidResistant: ArmorPropertyRuneData<"acidResistant">;
             advancing: ArmorPropertyRuneData<"advancing">;
             aimAiding: ArmorPropertyRuneData<"aimAiding">;

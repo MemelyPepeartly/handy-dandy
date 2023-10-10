@@ -1,8 +1,8 @@
 /// <reference types="jquery" resolution-mode="require"/>
 /// <reference types="jquery" resolution-mode="require"/>
 /// <reference types="tooltipster" />
-import { ActorPF2e } from "@actor";
 import { AfflictionPF2e, ConditionPF2e, EffectPF2e } from "@item";
+import { ActorPF2e } from "@actor";
 export declare class EffectsPanel extends Application {
     #private;
     private get token();

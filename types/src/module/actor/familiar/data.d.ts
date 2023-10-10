@@ -3,7 +3,7 @@ import type { CreatureSensePF2e } from "@actor/creature/sense.ts";
 import { AttributeString } from "@actor/types.ts";
 import { StatisticTraceData } from "@system/statistic/index.ts";
 type FamiliarSource = BaseCreatureSource<"familiar", FamiliarSystemSource>;
-interface FamiliarSystemSource extends CreatureSystemSource {
+interface FamiliarSystemSource extends Pick<CreatureSystemSource, "schema"> {
     details: FamiliarDetailsSource;
     attributes: FamiliarAttributesSource;
     master: {
@@ -12,18 +12,7 @@ interface FamiliarSystemSource extends CreatureSystemSource {
     };
     customModifiers?: never;
     resources?: never;
-    saves?: never;
-    skills?: never;
     traits?: never;
-}
-interface FamiliarAttributesSource {
-    hp: {
-        value: number;
-    };
-    initiative?: never;
-    immunities?: never;
-    weaknesses?: never;
-    resistances?: never;
 }
 interface FamiliarDetailsSource extends CreatureDetailsSource {
     creature: {
@@ -44,7 +33,16 @@ interface FamiliarSystemData extends Omit<FamiliarSystemSource, SourceOmission>,
     };
     traits: FamiliarTraitsData;
 }
-type SourceOmission = "attributes" | "customModifiers" | "details" | "toggles" | "resources" | "saves" | "skills" | "traits";
+type SourceOmission = "attributes" | "customModifiers" | "details" | "toggles" | "resources" | "traits";
+interface FamiliarAttributesSource {
+    hp: {
+        value: number;
+    };
+    initiative?: never;
+    immunities?: never;
+    weaknesses?: never;
+    resistances?: never;
+}
 interface FamiliarAttributes extends CreatureAttributes {
     ac: {
         value: number;

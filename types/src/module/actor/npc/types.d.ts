@@ -14,7 +14,9 @@ interface ActionsDetails {
 }
 interface NPCActionSheetData {
     passive: ActionsDetails;
-    active: ActionsDetails;
+    free: ActionsDetails;
+    reaction: ActionsDetails;
+    action: ActionsDetails;
 }
 /** Highlight such a statistic if adjusted by data preparation */
 interface WithAdjustments {
@@ -101,7 +103,7 @@ interface NPCSpeedSheetData {
     adjustedHigher: boolean;
     adjustedLower: boolean;
 }
-type NPCSheetItemData<TItem extends ItemPF2e<NPCPF2e>> = Omit<RawObject<TItem>, "traits"> & {
+type NPCSheetItemData<TItem extends ItemPF2e<NPCPF2e>> = RawObject<TItem> & {
     glyph: string;
     imageUrl: string;
     traits: {

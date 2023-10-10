@@ -147,6 +147,9 @@ interface NPCAttributes extends Omit<NPCAttributesSource, "initiative" | "immuni
     classOrSpellDC: {
         value: number;
     };
+    /** Rarely needed for an NPC but always available! */
+    bonusEncumbranceBulk: number;
+    bonusLimitBulk: number;
 }
 interface NPCDetails extends NPCDetailsSource, CreatureDetails {
     level: {
@@ -189,6 +192,7 @@ interface NPCHitPoints extends HitPointsStatistic {
 /** Perception data with an additional "base" value */
 interface NPCPerception extends PerceptionData {
     rank?: number;
+    base?: number;
 }
 /** Skill data with a "base" value and whether the skill should be rendered (visible) */
 interface NPCSkillData extends StatisticTraceData {

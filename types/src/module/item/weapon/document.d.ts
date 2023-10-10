@@ -15,8 +15,8 @@ declare class WeaponPF2e<TParent extends ActorPF2e | null = ActorPF2e | null> ex
     get baseType(): BaseWeaponType | null;
     get group(): WeaponGroup | null;
     get category(): WeaponCategory;
-    /** The default attribute used in attack rolls */
-    get defaultAttribute(): AttributeString;
+    /** The default ability used in attack rolls */
+    get defaultAbility(): AttributeString;
     get hands(): "0" | "1" | "1+" | "2";
     /** The maximum range of this weapon: `null` if melee, and usually 6 * range increment if ranged */
     get maxRange(): number | null;
@@ -75,9 +75,7 @@ declare class WeaponPF2e<TParent extends ActorPF2e | null = ActorPF2e | null> ex
     /** Generate a clone of this combination weapon with its melee usage overlain, or `null` if not applicable */
     private toMeleeUsage;
     /** Generate a melee item from this weapon for use by NPCs */
-    toNPCAttacks(this: WeaponPF2e<ActorPF2e>, { keepId }?: {
-        keepId?: boolean | undefined;
-    }): MeleePF2e<ActorPF2e>[];
+    toNPCAttacks(this: WeaponPF2e<ActorPF2e>): MeleePF2e<ActorPF2e>[];
     /** Consume a unit of ammunition used by this weapon */
     consumeAmmo(): Promise<void>;
     protected _preUpdate(changed: DeepPartial<this["_source"]>, options: DocumentUpdateContext<TParent>, user: UserPF2e): Promise<boolean | void>;

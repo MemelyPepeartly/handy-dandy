@@ -1,21 +1,21 @@
-import { Weakness } from "@actor/data/iwr.ts";
+import { WeaknessData } from "@actor/data/iwr.ts";
 import { WeaknessType } from "@actor/types.ts";
-import type { StrictArrayField } from "@system/schema-data-fields.ts";
+import type { ArrayField, StringField } from "types/foundry/common/data/fields.d.ts";
 import { ResolvableValueField } from "../data.ts";
-import { IWRException, IWRExceptionField, IWRRuleElement, IWRRuleSchema } from "./base.ts";
+import { IWRRuleElement, IWRRuleSchema } from "./base.ts";
 /** @category RuleElement */
 declare class WeaknessRuleElement extends IWRRuleElement<WeaknessRuleSchema> {
     static defineSchema(): WeaknessRuleSchema;
     static get dictionary(): Record<WeaknessType, string>;
-    get property(): Weakness[];
-    getIWR(value: number): Weakness[];
+    get property(): WeaknessData[];
+    getIWR(value: number): WeaknessData[];
 }
 interface WeaknessRuleElement extends IWRRuleElement<WeaknessRuleSchema>, ModelPropsFromSchema<WeaknessRuleSchema> {
     type: WeaknessType[];
-    exceptions: IWRException<WeaknessType>[];
+    exceptions: WeaknessType[];
 }
 type WeaknessRuleSchema = Omit<IWRRuleSchema, "exceptions"> & {
     value: ResolvableValueField<true, false, false>;
-    exceptions: StrictArrayField<IWRExceptionField>;
+    exceptions: ArrayField<StringField<WeaknessType, WeaknessType, true, false, false>>;
 };
 export { WeaknessRuleElement };

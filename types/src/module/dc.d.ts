@@ -14,7 +14,11 @@ interface DCOptions {
     proficiencyWithoutLevel?: boolean;
     rarity?: Rarity;
 }
-/** Level-based DCs */
+/**
+ * Normal Level Based DCs
+ * @param level
+ * @param proficiencyWithoutLevel
+ */
 declare function calculateDC(level: number, { proficiencyWithoutLevel, rarity }?: DCOptions): number;
 declare function calculateSimpleDC(rank: ProficiencyRank, { proficiencyWithoutLevel }?: DCOptions): number;
 declare function calculateSpellDC(spellLevel: number, { proficiencyWithoutLevel }?: DCOptions): number;

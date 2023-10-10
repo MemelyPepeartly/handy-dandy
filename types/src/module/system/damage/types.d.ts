@@ -1,6 +1,7 @@
 import { DamageDicePF2e, ModifierPF2e } from "@actor/modifiers.ts";
 import { ResistanceType, RollTarget, StrikeSelf } from "@actor/types.ts";
 import { ZeroToTwo } from "@module/data.ts";
+import { RollNotePF2e } from "@module/notes.ts";
 import { DegreeOfSuccessString } from "@system/degree-of-success.ts";
 import { BaseRollContext } from "@system/rolls.ts";
 import { DamageRoll } from "./roll.ts";
@@ -46,7 +47,7 @@ interface DamageRollContext extends BaseRollContext {
     /** The number of MAP increases from the preceding check */
     mapIncreases?: ZeroToTwo;
 }
-interface DamageFormulaData {
+interface CreateDamageFormulaParams {
     base: BaseDamageData[];
     dice: DamageDicePF2e[];
     modifiers: ModifierPF2e[];
@@ -55,7 +56,7 @@ interface DamageFormulaData {
         max: number | null;
     }[];
 }
-interface ResolvedDamageFormulaData extends DamageFormulaData {
+interface ResolvedDamageFormulaData extends CreateDamageFormulaParams {
     formula: Record<DegreeOfSuccessString, string | null>;
     breakdown: Record<DegreeOfSuccessString, string[]>;
 }
@@ -82,12 +83,14 @@ interface WeaponBaseDamageData extends BaseDamageData {
 }
 interface BaseDamageTemplate {
     name: string;
+    notes: RollNotePF2e[];
     traits: string[];
     materials: MaterialDamageEffect[];
     modifiers?: (ModifierPF2e | DamageDicePF2e)[];
 }
 interface WeaponDamageTemplate extends BaseDamageTemplate {
     damage: ResolvedDamageFormulaData;
+    domains: string[];
 }
 interface SpellDamageTemplate extends BaseDamageTemplate {
     damage: {
@@ -98,4 +101,4 @@ interface SpellDamageTemplate extends BaseDamageTemplate {
 type AfflictionDamageTemplate = SpellDamageTemplate;
 type SimpleDamageTemplate = SpellDamageTemplate;
 type DamageTemplate = WeaponDamageTemplate | SpellDamageTemplate | AfflictionDamageTemplate | SimpleDamageTemplate;
-export type { AfflictionDamageTemplate, BaseDamageData, DamageFormulaData, CriticalInclusion, DamageCategory, DamageCategoryRenderData, DamageCategoryUnique, DamageDieSize, DamagePartialTerm, DamageRollContext, DamageRollRenderData, DamageTemplate, DamageType, DamageTypeRenderData, MaterialDamageEffect, SimpleDamageTemplate, SpellDamageTemplate, WeaponBaseDamageData, WeaponDamageTemplate, };
+export type { AfflictionDamageTemplate, BaseDamageData, CreateDamageFormulaParams, CriticalInclusion, DamageCategory, DamageCategoryRenderData, DamageCategoryUnique, DamageDieSize, DamagePartialTerm, DamageRollContext, DamageRollRenderData, DamageTemplate, DamageType, DamageTypeRenderData, MaterialDamageEffect, SimpleDamageTemplate, SpellDamageTemplate, WeaponBaseDamageData, WeaponDamageTemplate, };

@@ -16,7 +16,7 @@ import { DamageType } from "@system/damage/types.ts";
 import { CreatureSheetPF2e } from "../creature/sheet.ts";
 import { CharacterConfig } from "./config.ts";
 import { CraftingEntry, CraftingFormula } from "./crafting/index.ts";
-import { CharacterBiography, CharacterSaveData, CharacterStrike, CharacterSystemData, ClassDCData, MartialProficiency } from "./data.ts";
+import { CharacterBiography, CharacterSaveData, CharacterStrike, CharacterSystemData, ClassDCData } from "./data.ts";
 import { CharacterPF2e } from "./document.ts";
 import { ElementalBlastConfig } from "./elemental-blast.ts";
 import { FeatGroup } from "./feats.ts";
@@ -92,6 +92,8 @@ interface CharacterSheetData<TActor extends CharacterPF2e = CharacterPF2e> exten
     ancestry: AncestryPF2e<CharacterPF2e> | null;
     heritage: HeritagePF2e<CharacterPF2e> | null;
     background: BackgroundPF2e<CharacterPF2e> | null;
+    adjustedBonusEncumbranceBulk: boolean;
+    adjustedBonusLimitBulk: boolean;
     attributeBoostsAllocated: boolean;
     biography: CharacterBiography;
     class: ClassPF2e<CharacterPF2e> | null;
@@ -110,7 +112,6 @@ interface CharacterSheetData<TActor extends CharacterPF2e = CharacterPF2e> exten
     /** This actor has actual containers for stowing, rather than just containers serving as a UI convenience */
     hasRealContainers: boolean;
     magicTraditions: Record<MagicTradition, string>;
-    martialProficiencies: Record<"attacks" | "defenses", Record<string, MartialProficiency>>;
     options: CharacterSheetOptions;
     preparationType: Object;
     showPFSTab: boolean;
@@ -163,5 +164,4 @@ interface ElementalBlastSheetConfig extends ElementalBlastConfig {
         };
     };
 }
-export { CharacterSheetPF2e };
-export type { CharacterSheetData, CharacterSheetTabVisibility };
+export { CharacterSheetPF2e, type CharacterSheetTabVisibility };

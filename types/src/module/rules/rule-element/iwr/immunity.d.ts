@@ -1,21 +1,21 @@
-import { Immunity } from "@actor/data/iwr.ts";
+import { ImmunityData } from "@actor/data/iwr.ts";
 import { ImmunityType } from "@actor/types.ts";
-import type { StrictArrayField } from "@system/schema-data-fields.ts";
-import { IWRRuleElement, IWRRuleSchema, type IWRExceptionField, IWRException } from "./base.ts";
+import type { ArrayField, StringField } from "types/foundry/common/data/fields.d.ts";
+import { IWRRuleElement, IWRRuleSchema } from "./base.ts";
 /** @category RuleElement */
 declare class ImmunityRuleElement extends IWRRuleElement<ImmunityRuleSchema> {
     /** Immunities don't take values */
     readonly value: null;
     static defineSchema(): ImmunityRuleSchema;
     static get dictionary(): Record<ImmunityType, string>;
-    get property(): Immunity[];
-    getIWR(): Immunity[];
+    get property(): ImmunityData[];
+    getIWR(): ImmunityData[];
 }
 interface ImmunityRuleElement extends IWRRuleElement<ImmunityRuleSchema>, ModelPropsFromSchema<ImmunityRuleSchema> {
     type: ImmunityType[];
-    exceptions: IWRException<ImmunityType>[];
+    exceptions: ImmunityType[];
 }
 type ImmunityRuleSchema = Omit<IWRRuleSchema, "exceptions"> & {
-    exceptions: StrictArrayField<IWRExceptionField<ImmunityType>>;
+    exceptions: ArrayField<StringField<ImmunityType, ImmunityType, true, false, false>>;
 };
 export { ImmunityRuleElement };

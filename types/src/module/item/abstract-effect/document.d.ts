@@ -19,11 +19,6 @@ declare abstract class AbstractEffectPF2e<TParent extends ActorPF2e | null = Act
     get isLocked(): boolean;
     /** Whether this effect originated from a spell */
     get fromSpell(): boolean;
-    get totalDuration(): number;
-    get remainingDuration(): {
-        expired: boolean;
-        remaining: number;
-    };
     getRollOptions(prefix?: string): string[];
     prepareBaseData(): void;
     /** Set a self roll option for this effect */

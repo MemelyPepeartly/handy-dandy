@@ -17,7 +17,6 @@ import type { CanvasPF2e, EffectsCanvasGroupPF2e } from "@module/canvas/index.ts
 import type { StatusEffects } from "@module/canvas/status-effects.ts";
 import type { ChatMessagePF2e } from "@module/chat-message/index.ts";
 import type { ActorsPF2e } from "@module/collection/actors.ts";
-import type { CombatantPF2e, EncounterPF2e } from "@module/encounter/index.ts";
 import type { MacroPF2e } from "@module/macro.ts";
 import type { RuleElementPF2e, RuleElements } from "@module/rules/index.ts";
 import type { UserPF2e } from "@module/user/index.ts";
@@ -28,15 +27,14 @@ import type { DicePF2e } from "@scripts/dice.ts";
 import type { calculateXP, editPersistent, launchTravelSheet, perceptionForSelected, rollActionMacro, rollItemMacro, stealthForSelected, xpFromEncounter } from "@scripts/macros/index.ts";
 import type { remigrate } from "@scripts/system/remigrate.ts";
 import type { CheckPF2e } from "@system/check/index.ts";
-import type { ConditionManager } from "@system/conditions/manager.ts";
 import type { EffectTracker } from "@system/effect-tracker.ts";
 import type { ModuleArt } from "@system/module-art.ts";
 import type { CustomDamageData, HomebrewTag, HomebrewTraitSettingsKey } from "@system/settings/homebrew/index.ts";
 import type { TextEditorPF2e } from "@system/text-editor.ts";
 import type { sluggify } from "@util";
-import type EnJSON from "static/lang/en.json";
-import type ReEnJSON from "static/lang/re-en.json";
 import type Peggy from "peggy";
+import type { CombatantPF2e, EncounterPF2e } from "./module/encounter/index.js";
+import type { ConditionManager } from "./module/system/conditions/index.js";
 interface GamePF2e extends Game<ActorPF2e<null>, ActorsPF2e<ActorPF2e<null>>, ChatMessagePF2e, EncounterPF2e, ItemPF2e<null>, MacroPF2e, ScenePF2e, UserPF2e> {
     pf2e: {
         actions: Record<string, Function>;
@@ -124,8 +122,8 @@ declare global {
         get(module: "pf2e", setting: "automaticBonusVariant"): "noABP" | "ABPFundamentalPotency" | "ABPRulesAsWritten";
         get(module: "pf2e", setting: "dualClassVariant"): boolean;
         get(module: "pf2e", setting: "freeArchetypeVariant"): boolean;
-        get(module: "pf2e", setting: "proficiencyVariant"): boolean;
-        get(module: "pf2e", setting: "staminaVariant"): boolean;
+        get(module: "pf2e", setting: "proficiencyVariant"): "ProficiencyWithLevel" | "ProficiencyWithoutLevel";
+        get(module: "pf2e", setting: "staminaVariant"): 0 | 1;
         get(module: "pf2e", setting: "proficiencyUntrainedModifier"): number;
         get(module: "pf2e", setting: "proficiencyTrainedModifier"): number;
         get(module: "pf2e", setting: "proficiencyExpertModifier"): number;
@@ -187,8 +185,6 @@ declare global {
     }
     const BUILD_MODE: "development" | "production";
     const CONDITION_SOURCES: ConditionSource[];
-    const EN_JSON: typeof EnJSON;
-    const RE_EN_JSON: typeof ReEnJSON;
     const ROLL_PARSER: Peggy.Parser;
 }
 export {};

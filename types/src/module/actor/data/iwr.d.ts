@@ -1,39 +1,32 @@
 import { ImmunityType, IWRType, ResistanceType, WeaknessType } from "@actor/types.ts";
-import { IWRException } from "@module/rules/rule-element/iwr/base.ts";
 import { PredicatePF2e, PredicateStatement } from "@system/predication.ts";
-declare abstract class IWR<TType extends IWRType> {
-    #private;
+declare abstract class IWRData<TType extends IWRType> {
     readonly type: TType;
-    readonly exceptions: IWRException<TType>[];
-    /** A definition for a custom IWR */
-    readonly definition: PredicatePF2e | null;
+    readonly exceptions: TType[];
     source: string | null;
     protected abstract readonly typeLabels: Record<TType, string>;
     constructor(data: IWRConstructorData<TType>);
     abstract get label(): string;
     /** A label showing the type, exceptions, and doubleVs but no value (in case of weaknesses and resistances) */
     get applicationLabel(): string;
-    /** A label consisting of just the type */
     get typeLabel(): string;
-    protected describe(iwrType: IWRException<TType>): PredicateStatement[];
+    protected describe(iwrType: TType): PredicateStatement[];
     get predicate(): PredicatePF2e;
     toObject(): Readonly<IWRDisplayData<TType>>;
     /** Construct an object argument for Localization#format (see also PF2E.Actor.IWR.CompositeLabel in en.json) */
-    protected createFormatData({ list, prefix, }: {
-        list: IWRException<TType>[];
+    protected createFormatData({ list, prefix }: {
+        list: TType[];
         prefix: string;
     }): Record<string, string>;
     test(statements: string[] | Set<string>): boolean;
 }
 type IWRConstructorData<TType extends IWRType> = {
     type: TType;
-    exceptions?: IWRException<TType>[];
-    customLabel?: Maybe<string>;
-    definition?: Maybe<PredicatePF2e>;
+    exceptions?: TType[];
     source?: string | null;
 };
-type IWRDisplayData<TType extends IWRType> = Pick<IWR<TType>, "type" | "exceptions" | "source" | "label">;
-declare class Immunity extends IWR<ImmunityType> implements ImmunitySource {
+type IWRDisplayData<TType extends IWRType> = Pick<IWRData<TType>, "type" | "exceptions" | "source" | "label">;
+declare class ImmunityData extends IWRData<ImmunityType> implements ImmunitySource {
     protected readonly typeLabels: {
         acid: string;
         adamantine: string;
@@ -52,7 +45,6 @@ declare class Immunity extends IWR<ImmunityType> implements ImmunitySource {
         controlled: string;
         "critical-hits": string;
         curse: string;
-        custom: string;
         darkwood: string;
         dazzled: string;
         deafened: string;
@@ -89,6 +81,7 @@ declare class Immunity extends IWR<ImmunityType> implements ImmunitySource {
         "misfortune-effects": string;
         mithral: string;
         necromancy: string;
+        negative: string;
         "non-magical": string;
         "nonlethal-attacks": string;
         "object-immunities": string;
@@ -96,13 +89,13 @@ declare class Immunity extends IWR<ImmunityType> implements ImmunitySource {
         olfactory: string;
         orichalcum: string;
         paralyzed: string;
-        "persistent-damage": string;
         petrified: string;
         physical: string;
         piercing: string;
         plant: string;
         poison: string;
         polymorph: string;
+        positive: string;
         possession: string;
         precision: string;
         prone: string;
@@ -127,21 +120,18 @@ declare class Immunity extends IWR<ImmunityType> implements ImmunitySource {
         "unarmed-attacks": string;
         unconscious: string;
         visual: string;
-        vitality: string;
-        void: string;
         water: string;
         wood: string;
-        wounded: string;
     };
     /** No value on immunities, so the full label is the same as the application label */
     get label(): string;
 }
 interface IWRSource<TType extends IWRType = IWRType> {
     type: TType;
-    exceptions?: IWRException<TType>[];
+    exceptions?: TType[];
 }
 type ImmunitySource = IWRSource<ImmunityType>;
-declare class Weakness extends IWR<WeaknessType> implements WeaknessSource {
+declare class WeaknessData extends IWRData<WeaknessType> implements WeaknessSource {
     protected readonly typeLabels: {
         acid: string;
         adamantine: string;
@@ -155,7 +145,6 @@ declare class Weakness extends IWR<WeaknessType> implements WeaknessSource {
         cold: string;
         "cold-iron": string;
         "critical-hits": string;
-        custom: string;
         darkwood: string;
         earth: string;
         electricity: string;
@@ -173,6 +162,7 @@ declare class Weakness extends IWR<WeaknessType> implements WeaknessSource {
         mental: string;
         metal: string;
         mithral: string;
+        negative: string;
         "non-magical": string;
         "nonlethal-attacks": string;
         orichalcum: string;
@@ -180,6 +170,7 @@ declare class Weakness extends IWR<WeaknessType> implements WeaknessSource {
         piercing: string;
         plant: string;
         poison: string;
+        positive: string;
         precision: string;
         radiation: string;
         salt: string;
@@ -192,8 +183,6 @@ declare class Weakness extends IWR<WeaknessType> implements WeaknessSource {
         "splash-damage": string;
         "unarmed-attacks": string;
         "vampire-weaknesses": string;
-        vitality: string;
-        void: string;
         vorpal: string;
         "vorpal-fear": string;
         "vulnerable-to-sunlight": string;
@@ -210,11 +199,11 @@ declare class Weakness extends IWR<WeaknessType> implements WeaknessSource {
     get label(): string;
     toObject(): Readonly<WeaknessDisplayData>;
 }
-type WeaknessDisplayData = IWRDisplayData<WeaknessType> & Pick<Weakness, "value">;
+type WeaknessDisplayData = IWRDisplayData<WeaknessType> & Pick<WeaknessData, "value">;
 interface WeaknessSource extends IWRSource<WeaknessType> {
     value: number;
 }
-declare class Resistance extends IWR<ResistanceType> implements ResistanceSource {
+declare class ResistanceData extends IWRData<ResistanceType> implements ResistanceSource {
     protected readonly typeLabels: {
         acid: string;
         adamantine: string;
@@ -227,7 +216,6 @@ declare class Resistance extends IWR<ResistanceType> implements ResistanceSource
         cold: string;
         "cold-iron": string;
         "critical-hits": string;
-        custom: string;
         "damage-from-spells": string;
         darkwood: string;
         earth: string;
@@ -244,6 +232,7 @@ declare class Resistance extends IWR<ResistanceType> implements ResistanceSource
         mental: string;
         metal: string;
         mithral: string;
+        negative: string;
         "non-magical": string;
         nonlethal: string;
         "nonlethal-attacks": string;
@@ -252,6 +241,7 @@ declare class Resistance extends IWR<ResistanceType> implements ResistanceSource
         piercing: string;
         plant: string;
         poison: string;
+        positive: string;
         precision: string;
         "protean-anatomy": string;
         radiation: string;
@@ -263,8 +253,6 @@ declare class Resistance extends IWR<ResistanceType> implements ResistanceSource
         spells: string;
         spirit: string;
         "unarmed-attacks": string;
-        vitality: string;
-        void: string;
         vorpal: string;
         "vorpal-adamantine": string;
         warpglass: string;
@@ -274,10 +262,10 @@ declare class Resistance extends IWR<ResistanceType> implements ResistanceSource
         wood: string;
     };
     value: number;
-    readonly doubleVs: IWRException<ResistanceType>[];
+    readonly doubleVs: ResistanceType[];
     constructor(data: IWRConstructorData<ResistanceType> & {
         value: number;
-        doubleVs?: IWRException<ResistanceType>[];
+        doubleVs?: ResistanceType[];
     });
     get label(): string;
     get applicationLabel(): string;
@@ -285,12 +273,12 @@ declare class Resistance extends IWR<ResistanceType> implements ResistanceSource
     /** Get the doubled value of this resistance if present and applicable to a given instance of damage */
     getDoubledValue(damageDescription: Set<string>): number;
 }
-type ResistanceDisplayData = IWRDisplayData<ResistanceType> & Pick<Resistance, "value" | "doubleVs">;
+type ResistanceDisplayData = IWRDisplayData<ResistanceType> & Pick<ResistanceData, "value" | "doubleVs">;
 interface ResistanceSource extends IWRSource<ResistanceType> {
     value: number;
-    doubleVs?: IWRException<ResistanceType>[];
+    doubleVs?: ResistanceType[];
 }
 /** Weaknesses to things that "[don't] normally deal damage, such as water": applied separately as untyped damage */
 declare const NON_DAMAGE_WEAKNESSES: Set<WeaknessType>;
-export { Immunity, NON_DAMAGE_WEAKNESSES, Resistance, Weakness };
+export { ImmunityData, NON_DAMAGE_WEAKNESSES, ResistanceData, WeaknessData };
 export type { ImmunitySource, IWRSource, ResistanceSource, WeaknessSource };

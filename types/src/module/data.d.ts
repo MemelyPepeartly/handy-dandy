@@ -47,25 +47,26 @@ interface ValueAndMaybeMax {
     value: number;
     max?: number;
 }
-interface ValueAndMax extends Required<ValueAndMaybeMax> {
-}
+type ValueAndMax = Required<ValueAndMaybeMax>;
 declare function goesToEleven(value: number): value is ZeroToEleven;
 /** The tracked schema data of actors and items */
-interface NewDocumentMigrationRecord {
+interface NewDocumentSchemaRecord {
     version: null;
-    previous: null;
+    lastMigration: null;
 }
-interface MigratedDocumentMigrationRecord {
+interface MigratedDocumentSchemaRecord {
     version: number;
-    previous: {
-        schema: number | null;
-        system?: string;
-        foundry?: string;
+    lastMigration: {
+        version: {
+            schema: number | null;
+            system?: string;
+            foundry?: string;
+        };
     } | null;
 }
-type MigrationRecord = NewDocumentMigrationRecord | MigratedDocumentMigrationRecord;
+type DocumentSchemaRecord = NewDocumentSchemaRecord | MigratedDocumentSchemaRecord;
 export declare const PROFICIENCY_RANKS: readonly ["untrained", "trained", "expert", "master", "legendary"];
 export declare const MATH_FUNCTION_NAMES: Set<MathFunctionName>;
 type EnfolderableDocumentPF2e = ActorPF2e<null> | ItemPF2e<null> | Exclude<EnfolderableDocument, Actor<null> | Item<null>>;
 export { RARITIES, SIZES, SIZE_SLUGS, goesToEleven };
-export type { EnfolderableDocumentPF2e, LabeledNumber, LabeledString, LabeledValue, MigrationRecord, OneToFive, OneToFour, OneToTen, OneToThree, Rarity, Size, TraitsWithRarity, TwoToThree, TypeAndValue, ValueAndMax, ValueAndMaybeMax, ValuesList, ZeroToEleven, ZeroToFive, ZeroToFour, ZeroToTen, ZeroToThree, ZeroToTwo, };
+export type { DocumentSchemaRecord, EnfolderableDocumentPF2e, LabeledNumber, LabeledString, LabeledValue, OneToFive, OneToFour, OneToTen, OneToThree, Rarity, Size, TraitsWithRarity, TwoToThree, TypeAndValue, ValueAndMax, ValueAndMaybeMax, ValuesList, ZeroToEleven, ZeroToFive, ZeroToFour, ZeroToTen, ZeroToThree, ZeroToTwo, };

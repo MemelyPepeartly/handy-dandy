@@ -18,6 +18,7 @@ declare abstract class ABCSheetPF2e<TItem extends ABCItem> extends ItemSheetPF2e
     activateListeners($html: JQuery): void;
 }
 interface ABCSheetData<TItem extends ABCItem> extends ItemSheetDataPF2e<TItem> {
+    hasDetails: true;
     features: {
         key: string;
         item: FeatureSheetData;
