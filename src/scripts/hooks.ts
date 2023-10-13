@@ -1,13 +1,13 @@
 import { MODULENAME } from "./const.js";
-import { loadHandlebarsTemplates, registerHandlebarsHelpers, registerHandlebarsPartials } from "./helpers/handlebar-helper.js";
-import { logInfo, pushNotification } from "./utils.js";
+import { registerHandlebarsHelpers, registerHandlebarsPartials, loadHandlebarsTemplates } from "./helpers/handlebar-helper.js";
+import { logInfo } from "./utils.js";
 
 // Initialize module
-Hooks.once("init", async (_actor: Actor) => {
+Hooks.once("init", async (_actor: Actor<any>) => {
     logInfo("Handy Dandy | Initializing handy-dandy settings");
 
     // Register custom module settings
-    (game as Game).settings.register(MODULENAME, "GPTApiKey", {
+    game.settings.register(MODULENAME, "GPTApiKey", {
         name: "GPT API Key",
         hint: "Insert your GPT API Key here",
         scope: "client",
@@ -30,7 +30,7 @@ Hooks.on("ready", () => {
     
 });
 
-Hooks.on("renderActorSheet", async (sheet: ActorSheet, $html: JQuery) => {
+Hooks.on("renderActorSheet", async (sheet: ActorSheet<any, any>, $html: JQuery) => {
     logInfo("Handy Dandy | renderActorSheet hook called", sheet, $html);
 
     logInfo("renderActorSheetHook called", sheet, $html);
