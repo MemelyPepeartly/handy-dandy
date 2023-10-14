@@ -21,10 +21,10 @@
     "scripts/hooks.js",
     "scripts/utils.js",
     "scripts/const.js",
+    "scripts/handy-dandy.js",
 
     "scripts/ai/models.js",
 
-    "scripts/helpers/ai-helper.js",
     "scripts/helpers/handlebar-helper.js"
   ],
   "styles": [
