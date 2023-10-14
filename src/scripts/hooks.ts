@@ -1,15 +1,14 @@
-import { MODULENAME } from "./const.js";
+import { MODULEID } from "./const.js";
 import { registerHandlebarsHelpers, registerHandlebarsPartials, loadHandlebarsTemplates } from "./helpers/handlebar-helper.js";
 import { logInfo } from "./utils.js";
+import { HandyDandy } from "./handy-dandy.js";
 
 // Initialize module
-Hooks.once("init", (_actor: Actor) => {
+Hooks.once("init", async (_actor: Actor) => {
     logInfo("Handy Dandy | Initializing handy-dandy settings");
 
-    var game = Game as any;
-
     // Register custom module settings
-    game.settings.register(MODULENAME, "GPTApiKey", {
+    (game as Game).settings.register(MODULEID, "GPTApiKey", {
         name: "GPT API Key",
         hint: "Insert your GPT API Key here",
         scope: "client",
@@ -18,9 +17,9 @@ Hooks.once("init", (_actor: Actor) => {
         default: ""
     });
 
-    registerHandlebarsHelpers();
-    registerHandlebarsPartials();
-    loadHandlebarsTemplates();
+    await registerHandlebarsHelpers();
+    await registerHandlebarsPartials();
+    await loadHandlebarsTemplates();
 });
 
 Hooks.on('init', () => {
@@ -29,7 +28,7 @@ Hooks.on('init', () => {
 
 Hooks.on("ready", () => {
     logInfo("Handy Dandy | Ready hook called");
-    
+
 });
 
 Hooks.on("renderActorSheet", async (sheet: ActorSheet<any, any>, $html: JQuery) => {
@@ -46,24 +45,18 @@ Hooks.on("renderActorSheet", async (sheet: ActorSheet<any, any>, $html: JQuery) 
     }
 
     // Only add the button if the user can update the actor
-    if(!actor.canUserModify(game["user"], "update")) {
+    if (!actor.canUserModify(game["user"], "update")) {
         return;
     }
 
     // Add the button
     let element = $html.find(".window-header .window-title");
     let button = $(`<a class="popout" style><i class="fas fa-book"></i>Handy Dandy</a>`);
-    let template = "modules/handy-dandy/templates/handy-dandy.hbs";
-    let content = await renderTemplate(template, {});
-    
+
     // On click
     button.on("click", async () => {
-        
-        new Dialog({
-            title: "Handy Dandy",
-            content: content,
-            buttons: {}
-        }).render(true);             
+        var thing = new HandyDandy();
+        thing.render(true);
     })
     element.after(button);
 });
