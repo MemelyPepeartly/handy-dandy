@@ -1,4 +1,4 @@
-import { MODULENAME } from "./const.js";
+import { MODULEID } from "./const.js";
 
 export function logTrace(...args) {
     log(0, ...args);
@@ -55,5 +55,5 @@ function log(logLevel = 2, ...args) {
 }
 
 export function pushNotification(message: any, type: "info" | "error" | "warning" = "info") {
-    (ui as any).notifications.notify(`${MODULENAME} | ${message}`, type);
+    ui.notifications.notify(`${MODULEID} | ${message}`, type);
 }
