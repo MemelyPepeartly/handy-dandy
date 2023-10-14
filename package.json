@@ -15,7 +15,7 @@
     "archiver": "^5.0.0",
     "chalk": "^4.1.2",
     "del": "^6.1.1",
-    "foundry-types": "file:types/types/foundry",
+    "foundry-vtt-types": "github:MemelyPepeartly/foundry-vtt-types#semver:^1.1.0",
     "fs-extra": "^9.0.1",
     "glob": "^7.1.7",
     "gulp": "^4.0.2",

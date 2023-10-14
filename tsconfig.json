@@ -12,55 +12,19 @@
       "dom.iterable",
       "esnext"
     ],
+    "types": ["node", "jquery"],
+    "rootDir": ".",
     "paths": {
-      "@actor": [
-        "types/src/module/actor/index.js"
-      ],
-      "@actor/*": [
-        "types/src/module/actor/*"
-      ],
-      "@item": [
-        "types/src/module/item/index.js"
-      ],
-      "@item/*": [
-        "types/src/module/item/*"
-      ],
-      "@module/*": [
-        "types/src/module/*"
-      ],
-      "@scene": [
-        "types/src/module/scene/index.js"
-      ],
-      "@scene/*": [
-        "types/src/module/scene/*"
-      ],
-      "@scripts/*": [
-        "types/src/scripts/*"
-      ],
-      "@system/*": [
-        "types/src/module/system/*"
-      ],
-      "@util": [
-        "types/src/util/index.js"
-      ],
-      "@util/*": [
-        "types/src/util/*"
+      "@foundry": [
+        "node_modules/foundry-vtt-types"
       ]
     },
-    "types": ["node", "jquery", "foundry-types"],
-    "useDefineForClassFields": true,
-    "removeComments": false,
-    "resolveJsonModule": true,
-    "noEmitOnError": false,
-    "skipLibCheck": true,
-    "rootDir": ".",
     "typeRoots": [
       "node_modules/@types",
-      "types/types/foundry",
-      "types"
+      "node_modules/foundry-vtt-types"
     ]
   },
-  "include": ["src/**/*", "types/**/*"],
+  "include": ["src/**/*"],
   "exclude": ["node_modules"],
   "ts-node": {
     "compilerOptions": {
