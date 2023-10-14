@@ -1,8 +1,19 @@
 {
   "compilerOptions": {
     "moduleResolution": "node",
-    "strictNullChecks": true,
+    "target": "ES6",
+    "experimentalDecorators": true,
+    "lib": ["DOM", "ES6", "ES2017", "ES2018", "ES2019", "ES2020"],
+    "types": ["@league-of-foundry-developers/foundry-vtt-types"],
     "skipLibCheck": true,
-    "types": ["node", "jquery", "@league-of-foundry-developers/foundry-vtt-types"]
+    "sourceMap": true,
+    "allowUmdGlobalAccess": true
+  },
+  "ts-node": {
+    "compilerOptions": {
+      "strictNullChecks": false,
+      "allowSyntheticDefaultImports": false,
+      "skipLibCheck": true
+    }
   }
 }
