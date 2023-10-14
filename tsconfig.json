@@ -1,36 +1,8 @@
 {
   "compilerOptions": {
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
-    "target": "es2022",
-    "experimentalDecorators": true,
-    "allowUnusedLabels": false,
-    "baseUrl": ".",
-    "esModuleInterop": true,
-    "lib": [
-      "dom",
-      "dom.iterable",
-      "esnext"
-    ],
-    "types": ["node", "jquery", "./node_modules/foundry-vtt-types/index.d.ts"],
-    "rootDir": ".",
-    "paths": {
-      "@foundry": [
-        "node_modules/foundry-vtt-types"
-      ]
-    },
-    "typeRoots": [
-      "node_modules/@types",
-      "node_modules/foundry-vtt-types"
-    ]
-  },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules"],
-  "ts-node": {
-    "compilerOptions": {
-      "strictNullChecks": false,
-      "allowSyntheticDefaultImports": false,
-      "skipLibCheck": true
-    }
+    "moduleResolution": "node",
+    "strictNullChecks": true,
+    "skipLibCheck": true,
+    "types": ["node", "jquery", "@league-of-foundry-developers/foundry-vtt-types"]
   }
 }

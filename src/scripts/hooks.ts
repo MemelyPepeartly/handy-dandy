@@ -3,8 +3,10 @@ import { registerHandlebarsHelpers, registerHandlebarsPartials, loadHandlebarsTe
 import { logInfo } from "./utils.js";
 
 // Initialize module
-Hooks.once("init", async (_actor: Actor<any>) => {
+Hooks.once("init", (_actor: Actor) => {
     logInfo("Handy Dandy | Initializing handy-dandy settings");
+
+    var game = Game as any;
 
     // Register custom module settings
     game.settings.register(MODULENAME, "GPTApiKey", {
@@ -16,9 +18,9 @@ Hooks.once("init", async (_actor: Actor<any>) => {
         default: ""
     });
 
-    await registerHandlebarsHelpers();
-    await registerHandlebarsPartials();
-    await loadHandlebarsTemplates();
+    registerHandlebarsHelpers();
+    registerHandlebarsPartials();
+    loadHandlebarsTemplates();
 });
 
 Hooks.on('init', () => {

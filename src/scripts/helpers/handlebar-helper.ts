@@ -1,16 +1,16 @@
-import { processAIInput } from "./ai-helper";
+import { processAIInput } from "./ai-helper.js";
 
-jQuery(function() {
-    const button = document.getElementById("generateButton");
-    const form = document.getElementById("handy-dandy-form");
-    if (button && form) {
-        button.addEventListener('click', (e) => {
-            console.log("Button clicked!");
-            const serializedData = $(form).serialize();
-            processAIInput(serializedData);
-        });
-    }
-  });
+// jQuery(function() {
+//     const button = document.getElementById("generateButton");
+//     const form = document.getElementById("handy-dandy-form");
+//     if (button && form) {
+//         button.addEventListener('click', (e) => {
+//             console.log("Button clicked!");
+//             const serializedData = $(form).serialize();
+//             processAIInput(serializedData);
+//         });
+//     }
+//   });
 
 export async function registerHandlebarsHelpers() {
     // Registering Helpers
