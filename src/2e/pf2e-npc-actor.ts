@@ -183,6 +183,12 @@ interface NPCSystemData extends Omit<NPCSystemSource, "attributes">, CreatureSys
     };
 }
 
+interface NPCPF2e<TParent extends TokenDocument | null = TokenDocument | null> {
+    flags: any;
+    readonly _source: any;
+    system: NPCSystemData;
+}
+
 export {
     NPCSaves,
     NPCSaveData,
@@ -195,6 +201,8 @@ export {
     NPCStrike,
     NPCTraitsSource,
     NPCTraitsData,
+    NPCAttributesSource,
     NPCSystemSource,
-    NPCSystemData
+    NPCSystemData,
+    NPCPF2e
 }

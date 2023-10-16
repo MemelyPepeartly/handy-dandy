@@ -75,13 +75,13 @@ interface ActorDetails extends ActorDetailsSource {
 export {
     ActorAlliance,
     ActorDetailsSource,
-    ActorHitPoints,
     ActorHitPointsSource,
-    ActorAttributesSource,
     ActorSystemSource,
     ActorTraitsSource,
     ActorTraitsData,
+    ActorAttributesSource,
     ActorAttributes,
     ActorSystemData,
-    ActorDetails
+    ActorDetails,
+    ActorHitPoints
 }

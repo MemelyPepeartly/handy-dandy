@@ -1,3 +1,4 @@
+import { NPCPF2e } from "@pf2e";
 import { HandyDandy } from "../handy-dandy";
 
 

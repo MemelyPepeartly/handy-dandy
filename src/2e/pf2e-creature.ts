@@ -1,4 +1,4 @@
-import { ActorDetailsSource, ActorAttributes, ActorHitPoints, ActorSystemSource, ActorTraitsSource, ActorAlliance, ActorTraitsData, ActorSystemData } from "./pf2e-actor";
+import { ActorDetailsSource, ActorAttributes, ActorSystemSource, ActorTraitsSource, ActorAlliance, ActorTraitsData, ActorSystemData, ActorHitPoints } from "./pf2e-actor";
 import { SaveData } from "./pf2e-data";
 import { SaveType, Abilities, SkillAbbreviation, SkillData, StrikeData, SenseData, Alignment } from "./pf2e-sheet";
 
@@ -93,11 +93,11 @@ export {
     CreatureSaves,
     CreatureDetailsSource,
     CreatureSystemData,
-    CreatureAttributes,
     CreatureSystemSource,
     CreatureResources,
     CreatureResourcesSource,
     CreatureTraitsSource,
     CreatureTraitsData,
-    CreatureDetails
+    CreatureDetails,
+    CreatureAttributes
 }
