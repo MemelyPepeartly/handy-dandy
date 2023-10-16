@@ -3,8 +3,6 @@ import { HandyDandy, OpenAIEngine } from "./handy-dandy.js";
 import { registerHandlebarsHelpers, registerHandlebarsPartials, loadHandlebarsTemplates } from "./helpers/handlebar-helper.js";
 import { logInfo } from "./utils.js";
 
-
-
 // Initialize module
 Hooks.once("init", async (_actor: Actor) => {
     logInfo("Handy Dandy | Initializing handy-dandy settings");
