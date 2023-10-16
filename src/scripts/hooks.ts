@@ -1,3 +1,4 @@
+import { NPCPF2e } from "@pf2e";
 import { MODULEID } from "./const.js";
 import { HandyDandy, OpenAIEngine } from "./handy-dandy.js";
 import { registerHandlebarsHelpers, registerHandlebarsPartials, loadHandlebarsTemplates } from "./helpers/handlebar-helper.js";
@@ -29,7 +30,8 @@ Hooks.once("init", async (_actor: Actor) => {
     game.handyDandy = new HandyDandy({});
     
     const apiKey = game.settings.get(MODULEID, "GPTApiKey") as string;
-    game.handyDandy.engine = new OpenAIEngine(apiKey);
+    const organization = game.settings.get(MODULEID, "GPTOrganization") as string;
+    game.handyDandy.engine = new OpenAIEngine(apiKey, organization);
 
     await registerHandlebarsHelpers();
     await registerHandlebarsPartials();
@@ -46,9 +48,6 @@ Hooks.on("ready", () => {
 
 Hooks.on("renderActorSheet", async (sheet: ActorSheet<any, any>, $html: JQuery) => {
     logInfo("Handy Dandy | renderActorSheet hook called", sheet, $html);
-    logInfo("renderActorSheetHook called", sheet, $html);
-
-    ui.notifications?.info(`Handy Dandy | Opened sheet for ${sheet.actor.name}`);
 
     // Only add the button to NPCs
     let actor = sheet.object
@@ -68,6 +67,7 @@ Hooks.on("renderActorSheet", async (sheet: ActorSheet<any, any>, $html: JQuery) 
     // On click
     button.on("click", async () => {
         game.handyDandy.render(true);
-    })
+    });
+
     element.after(button);
 });

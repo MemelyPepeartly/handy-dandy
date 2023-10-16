@@ -20,7 +20,7 @@ gulp.task('build', (done) => {
     del.sync(['build/**', '!build']);
 
     // Compile TypeScript files
-    const tsResult = gulp.src('src/**/*.ts')
+    const tsResult = gulp.src(['src/**/*.ts', '!src/2e/**/*.ts'])
         .pipe(tsProject());
 
     // Write compiled JS to build directory

@@ -33,13 +33,13 @@ export class HandyDandy extends FormApplication<HandyDandyOptions> {
         $html.on('submit', 'form', (e) => {
             e.preventDefault();
         });
-    
+
         const $button = $html.find("#generateButton");
         $button.on('click', (e) => {
             // get form values and create an object to pass to the processAIInput function
             const $form = $html.find("#handy-dandy-form");
             const serializedData = $form.serialize();
-            
+
             const formValues = FormInput.deserialize(serializedData);
             this.processAIInput(formValues);
         });
@@ -49,7 +49,7 @@ export class HandyDandy extends FormApplication<HandyDandyOptions> {
         // Perform AI operations and return the result.
         console.log("Input data to Handy Dandy:", input);
         return null;
-      }
+    }
 }
 
 export class FormInput {
@@ -90,12 +90,22 @@ export class OpenAIEngine {
     formInput?: FormInput;
     options?: ClientOptions;
 
-    constructor(apiKey?: string) {
+    constructor(apiKey?: string, organization?: string) {
         this.options = {
-            apiKey: apiKey
+            apiKey: apiKey,
+            organization: organization
         };
-    } 
-    createCompletionRequest(): any {
+    }
+    async createCompletionRequest() {
         console.log("Creating completion request");
+
+        const openai = new OpenAI(this.options);
+
+        await openai.completions.create({
+            model: "gpt-4",
+            prompt: "This is a test"
+        }).then((data) => {
+            console.log(data);
+        });
     }
 }
