@@ -32,7 +32,7 @@ jobs:
       
       - name: Zip Build Directory
         run: |
-          cd build
+          cd dist
           zip -r ../module.zip ./*
       
       
@@ -45,7 +45,7 @@ jobs:
           draft: false
           prerelease: false
           token: ${{ secrets.GITHUB_TOKEN }}
-          artifacts: './build/module.json,./module.zip'
+          artifacts: './dist/module.json,./module.zip'
           tag: latest
       
       - name: Create Version Release
@@ -57,5 +57,5 @@ jobs:
           draft: false
           prerelease: false
           token: ${{ secrets.GITHUB_TOKEN }}
-          artifacts: './build/module.json,./module.zip'
+          artifacts: './dist/module.json,./module.zip'
           tag: ${{ steps.get_version.outputs.version }}
