@@ -1,14 +1,18 @@
-import { MODULEID } from "./const";
+import { HandyDandy } from "./handy-dandy";
 import { registerHandlebarsHelpers, registerHandlebarsPartials, loadHandlebarsTemplates } from "./helpers/handlebar-helper";
 import { logInfo, getGame } from "./utils";
 
+const MODULEID = "handy-dandy";
+const MODULENAME = "Handy Dandy";
 
 // Initialize module
 Hooks.once("init", async (_actor: Actor) => {
     logInfo("Handy Dandy | Initializing handy-dandy settings");
 
+    var game = getGame();
+
     // Register custom module settings
-    getGame().settings.register(MODULEID, "GPTApiKey", {
+    game.settings.register(MODULEID, "GPTApiKey", {
         name: "GPT API Key",
         hint: "Insert your GPT API Key here",
         scope: "client",
@@ -17,7 +21,7 @@ Hooks.once("init", async (_actor: Actor) => {
         default: ""
     });
 
-    getGame().settings.register(MODULEID, "GPTOrganization", {
+    game.settings.register(MODULEID, "GPTOrganization", {
         name: "GPT Organization",
         hint: "Insert your GPT Organization here",
         scope: "client",
@@ -29,6 +33,8 @@ Hooks.once("init", async (_actor: Actor) => {
     await registerHandlebarsHelpers();
     await registerHandlebarsPartials();
     await loadHandlebarsTemplates();
+
+
 });
 
 Hooks.on('init', () => {
@@ -37,15 +43,15 @@ Hooks.on('init', () => {
 
 Hooks.on("ready", () => {
     logInfo("Handy Dandy | Ready hook called");
-    
+
     const apiKey = getGame().settings.get(MODULEID, "GPTApiKey") as string;
     const organization = getGame().settings.get(MODULEID, "GPTOrganization") as string;
     console.log("API Key:", apiKey);
     console.log("Organization:", organization);
 
     // const module = new HandyDandy({});
-    // module.engine.apiKey = apiKey;
-    // module.engine.organization = organization;
+
+    // module.testMsg();
 });
 
 Hooks.on("renderActorSheet", async (sheet: ActorSheet<any, any>, $html: JQuery) => {

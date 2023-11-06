@@ -20,9 +20,7 @@
   "esmodules": [
     "scripts/bundle.js"
   ],
-  "styles": [
-    "styles/module.css"
-  ],
+  "styles": [],
   "languages": [],
   "packs": [],
   "relationships": {

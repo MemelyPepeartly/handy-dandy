@@ -1,4 +1,5 @@
-import { MODULEID } from "./const.js";
+const MODULEID = "handy-dandy";
+const MODULENAME = "Handy Dandy";
 
 export function logTrace(...args: any[]) {
     log(0, ...args);
