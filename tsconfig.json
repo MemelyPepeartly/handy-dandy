@@ -1,46 +1,15 @@
 {
-  "compilerOptions": {
-    "moduleResolution": "node",
-    "target": "ES6",
-    "experimentalDecorators": true,
-    "lib": [
-      "DOM",
-      "ES6",
-      "ES2017",
-      "ES2018",
-      "ES2019",
-      "ES2020"
-    ],
-    "types": [
-      "@league-of-foundry-developers/foundry-vtt-types"
-    ],
-    "paths": {
-      "@pf2e": [
-        "./src/2e/index.ts"
-      ],
-      "@pf2e/*": [
-        "./src/2e/*"
-      ],
-    },
-    "skipLibCheck": true,
-    "sourceMap": true,
-    "allowUmdGlobalAccess": true
-  },
-  "ts-node": {
     "compilerOptions": {
-      "strictNullChecks": false,
-      "allowSyntheticDefaultImports": false,
-      "skipLibCheck": true
+        "esModuleInterop": true,
+        "types": [
+            "@league-of-foundry-developers/foundry-vtt-types"
+        ],
+        "moduleResolution": "node",
+        "strictNullChecks": true,
+        "outDir": "./dist/",
+        "noImplicitAny": true,
+        "module": "es6",
+        "target": "es5",
+        "allowJs": true,
     }
-  },
-  "include": [
-    "src/**/*",
-    "src/types/**/*"
-  ],
-  "typeRoots": ["./types", "./node_modules/@types"],
-  "baseUrl": "./",
-  "paths": {
-    "pf2e-types": ["types/index"],
-    "pf2e-types/*": ["types/*"]
-  }  
 }

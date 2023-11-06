@@ -1,15 +1,14 @@
-import { NPCPF2e } from "@pf2e";
-import { MODULEID } from "./const.js";
-import { HandyDandy, OpenAIEngine } from "./handy-dandy.js";
-import { registerHandlebarsHelpers, registerHandlebarsPartials, loadHandlebarsTemplates } from "./helpers/handlebar-helper.js";
-import { logInfo } from "./utils.js";
+import { MODULEID } from "./const";
+import { registerHandlebarsHelpers, registerHandlebarsPartials, loadHandlebarsTemplates } from "./helpers/handlebar-helper";
+import { logInfo, getGame } from "./utils";
+
 
 // Initialize module
 Hooks.once("init", async (_actor: Actor) => {
     logInfo("Handy Dandy | Initializing handy-dandy settings");
 
     // Register custom module settings
-    game.settings.register(MODULEID, "GPTApiKey", {
+    getGame().settings.register(MODULEID, "GPTApiKey", {
         name: "GPT API Key",
         hint: "Insert your GPT API Key here",
         scope: "client",
@@ -18,7 +17,7 @@ Hooks.once("init", async (_actor: Actor) => {
         default: ""
     });
 
-    game.settings.register(MODULEID, "GPTOrganization", {
+    getGame().settings.register(MODULEID, "GPTOrganization", {
         name: "GPT Organization",
         hint: "Insert your GPT Organization here",
         scope: "client",
@@ -26,12 +25,6 @@ Hooks.once("init", async (_actor: Actor) => {
         type: String,
         default: ""
     });
-
-    game.handyDandy = new HandyDandy({});
-    
-    const apiKey = game.settings.get(MODULEID, "GPTApiKey") as string;
-    const organization = game.settings.get(MODULEID, "GPTOrganization") as string;
-    game.handyDandy.engine = new OpenAIEngine(apiKey, organization);
 
     await registerHandlebarsHelpers();
     await registerHandlebarsPartials();
@@ -44,6 +37,15 @@ Hooks.on('init', () => {
 
 Hooks.on("ready", () => {
     logInfo("Handy Dandy | Ready hook called");
+    
+    const apiKey = getGame().settings.get(MODULEID, "GPTApiKey") as string;
+    const organization = getGame().settings.get(MODULEID, "GPTOrganization") as string;
+    console.log("API Key:", apiKey);
+    console.log("Organization:", organization);
+
+    // const module = new HandyDandy({});
+    // module.engine.apiKey = apiKey;
+    // module.engine.organization = organization;
 });
 
 Hooks.on("renderActorSheet", async (sheet: ActorSheet<any, any>, $html: JQuery) => {
@@ -56,18 +58,17 @@ Hooks.on("renderActorSheet", async (sheet: ActorSheet<any, any>, $html: JQuery) 
     }
 
     // Only add the button if the user can update the actor
-    if (!actor.canUserModify(game["user"], "update")) {
-        return;
-    }
+    // if (!actor.canUserModify(getGame().user as BaseUser, "update")) {
+    //     return;
+    // }
 
     // Add the button
     let element = $html.find(".window-header .window-title");
     let button = $(`<a class="popout" style><i class="fas fa-book"></i>Handy Dandy</a>`);
+    element.after(button);
 
     // On click
     button.on("click", async () => {
-        game.handyDandy.render(true);
+        //module.render(true);
     });
-
-    element.after(button);
 });

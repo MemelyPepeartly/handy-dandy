@@ -18,14 +18,7 @@
   "download": "https://github.com/MemelyPepeartly/Handy-Dandy/releases/download/latest/module.zip",
   "bugs": "",
   "esmodules": [
-    "scripts/hooks.js",
-    "scripts/utils.js",
-    "scripts/const.js",
-    "scripts/handy-dandy.js",
-
-    "scripts/ai/models.js",
-
-    "scripts/helpers/handlebar-helper.js"
+    "scripts/bundle.js"
   ],
   "styles": [
     "styles/module.css"
