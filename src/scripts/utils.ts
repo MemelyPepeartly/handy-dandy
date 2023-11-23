@@ -1,5 +1,4 @@
-const MODULEID = "handy-dandy";
-const MODULENAME = "Handy Dandy";
+import CONSTANTS from "./module/constants";
 
 export function logTrace(...args: any[]) {
     log(0, ...args);
@@ -56,7 +55,7 @@ function log(logLevel = 2, ...args: any[]) {
 }
 
 export function pushNotification(message: any, type: "info" | "error" | "warning" = "info") {
-    ui.notifications?.notify(`${MODULEID} | ${message}`, type);
+    ui.notifications?.notify(`${CONSTANTS.MODULEID} | ${message}`, type);
 }
 
 export function getGame(): Game {

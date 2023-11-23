@@ -1,7 +1,7 @@
 {
-  "id": "<%= id %>",
-  "title": "<%= title %>",
-  "version": "<%= version %>",
+  "id": "handy-dandy",
+  "title": "Handy Dandy",
+  "version": "0.7.0",
   "compatibility": {
     "minimum": "11",
     "verified": "11"
@@ -17,9 +17,21 @@
   "manifest": "https://github.com/MemelyPepeartly/Handy-Dandy/releases/download/latest/module.json",
   "download": "https://github.com/MemelyPepeartly/Handy-Dandy/releases/download/latest/module.zip",
   "bugs": "",
-  "esmodules": [
-    "scripts/bundle.js"
+  "type": "module",
+  "socket": true,
+  "includes": [
+    "./assets/**",
+    "./lang/**",
+    "./languages/**",
+    "./scripts/**",
+    "./styles/**",
+    "./templates/**",
+    "./module.json",
+    "./README.md",
+    "./icons/**",
+    "./packs/**"
   ],
+  "esmodules": ["init.js"],
   "styles": [],
   "languages": [],
   "packs": [],
@@ -27,6 +39,5 @@
     "requires": [],
     "systems": [],
     "recommends": []
-  },
-  "socket": false
+  }
 }
