@@ -70,7 +70,7 @@ export function test(done) {
             console.log(`Copying build to ${appdataPath}`);
 
             // Then, copy build to appdata directory
-            gulp.src('./build/**/*')
+            gulp.src('./dist/**/*')
                 .pipe(gulp.dest(appdataPath))
                 .on('finish', done); // Signal completion when copying is done
         });
