@@ -28,6 +28,4 @@ export function checkSettingsInitialized() {
     if (!game.user?.isGM) {
       return;
     }
-    // const defaultIcons = game.settings.get(CONSTANTS.MODULE_NAME, "defaultIcons");
-    // const itemProperties = game.settings.get(CONSTANTS.MODULE_NAME, "itemProperties");
   }
