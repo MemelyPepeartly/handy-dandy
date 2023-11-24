@@ -1,9 +1,20 @@
 const CONSTANTS = {
+    /**
+     * The ID of the module.
+     */
     MODULEID: "handy-dandy",
+    /**
+     * The name of the module.
+     */
     MODULE_NAME: "Handy Dandy",
-    PATH: `module/handy-dandy/`
+    /**
+     * The path to the module's root directory.
+     */
+    PATH: `modules/handy-dandy/`,
+    /**
+     * The path to the module's Handlebars templates.
+     */
+    TEMPLATEPATH: `modules/handy-dandy/templates`,
   };
-  
-  CONSTANTS.PATH = `module/${CONSTANTS.MODULE_NAME}/`;
   
   export default CONSTANTS;
