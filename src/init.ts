@@ -14,8 +14,11 @@
 // Import TypeScript modules
 import API from "./scripts/module/api";
 import CONSTANTS from "./scripts/module/constants";
+import HandyDandyApplication from "./scripts/module/handy-dandy";
+import { preloadPartials } from "./scripts/module/preload-templates";
 import registerSettings, { checkSettingsInitialized } from "./scripts/module/settings";
-import { logInfo } from "./scripts/utils";
+import { createDialogue, logInfo } from "./scripts/utils";
+import './scripts/helpers/form-handler';
 
 /* ------------------------------------ */
 /* Initialize module					*/
@@ -23,6 +26,8 @@ import { logInfo } from "./scripts/utils";
 
 Hooks.once("init", () => {
   registerSettings();
+
+  preloadPartials();
 
 //   Hooks.callAll(`${CONSTANTS.MODULE_NAME}:afterInit`);
 });
@@ -68,10 +73,12 @@ Hooks.on("renderActorSheet", async (sheet: ActorSheet<any, any>, $html: JQuery) 
     let element = $html.find(".window-header .window-title");
     let button = $(`<a class="popout" style><i class="fas fa-book"></i>Handy Dandy</a>`);
     element.after(button);
+    
+    const handyDandyApplication = new HandyDandyApplication();
 
     // On click
     button.on("click", async () => {
-        //module.render(true);
+      handyDandyApplication.render(true);
     });
 });
 
