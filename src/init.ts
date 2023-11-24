@@ -12,10 +12,10 @@
 // Import JavaScript modules
 
 // Import TypeScript modules
-import API from "./module/api";
-import CONSTANTS from "./module/constants";
-import registerSettings, { checkSettingsInitialized } from "./module/settings";
-import { logInfo } from "./utils";
+import API from "./scripts/module/api";
+import CONSTANTS from "./scripts/module/constants";
+import registerSettings, { checkSettingsInitialized } from "./scripts/module/settings";
+import { logInfo } from "./scripts/utils";
 
 /* ------------------------------------ */
 /* Initialize module					*/
