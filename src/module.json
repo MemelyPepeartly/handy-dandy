@@ -1,7 +1,7 @@
 {
-  "id": "handy-dandy",
+  "id": "<%= id %>",
   "title": "Handy Dandy",
-  "version": "0.7.0",
+  "version": "<%= version %>",
   "compatibility": {
     "minimum": "11",
     "verified": "11"
@@ -31,13 +31,13 @@
     "./icons/**",
     "./packs/**"
   ],
-  "esmodules": ["init.js"],
+  "esmodules": ["scripts/bundle.js"],
   "styles": [],
   "languages": [],
   "packs": [],
   "relationships": {
     "requires": [],
-    "systems": [],
+    "systems": ["pf2e"],
     "recommends": []
   }
 }
