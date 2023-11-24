@@ -64,3 +64,27 @@ export function getGame(): Game {
     }
     return game;
   }
+
+export async function createDialogue(dialogTmp: string, title: string = "Handy Dandy") {
+    const dialog = new Dialog({
+        title: title,
+        content: dialogTmp,
+        buttons: {
+            ok: {
+                label: "OK",
+                callback: () => {
+                    logInfo("Handy Dandy | OK button clicked");
+                }
+            }
+        },
+        default: "cancel",
+        close: () => {
+            logInfo("Handy Dandy | Dialog window closed");
+        }
+    }, 
+    {
+        id: "handy-dandy"
+    });
+
+    await dialog.render(true);
+}
