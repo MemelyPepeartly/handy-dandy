@@ -1,56 +1,61 @@
-name: Release Creation
-
-on: 
-  release:
-    types: [published]
+name: CI/CD
 
 permissions:
   contents: write
 
+on:
+  push:
+    branches:
+      - main
+
 jobs:
-  build:
+  build-and-release:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+      - name: Checkout code
+        uses: actions/checkout@v2
+      
+      - name: Setup Node
+        uses: actions/setup-node@v2
+        with:
+          node-version: '20' 
 
-    #Substitute the Manifest and Download URLs in the module.json
-    - name: Substitute Manifest and Download Links For Versioned Ones
-      id: sub_manifest_link_version
-      uses: microsoft/variable-substitution@v1
-      with:
-        files: 'src/module.json'
-      env:
-        version: ${{github.event.release.tag_name}}
-        manifest: https://github.com/${{github.repository}}/releases/latest/download/module.json
-        download: https://github.com/${{github.repository}}/releases/download/${{github.event.release.tag_name}}/module.zip
+      - name: Install Dependencies
+        run: npm install
 
-    # create a zip file with all files required by the module to add to the release
-    - run: cd src; zip -r ./module.zip *
-
-    # Create a release for this specific version
-    - name: Update Release with Files
-      id: create_version_release
-      uses: ncipollo/release-action@v1
-      with:
-        allowUpdates: true # set this to false if you want to prevent updating existing releases
-        name: ${{ github.event.release.name }}
-        draft: false
-        prerelease: false
-        token: ${{ secrets.GITHUB_TOKEN }}
-        artifacts: 'src/module.json, src/module.zip'
-        tag: ${{ github.event.release.tag_name }}
-        body: ${{ github.event.release.body }}
-
-    # Update the 'latest' release
-    - name: Create Release
-      id: create_latest_release
-      uses: ncipollo/release-action@v1
-      with:
-        allowUpdates: true
-        name: Latest
-        draft: false
-        prerelease: false
-        token: ${{ secrets.GITHUB_TOKEN }}
-        artifacts: 'src/module.json,src/module.zip'
-        tag: latest
-        body: ${{ github.event.release.body }}
+      - name: Build Project
+        run: npm run build
+      
+      - name: Get Version from package.json
+        id: get_version
+        run: echo "::set-output name=version::$(node -p "require('./package.json').version")"
+      
+      - name: Zip dist Directory
+        run: |
+          cd dist
+          zip -r ../module.zip ./*
+      
+      
+      - name: Update Latest Release
+        id: update_latest_release
+        uses: ncipollo/release-action@v1
+        with:
+          allowUpdates: true
+          name: Latest
+          draft: false
+          prerelease: false
+          token: ${{ secrets.GITHUB_TOKEN }}
+          artifacts: './dist/module.json,./module.zip'
+          tag: latest
+      
+      - name: Create Version Release
+        id: create_version_release
+        uses: ncipollo/release-action@v1
+        with:
+          allowUpdates: true
+          name: Release ${{ steps.get_version.outputs.version }}
+          draft: false
+          prerelease: false
+          token: ${{ secrets.GITHUB_TOKEN }}
+          artifacts: './dist/module.json,./module.zip'
+          tag: ${{ steps.get_version.outputs.version }}
