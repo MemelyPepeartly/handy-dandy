@@ -37,12 +37,9 @@ Hooks.once("init", () => {
 /* ------------------------------------ */
 
 Hooks.once("setup", () => {
-  //@ts-ignore
-  // window.ForienIdentification = Identification;
-
   Hooks.callAll(`${CONSTANTS.MODULE_NAME}:afterSetup`);
 
-  setApi(API);
+  //setApi(API);
 });
 
 /* ------------------------------------ */
@@ -81,6 +78,33 @@ Hooks.on("renderActorSheet", async (sheet: ActorSheet<any, any>, $html: JQuery) 
       handyDandyApplication.render(true);
     });
 });
+
+Hooks.on('getSceneControlButtons', (buttons) => {
+  let handyDandyTool = {
+    name: CONSTANTS.MODULEID,
+    title: CONSTANTS.MODULE_NAME,
+    layer: "handy-dandy",
+    icon: "fas fa-microchip",
+    visible: game.user?.isGM as boolean,
+    activeTool: "select",
+    tools: [
+      { name: "select", icon: "fas fa-expand", title: "Select" },
+      {
+        name: "prompter",
+        title: CONSTANTS.MODULE_NAME,
+        icon: "fas fa-microchip",
+        onClick: () => {
+          createDialogue("Hello World");
+        },
+        button: true
+      }
+    ]
+  };
+
+  console.log("BUTTONS ------------> ", buttons);
+  buttons.push(handyDandyTool);
+});
+
 
 // Add any additional hooks if necessary
 
