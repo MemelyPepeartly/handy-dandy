@@ -36,8 +36,16 @@
   "languages": [],
   "packs": [],
   "relationships": {
-    "requires": [],
-    "systems": ["pf2e"],
-    "recommends": []
+    "systems": [
+      {
+        "id": "pf2e",
+        "type": "system",
+        "manifest": "https://github.com/foundryvtt/pf2e/releases/download/latest/system.json",
+        "compatibility": {
+          "minimum": "5.12.0",
+          "verified": "5.12.0"
+        }
+      }
+    ]
   }
 }
