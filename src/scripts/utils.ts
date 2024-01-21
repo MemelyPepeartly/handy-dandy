@@ -1,4 +1,5 @@
 import CONSTANTS from "./module/constants";
+import { HandyDandyWindow } from "./module/handy-dandy-window";
 
 export function logTrace(...args: any[]) {
     log(0, ...args);
@@ -87,4 +88,26 @@ export async function createDialogue(dialogTmp: string, title: string = "Handy D
     });
 
     await dialog.render(true);
+}
+
+export function addHandyDandyButton(app, html, data) {
+    // Find the header of the actor sheet
+    const header = html.find('.window-header');
+
+    // Check if the button is already there to avoid duplicates
+    if (!header.find('.handy-dandy-button').length) {
+        const handyDandyButton = $('<a class="handy-dandy-button"><i class="fas fa-microchip"></i>Handy Dandy</a>');
+
+        // Attach an event listener to the button
+        handyDandyButton.on("click", event => {
+            event.preventDefault();
+            const handyDandyApp = new HandyDandyWindow();
+            handyDandyApp.render(true);
+        });
+        
+
+        // Find the <h4> element and insert the button after it
+        const titleElement = header.find('h4.window-title');
+        handyDandyButton.insertAfter(titleElement);
+    }
 }
