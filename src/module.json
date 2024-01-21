@@ -32,7 +32,7 @@
     "./packs/**"
   ],
   "esmodules": ["bundle.js"],
-  "styles": [],
+  "styles": ["styles/handy-dandy-styles.css"],
   "languages": [],
   "packs": [],
   "relationships": {
