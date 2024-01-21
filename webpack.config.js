@@ -33,7 +33,8 @@ module.exports = {
           }
         },
         { from: 'src/assets', to: 'assets' }, // Copy the entire assets folder
-        { from: 'src/templates', to: 'templates' } // Copy the entire templates folder
+        { from: 'src/templates', to: 'templates' }, // Copy the entire templates folder
+        { from: 'src/styles', to: 'styles' } // Copy the entire packs folder
       ]
     })
   ]

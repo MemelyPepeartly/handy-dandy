@@ -1,0 +1,23 @@
+.handy-dandy-form .user-prompt {
+    width: 100%;
+    resize: vertical;
+    padding: 5px;
+    font-size: 14px;
+    margin-bottom: 10px;
+}
+
+.response-output {
+    margin-top: 15px;
+    padding: 10px;
+    border: 1px solid #000;
+    border-radius: 4px;
+    color: #333;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.loading-spinner {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
