@@ -1,8 +1,10 @@
 import CONSTANTS from "./constants";
 
-export default function registerSettings() {
-    // Register custom module settings
-    game.settings.register(CONSTANTS.MODULEID, "GPTApiKey", {
+export function registerSettings() {
+    // Type assertion to inform TypeScript that `game` is indeed a Game object
+    const gameInstance = game as Game;
+
+    gameInstance.settings.register(CONSTANTS.MODULEID, "GPTApiKey", {
         name: "GPT API Key",
         hint: "Insert your GPT API Key here",
         scope: "client",
@@ -11,7 +13,7 @@ export default function registerSettings() {
         default: ""
     });
 
-    game.settings.register(CONSTANTS.MODULEID, "GPTOrganization", {
+    gameInstance.settings.register(CONSTANTS.MODULEID, "GPTOrganization", {
         name: "GPT Organization",
         hint: "Insert your GPT Organization here",
         scope: "client",
@@ -20,12 +22,3 @@ export default function registerSettings() {
         default: ""
     });
 }
-
-/**
- * Checks if options exist, if not, orders their initialization
- */
-export function checkSettingsInitialized() {
-    if (!game.user?.isGM) {
-      return;
-    }
-  }
