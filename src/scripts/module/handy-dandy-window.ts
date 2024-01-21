@@ -32,23 +32,17 @@ export class HandyDandyWindow extends Application {
     }
 
     activateListeners(html) {
-        super.activateListeners(html); 
-        // Event listener for the form submission
-        const submitButton = html.find("#generate-button");
-
-        submitButton.on("click", event => {
-            event.preventDefault();
-            // Log to the console for debugging
-            console.log("Handy Dandy | Generate button clicked");
-
-            this._onGenerate(html);
+        super.activateListeners(html);
+    
+        // Attach click event listener to the button instead of form submit
+        html.find(".generate-button").on("click", event => {
+            event.preventDefault(); // Prevent the default button click behavior
+            this._onGenerate(event);
         });
     }
     
-
-    async _onGenerate(html) {
-        const form = html.find(".handy-dandy-form");
-
+    async _onGenerate(event) {
+        const form = $(event.currentTarget).parents(".handy-dandy-form");
         const type = form.find(".type-dropdown").val();
         const userPrompt = form.find(".user-prompt").val();
 
@@ -74,12 +68,16 @@ export class HandyDandyWindow extends Application {
         const organization = gameInstance.settings.get(CONSTANTS.MODULEID, "GPTOrganization") as string;
         const apiKey = gameInstance.settings.get(CONSTANTS.MODULEID, "GPTApiKey") as string;
 
-        const openai = new OpenAI({apiKey: apiKey, organization: organization});
+        const openai = new OpenAI({
+            apiKey: apiKey, 
+            organization: organization, 
+            dangerouslyAllowBrowser: true
+        });
 
         const params: OpenAI.Chat.ChatCompletionCreateParams = {
-            messages: [{ role: 'user', content: 'Say this is a test' }],
+            messages: [{ role: 'user', content: prompt }],
             model: 'gpt-3.5-turbo',
-          };
+        };
 
         const chatCompletion: OpenAI.Chat.ChatCompletion = await openai.chat.completions.create(params);
 
