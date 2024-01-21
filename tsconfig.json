@@ -1,73 +1,17 @@
 {
   "compilerOptions": {
-    /* Specify how TypeScript looks up a file from a given module specifier. */
-    "moduleResolution": "node",
-    /* Set the JavaScript language version for emitted JavaScript and include compatible library declarations. */
-    "target": "ES6",
-    /* Specify a set of bundled library declaration files that describe the target runtime environment. */
-    "lib": [
-      "DOM",
-      "ES6",
-      "ES2017",
-      "ES2018",
-      "ES2019",
-      "ES2020",
-      "dom.iterable"
-    ],
-    /* Specify the root folder within your source files. */
+    "target": "es2018",                // Or the ECMAScript target that suits Foundry VTT's current version
+    "module": "esnext",
+    "outDir": "./dist",
     "rootDir": "./src",
-    /* Specify type package names to be included without being referenced in a source file. */
-    "types": [
-      "jquery",
-      "jest",
-      "node",
-      "handlebars",
-      "@league-of-foundry-developers/foundry-vtt-types/index-lenient"
-    ],
-    /* Enable importing .json files */
-    "resolveJsonModule": true,
-    /* Allow JavaScript files to be a part of your program. Use the `checkJS` option to get errors from these files. */
-    "allowJs": true,
-    /* Enable error reporting in type-checked JavaScript files. */
-    "checkJs": false,
-    /* Disable emitting files from a compilation. */
-    "noEmit": false,
-    /* Specify emit/checking behavior for imports that are only used for types */
-    // "importsNotUsedAsValues": "error",               
-    /* Ensure that each file can be safely transpiled without relying on other imports. */
-    "isolatedModules": false,
-    /* Allow 'import x from y' when a module doesn't have a default export. */
-    "allowSyntheticDefaultImports": true,
-    /* Emit additional JavaScript to ease support for importing CommonJS modules. This enables `allowSyntheticDefaultImports` for type compatibility. */
-    "esModuleInterop": true,
-    /* Ensure that casing is correct in imports. */
-    "forceConsistentCasingInFileNames": true,
-    /* Enable all strict type-checking options. */
     "strict": true,
-    /* When type checking, take into account `null` and `undefined`. */
-    "strictNullChecks": true,
-    /* Enable error reporting for codepaths that do not explicitly return in a function. */
-    "noImplicitReturns": true,
-    /* Enable error reporting for fallthrough cases in switch statements. */
-    "noFallthroughCasesInSwitch": true,
-    /* Include 'undefined' in index signature results */
-    "noUncheckedIndexedAccess": true,
-    /* Skip type checking all .d.ts files. */
+    "esModuleInterop": true,
+    "moduleResolution": "node",
+    "types": ["@league-of-foundry-developers/foundry-vtt-types"],
     "skipLibCheck": true,
-    "sourceMap": true,
-    "baseUrl": ".",
-    "removeComments": false
+    "forceConsistentCasingInFileNames": true,
+    "noImplicitAny": false
   },
-  "ts-node": {
-    "files": true
-  },
-  "include": [
-    "src/**/*.ts"
-  ],
-  "exclude": [
-    "gulpfile.ts",
-    "dist",
-    "node_modules",
-    "**/*.spec.ts"
-  ]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules"]
 }
