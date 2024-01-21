@@ -31,7 +31,7 @@
     "./icons/**",
     "./packs/**"
   ],
-  "esmodules": ["scripts/bundle.js"],
+  "esmodules": ["bundle.js"],
   "styles": [],
   "languages": [],
   "packs": [],
