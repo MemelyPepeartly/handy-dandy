@@ -187,16 +187,22 @@ async function exportCompendiums(compendiums) {
             continue;
         }
 
-        // Ensure the index is loaded
-        await pack.getIndex();
+        await pack.getIndex(); // Ensure the index is loaded
         const packFolder = zip.folder(pack.metadata.label);
 
-        // Iterate through each item in the compendium
         for (const entry of pack.index) {
             const entity = await pack.getDocument(entry._id);
-            const content = JSON.stringify(entity?.toObject(false), null, 2);
-            packFolder?.file(`${entry.name}.json`, content);
+            // Use type assertion to treat the entity's data as any
+            const entityData: any = entity?.toObject(false);
+            const content = JSON.stringify(entityData, null, 2);
+        
+            // Now you can safely access the type property without TypeScript errors
+            const typeFolderName = entityData.type || "unknown";
+        
+            let typeFolder = packFolder?.folder(typeFolderName);
+            typeFolder?.file(`${entry.name}.json`, content);
         }
+        
     }
 
     // Generate the ZIP file and trigger the download
