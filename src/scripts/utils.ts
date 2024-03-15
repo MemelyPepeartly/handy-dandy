@@ -1,5 +1,7 @@
 import CONSTANTS from "./module/constants";
 import { HandyDandyWindow } from "./module/handy-dandy-window";
+import JSZip from 'jszip';
+import { saveAs } from 'file-saver';
 
 export function logTrace(...args: any[]) {
     log(0, ...args);
@@ -110,4 +112,96 @@ export function addHandyDandyButton(app, html, data) {
         const titleElement = header.find('h4.window-title');
         handyDandyButton.insertAfter(titleElement);
     }
+}
+
+export function addExportButtonToCompendiums(html) {
+    const exportButton = $(`<button type="button"><i class="fas fa-archive"></i> Export Compendiums</button>`);
+
+    // Add event listener for your button
+    exportButton.on("click", () => showExportDialog());
+
+    // Prepend your button to the compendium directory's header or another appropriate place
+    html.find('.directory-header').prepend(exportButton);
+}
+
+export function showExportDialog() {
+    var game = getGame();
+
+    let checkboxes = '';
+
+    game.packs.forEach(p => {
+        // Creating a checkbox for each compendium
+        checkboxes += `<input type="checkbox" name="compendium-select" value="${p.collection}">${p.title}<br>`;
+    });
+
+    let content = `
+        <form>
+            <div class="form-group" style="height: 300px; overflow-y: auto;">
+                <label>Select Compendiums:</label>
+                <div>${checkboxes}</div>
+            </div>
+        </form>
+    `;
+
+    new Dialog({
+        title: "Export Compendiums",
+        content: content,
+        buttons: {
+            export: {
+                icon: '<i class="fas fa-archive"></i>',
+                label: "Export",
+                callback: (html) => {
+                    const selectedCompendiums: string[] = [];
+
+                    $(html).find('input[name="compendium-select"]:checked').each(function() {
+                        // Ensure the value is defined and is a string before pushing it into the array
+                        const value = $(this).val();
+
+                        // Checks if value is string
+                        if (typeof value === "string") { 
+                            selectedCompendiums.push(value);
+                        }
+                    });
+                    exportCompendiums(selectedCompendiums);
+                }
+            },
+            cancel: {
+                icon: '<i class="fas fa-times"></i>',
+                label: "Cancel"
+            }
+        },
+        default: "export",
+        render: html => console.log("Rendering export dialog"),
+        close: () => console.log("Closed export dialog")
+    }).render(true);
+}
+
+async function exportCompendiums(compendiums) {
+    var game = getGame();
+    const zip = new JSZip();
+
+    for (const compendiumName of compendiums) {
+        const pack = game.packs.get(compendiumName);
+        if (!pack) {
+            console.warn(`Compendium ${compendiumName} not found.`);
+            continue;
+        }
+
+        // Ensure the index is loaded
+        await pack.getIndex();
+        const packFolder = zip.folder(pack.metadata.label);
+
+        // Iterate through each item in the compendium
+        for (const entry of pack.index) {
+            const entity = await pack.getDocument(entry._id);
+            const content = JSON.stringify(entity?.toObject(false), null, 2);
+            packFolder?.file(`${entry.name}.json`, content);
+        }
+    }
+
+    // Generate the ZIP file and trigger the download
+    zip.generateAsync({ type: "blob" })
+       .then(function(content) {
+            saveAs(content, "compendiums.zip");
+        });
 }

@@ -1,5 +1,5 @@
 import { registerSettings } from "./module/settings";
-import { addHandyDandyButton } from "./utils";
+import { addExportButtonToCompendiums, addHandyDandyButton } from "./utils";
 
 Hooks.once('init', () => {
     console.log("Handy Dandy | Initializing...");
@@ -7,7 +7,11 @@ Hooks.once('init', () => {
     registerSettings();
 });
 
+Hooks.on("renderCompendiumDirectory", (app, html, data) => {
+    addExportButtonToCompendiums(html);
+});
+
+
 Hooks.on('renderActorSheet', (app, html, data) => {
     addHandyDandyButton(app, html, data);
 });
-
