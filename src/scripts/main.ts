@@ -1,5 +1,5 @@
 import { registerSettings } from "./module/settings";
-import { addExportButtonToCompendiums, addHandyDandyButton, addRemigrateButtonToCompendiumWindows } from "./utils";
+import { addExportButtonToCompendiums, addFindInvalidButtonToCompendiumWindows, addHandyDandyButton, addRemigrateButtonToCompendiumWindows } from "./utils";
 
 // When initializing the module
 Hooks.once('init', () => {
@@ -16,6 +16,7 @@ Hooks.on("renderCompendiumDirectory", (app, html, data) => {
 // When rendering compendium window
 Hooks.on("renderCompendium", async (app, html, data) => {
     await addRemigrateButtonToCompendiumWindows(app, html, data);
+    await addFindInvalidButtonToCompendiumWindows(app, html, data);
 });
 
 // When rendering an actor sheet

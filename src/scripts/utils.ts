@@ -118,7 +118,7 @@ export function addRemigrateButtonToCompendiumWindows(app, html, data) {
     const remigrateButton = $(`<button style="margin-bottom:10px" type="button"><i class="fas fa-database"></i> Remigrate</button>`);
 
     // Add event listener for your button
-    remigrateButton.on("click", () => remigrateCompendium(data));
+    remigrateButton.on("click", async () => await remigrateCompendium(data));
 
     // Prepend your button to the compendium directory's header or another appropriate place
     html.find('.directory-header').prepend(remigrateButton);
@@ -140,6 +140,46 @@ export async function remigrateCompendium(data) {
     }
 }
 
+export function addFindInvalidButtonToCompendiumWindows(app, html, data) {
+    const findInvalidButton = $(`<button style="margin-bottom:10px" type="button"><i class="fas fa-search"></i> Find Invalid</button>`);
+
+    // Add event listener for your button
+    findInvalidButton.on("click", async () => await findInvalidEntries(app));
+
+    // Prepend your button to the compendium directory's header or another appropriate place
+    html.find('.directory-header').prepend(findInvalidButton);
+
+}
+
+export async function findInvalidEntries(app) {
+    // Assuming 'app' is the Compendium instance
+    const pack = app.collection;
+
+    if (!pack) {
+        console.error("Compendium pack not found.");
+        return;
+    }
+
+    await pack.getIndex(); // Ensure the index is loaded
+    const invalidEntries: string[] = []; // Explicitly type the array as string[]
+
+    for (const entry of pack.index) {
+        try {
+            // Attempt to get each document. This is a basic check to see if it can be loaded.
+            await pack.getDocument(entry._id);
+        } catch (e) {
+            // If an error occurs while fetching the document, consider it "invalid" for this example
+            invalidEntries.push(entry._id); // TypeScript now understands that entry._id is a string
+            console.log(`Invalid or corrupted entry found: ${entry.name} (${entry._id})`);
+        }
+    }
+
+    if (invalidEntries.length === 0) {
+        console.log("No invalid entries found.");
+    } else {
+        console.log(`Found invalid entries: ${invalidEntries.join(', ')}`);
+    }
+}
 
 export function addExportButtonToCompendiums(html) {
     const exportButton = $(`<button type="button"><i class="fas fa-archive"></i> Export Compendiums</button>`);
