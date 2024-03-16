@@ -114,6 +114,33 @@ export function addHandyDandyButton(app, html, data) {
     }
 }
 
+export function addRemigrateButtonToCompendiumWindows(app, html, data) {
+    const remigrateButton = $(`<button style="margin-bottom:10px" type="button"><i class="fas fa-database"></i> Remigrate</button>`);
+
+    // Add event listener for your button
+    remigrateButton.on("click", () => remigrateCompendium(data));
+
+    // Prepend your button to the compendium directory's header or another appropriate place
+    html.find('.directory-header').prepend(remigrateButton);
+}
+
+export async function remigrateCompendium(data) {
+    var game = getGame();
+
+    console.log("Remigrating compendium...", data);
+
+    // Migrate the pack associated with the open window
+    const pack = game.packs.get(data.collection.metadata.id);
+
+    logInfo("Handy Dandy | Migrating compendium: ");
+    console.log(pack);
+
+    if (pack) {
+        await pack.migrate();
+    }
+}
+
+
 export function addExportButtonToCompendiums(html) {
     const exportButton = $(`<button type="button"><i class="fas fa-archive"></i> Export Compendiums</button>`);
 
