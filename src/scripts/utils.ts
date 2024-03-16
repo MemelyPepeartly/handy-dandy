@@ -92,38 +92,6 @@ export async function createDialogue(dialogTmp: string, title: string = "Handy D
     await dialog.render(true);
 }
 
-export function addHandyDandyButton(app, html, data) {
-    // Find the header of the actor sheet
-    const header = html.find('.window-header');
-
-    // Check if the button is already there to avoid duplicates
-    if (!header.find('.handy-dandy-button').length) {
-        const handyDandyButton = $('<a class="handy-dandy-button"><i class="fas fa-microchip"></i>Handy Dandy</a>');
-
-        // Attach an event listener to the button
-        handyDandyButton.on("click", event => {
-            event.preventDefault();
-            const handyDandyApp = new HandyDandyWindow();
-            handyDandyApp.render(true);
-        });
-        
-
-        // Find the <h4> element and insert the button after it
-        const titleElement = header.find('h4.window-title');
-        handyDandyButton.insertAfter(titleElement);
-    }
-}
-
-export function addRemigrateButtonToCompendiumWindows(app, html, data) {
-    const remigrateButton = $(`<button style="margin-bottom:10px" type="button"><i class="fas fa-database"></i> Remigrate</button>`);
-
-    // Add event listener for your button
-    remigrateButton.on("click", async () => await remigrateCompendium(data));
-
-    // Prepend your button to the compendium directory's header or another appropriate place
-    html.find('.directory-header').prepend(remigrateButton);
-}
-
 export async function remigrateCompendium(data) {
     var game = getGame();
 
@@ -138,17 +106,6 @@ export async function remigrateCompendium(data) {
     if (pack) {
         await pack.migrate();
     }
-}
-
-export function addFindInvalidButtonToCompendiumWindows(app, html, data) {
-    const findInvalidButton = $(`<button style="margin-bottom:10px" type="button"><i class="fas fa-search"></i> Find Invalid</button>`);
-
-    // Add event listener for your button
-    findInvalidButton.on("click", async () => await findInvalidEntries(app));
-
-    // Prepend your button to the compendium directory's header or another appropriate place
-    html.find('.directory-header').prepend(findInvalidButton);
-
 }
 
 export async function findInvalidEntries(app) {
@@ -179,16 +136,6 @@ export async function findInvalidEntries(app) {
     } else {
         console.log(`Found invalid entries: ${invalidEntries.join(', ')}`);
     }
-}
-
-export function addExportButtonToCompendiums(html) {
-    const exportButton = $(`<button type="button"><i class="fas fa-archive"></i> Export Compendiums</button>`);
-
-    // Add event listener for your button
-    exportButton.on("click", () => showExportDialog());
-
-    // Prepend your button to the compendium directory's header or another appropriate place
-    html.find('.directory-header').prepend(exportButton);
 }
 
 export function showExportDialog() {
@@ -243,7 +190,7 @@ export function showExportDialog() {
     }).render(true);
 }
 
-async function exportCompendiums(compendiums) {
+export async function exportCompendiums(compendiums) {
     var game = getGame();
     const zip = new JSZip();
 
@@ -277,4 +224,17 @@ async function exportCompendiums(compendiums) {
        .then(function(content) {
             saveAs(content, "compendiums.zip");
         });
+}
+
+export function getSchema() {
+    var game = getGame();
+
+
+    const systemSchema = game.system.data?.schema;
+    const worldSchema = game.world.data?.schema;
+    const actorSchema = game.items?.documentClass.schema;
+
+    console.log("System schema: ", systemSchema);
+    console.log("World schema: ", worldSchema);
+    console.log("Actor schema: ", actorSchema);
 }

@@ -1,5 +1,10 @@
 import { registerSettings } from "./module/settings";
-import { addExportButtonToCompendiums, addFindInvalidButtonToCompendiumWindows, addHandyDandyButton, addRemigrateButtonToCompendiumWindows } from "./utils";
+import { addHandyDandyToolsButton, 
+    addExportButtonToCompendiums, 
+    addRemigrateButtonToCompendiumWindows, 
+    addFindInvalidButtonToCompendiumWindows, 
+    addHandyDandyButton } from "./setup";
+
 
 // When initializing the module
 Hooks.once('init', () => {
@@ -7,6 +12,11 @@ Hooks.once('init', () => {
 
     registerSettings();
 });
+
+Hooks.on('getSceneControlButtons', (controls) => {
+    addHandyDandyToolsButton(controls);
+});  
+  
 
 // When rendering the compendium directory
 Hooks.on("renderCompendiumDirectory", (app, html, data) => {
@@ -23,3 +33,4 @@ Hooks.on("renderCompendium", async (app, html, data) => {
 Hooks.on('renderActorSheet', (app, html, data) => {
     addHandyDandyButton(app, html, data);
 });
+  
