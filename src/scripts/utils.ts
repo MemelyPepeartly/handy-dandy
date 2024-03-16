@@ -226,15 +226,15 @@ export async function exportCompendiums(compendiums) {
         });
 }
 
-export function getSchema() {
+export function getSchemas() {
     var game = getGame();
 
 
     const systemSchema = game.system.data?.schema;
     const worldSchema = game.world.data?.schema;
-    const actorSchema = game.items?.documentClass.schema;
+    const actorSchema = game.items?.documentClass.schema as unknown as DocumentSchema;
 
-    console.log("System schema: ", systemSchema);
-    console.log("World schema: ", worldSchema);
-    console.log("Actor schema: ", actorSchema);
+    console.log("System schema: ", systemSchema.fields);
+    console.log("World schema: ", worldSchema.fields);
+    console.log("Actor schema: ", actorSchema.fields);
 }

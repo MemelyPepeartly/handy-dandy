@@ -13,10 +13,9 @@ Hooks.once('init', () => {
     registerSettings();
 });
 
-Hooks.on('getSceneControlButtons', (controls) => {
+Hooks.on("getSceneControlButtons", (controls: SceneControl[]) => {
     addHandyDandyToolsButton(controls);
-});  
-  
+});
 
 // When rendering the compendium directory
 Hooks.on("renderCompendiumDirectory", (app, html, data) => {

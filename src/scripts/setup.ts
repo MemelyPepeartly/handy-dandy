@@ -1,3 +1,4 @@
+import { HandyDandySchemaTool } from "./module/handy-dandy-tools";
 import { HandyDandyWindow } from "./module/handy-dandy-window";
 import { showExportDialog, findInvalidEntries, remigrateCompendium } from "./utils";
 
@@ -22,41 +23,30 @@ export function addFindInvalidButtonToCompendiumWindows(app, html, data) {
 
 }
 
-export function addHandyDandyToolsButton(controls) {
-// Define your custom toolset
-let customToolset = {
-    name: "handy-dandy-tools",
-    title: "Handy Dandy Tools", // Or use game.i18n.localize("YourLocalizationKey") for internationalization
-    icon: "fas fa-magic",
-    tools: [
-      {
-        name: "open-dialogue",
-        title: "Open Dialogue", // Or use game.i18n.localize("YourLocalizationKey") for internationalization
-        icon: "fas fa-comments",
-        onClick: () => {
-          // Define what happens when your tool is clicked. For example:
-          new Dialog({
-            title: "Custom Dialogue",
-            content: "<p>This is a custom dialogue triggered by my tool.</p>",
-            buttons: {
-              ok: {
-                icon: "<i class='fas fa-check'></i>",
-                label: "OK",
-                callback: () => console.log("OK Clicked")
-              }
-            },
-            default: "ok"
-          }).render(true);
-        },
-        button: true
-      },
-      // Add more tools as needed
-    ],
-    visible: true
-  };
+export function addHandyDandyToolsButton(controls: SceneControl[]) {
+    // Define the custom button with its tools/options
+    let customButton = {
+        name: "handy-dandy-tools",
+        title: "Handy Dandy Tools",
+        icon: "fas fa-magic",
+        layer: "controls", // Using a generic 'controls' layer for UI purposes
+        visible: true,
+        activeTool: "schema-tool", // Default active tool
+        tools: [
+            {
+                name: "schema-tool",
+                title: "Schema Tool",
+                icon: "fas fa-spell-check",
+                onClick: () => {
+                    const tool = new HandyDandySchemaTool();
+                    tool.render(true);
+                }
+            }
+        ]
+    };
 
-  // Add your custom toolset to the controls
-  controls.push(customToolset);
+    // Push the custom button into the scene controls array
+    controls.push(customButton);
 }
 
 export function addHandyDandyButton(app, html, data) {
