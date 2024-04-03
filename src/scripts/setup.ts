@@ -1,5 +1,5 @@
 import { HandyDandySchemaTool } from "./module/handy-dandy-tools";
-import { HandyDandyWindow } from "./module/handy-dandy-window";
+import { HandyDandyAi } from "./module/handy-dandy-ai";
 import { showExportDialog, findInvalidEntries, remigrateCompendium } from "./utils";
 
 export function addExportButtonToCompendiums(html) {
@@ -60,7 +60,7 @@ export function addHandyDandyButton(app, html, data) {
         // Attach an event listener to the button
         handyDandyButton.on("click", event => {
             event.preventDefault();
-            const handyDandyApp = new HandyDandyWindow();
+            const handyDandyApp = new HandyDandyAi();
             handyDandyApp.render(true);
         });
         

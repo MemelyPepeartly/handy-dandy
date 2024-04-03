@@ -1,5 +1,5 @@
 import CONSTANTS from "./module/constants";
-import { HandyDandyWindow } from "./module/handy-dandy-window";
+import { HandyDandyAi } from "./module/handy-dandy-ai";
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 
@@ -213,10 +213,13 @@ export async function exportCompendiums(compendiums) {
             // Now you can safely access the type property without TypeScript errors
             const typeFolderName = entityData.type || "unknown";
         
-            let typeFolder = packFolder?.folder(typeFolderName);
-            typeFolder?.file(`${entry.name}.json`, content);
-        }
+            // Sanitize the entry name to remove or replace invalid characters
+            // Here, we replace invalid characters with an underscore, but you can choose a different replacement
+            const sanitizedEntryName = entry.name?.replace(/[:*?"<>|\\\/]/g, '_');
         
+            let typeFolder = packFolder?.folder(typeFolderName);
+            typeFolder?.file(`${sanitizedEntryName}.json`, content);
+        }
     }
 
     // Generate the ZIP file and trigger the download

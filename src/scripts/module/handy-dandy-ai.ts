@@ -2,7 +2,7 @@ import OpenAI from "openai";
 import CONSTANTS from "./constants";
 import pathfinderContextMap from "../helpers/pathfinder-context-map";
 
-export class HandyDandyWindow extends Application {
+export class HandyDandyAi extends Application {
     response: string;
 
     constructor(options = {}) {

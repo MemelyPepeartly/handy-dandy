@@ -10,7 +10,8 @@
     "types": ["@league-of-foundry-developers/foundry-vtt-types"],
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "noImplicitAny": false
+    "noImplicitAny": false,
+    "noImplicitThis": false
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules"]

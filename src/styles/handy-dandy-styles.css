@@ -28,3 +28,22 @@
     justify-content: center;
     align-items: center;
 }
+
+.input-group {
+    display: flex;
+    align-items: center;
+}
+
+.input-group input[type="text"] {
+    flex-grow: 1;
+    border-radius: 4px 0 0 4px; /* Adjust as per your design */
+}
+
+.input-group-append .btn {
+    border-radius: 0 4px 4px 0; /* Adjust as per your design */
+    margin-left: -1px; /* To visually merge button and input */
+}
+
+.input-group .fa {
+    color: #666; /* Icon color */
+}
