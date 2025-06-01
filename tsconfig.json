@@ -1,18 +1,11 @@
 {
   "compilerOptions": {
-    "target": "es2018",                // Or the ECMAScript target that suits Foundry VTT's current version
-    "module": "esnext",
+    "rootDir": "./src/scripts",
     "outDir": "./dist",
-    "rootDir": "./src",
-    "strict": true,
-    "esModuleInterop": true,
-    "moduleResolution": "node",
-    "types": ["@league-of-foundry-developers/foundry-vtt-types"],
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "noImplicitAny": false,
-    "noImplicitThis": false
-  },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules"]
+    "target": "esnext",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "types": ["fvtt-types"],
+    "strict": true
+  }
 }
