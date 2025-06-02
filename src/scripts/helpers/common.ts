@@ -12,6 +12,17 @@ export function getGame(): Game & AssumeGameReady {
 }
 
 /**
+ * Returns the current user, throwing an error if it's null.
+ */
+export function getCurrentUser(): User {
+  const user = getGame().user;
+  if (!user) {
+    throw new Error('No current user found');
+  }
+  return user;
+}
+
+/**
  * Returns the game.settings object with proper typing
  * This removes the need for nullish assertions when accessing settings
  */
