@@ -1,9 +1,10 @@
 {
   "name": "handy-dandy",
-  "version": "0.13.4",
+  "version": "0.13.5",
   "type": "module",
   "scripts": {
-    "build": "webpack --mode production"
+    "build": "webpack --mode production",
+    "test": "webpack --mode production && xcopy /s /e /y /i dist \"%LOCALAPPDATA%\\FoundryVTT\\Data\\modules\\handy-dandy\\\""
   },
   "overrides": {
     "@types/earcut": "3.0.0"
