@@ -1,5 +1,5 @@
 // scripts/settings.ts
-import { CONSTANTS } from "./constants";
+import { CONSTANTS } from "../constants";
 
 export function registerSettings(): void {
   const settings = game.settings!;
