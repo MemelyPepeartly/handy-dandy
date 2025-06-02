@@ -2,10 +2,6 @@
   "id": "<%= id %>",
   "title": "Handy Dandy",
   "version": "<%= version %>",
-  "compatibility": {
-    "minimum": "11",
-    "verified": "11"
-  },
   "description": "A handy module",
   "authors": [
     {
@@ -13,13 +9,16 @@
       "discord": "memely"
     }
   ],
+  "compatibility": {
+    "minimum": "12",
+    "verified": "12"
+  },
   "url": "https://github.com/MemelyPepeartly/Handy-Dandy",
   "manifest": "https://github.com/MemelyPepeartly/Handy-Dandy/releases/download/latest/module.json",
   "download": "https://github.com/MemelyPepeartly/Handy-Dandy/releases/download/latest/module.zip",
   "bugs": "",
   "socket": true,
   "esmodules": ["handy-dandy.js"],
-  "styles": ["styles/handy-dandy-styles.css"],
   "languages": [],
   "packs": [],
   "relationships": {
