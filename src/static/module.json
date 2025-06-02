@@ -18,7 +18,7 @@
   "download": "https://github.com/MemelyPepeartly/Handy-Dandy/releases/download/latest/module.zip",
   "bugs": "",
   "socket": true,
-  "esmodules": ["bundle.js"],
+  "esmodules": ["module.js"],
   "styles": ["styles/handy-dandy-styles.css"],
   "languages": [],
   "packs": [],
