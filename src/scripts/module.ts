@@ -1,4 +1,4 @@
-import { registerSettings } from "./settings";
+import { registerSettings } from "./helpers/settings";
 import { OpenAI } from "openai";
 import { CONSTANTS } from "./constants";
 
