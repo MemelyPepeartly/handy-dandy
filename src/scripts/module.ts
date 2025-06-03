@@ -1,7 +1,8 @@
 // ---------- imports ----------
-import { registerSettings } from "./helpers/settings";
+import { registerSettings } from "./setup/settings";
 import { CONSTANTS } from "./constants";
 import { OpenAI } from "openai";
+import { insertSidebarButtons } from "./setup/sidebarButtons";
 
 // ---------- module namespace ----------
 declare global {
@@ -36,9 +37,7 @@ Hooks.once("ready", () => {
 
   const key = game.settings.get(CONSTANTS.MODULE_ID, "GPTApiKey") as string;
   if (!key) {
-    ui.notifications?.warn(
-      game.i18n.localize(`${CONSTANTS.MODULE_ID}.warnings.noKey`)
-    );
+    ui.notifications?.warn(`${CONSTANTS.MODULE_NAME} | No OpenAI API key set. Please configure it in the settings.`);
     return;
   }
 
@@ -59,34 +58,5 @@ Hooks.on("getSceneControlButtons", (controls: SceneControl[]) => {
   // Hot-module reloading: guard against double-insertion
   if (controls.some(c => c.name === "handy-dandy")) return;
 
-  const handyGroup: SceneControl = {
-    name: "handy-dandy",
-    title: "Handy Dandy Tools",
-    icon: "fas fa-screwdriver-wrench",
-    layer: "controls",                // Any existing layer is fine
-    visible: true,
-    activeTool: "prompt",             // Mandatory in v12 :contentReference[oaicite:0]{index=0}
-    tools: <SceneControlTool[]>[
-      {
-        name: "prompt",
-        title: "Prompt Tool",
-        icon: "fas fa-magic",
-        button: true,
-        onClick: () => {
-          ui.notifications?.info("Prompt tool clicked");
-          // TODO: launch your application window here
-        }
-      },
-      {
-        name: "toggle-test",
-        title: "Toggle Test",
-        icon: "fas fa-bug",
-        toggle: true,
-        onClick: (active: boolean) =>
-          console.debug(`${CONSTANTS.MODULE_NAME} | Toggle ${active ? "ON" : "OFF"}`)
-      }
-    ]
-  };
-
-  controls.push(handyGroup);          // Mutate in-place per docs :contentReference[oaicite:1]{index=1}
+  insertSidebarButtons(controls);
 });
