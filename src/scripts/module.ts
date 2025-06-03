@@ -3,31 +3,37 @@ import { registerSettings } from "./setup/settings";
 import { CONSTANTS } from "./constants";
 import { OpenAI } from "openai";
 import { insertSidebarButtons } from "./setup/sidebarButtons";
+import { SchemaTool } from "./tools/schema-tool";
 
 // ---------- module namespace ----------
 declare global {
   interface Game {
-    handyDandy?: { openai: OpenAI | null };
+    handyDandy?: { 
+      openai: OpenAI | null,
+      applications: {
+        schemaTool: Application
+      }
+    };
   }
 }
 
 // ---------- INIT ------------------------------------------------------------
 Hooks.once("init", async () => {
   console.log(`${CONSTANTS.MODULE_NAME} | init`);
-
-  // 1. Settings first – safest in init
   registerSettings();
 
-  // 2. Pre-load any handlebars the HUD will need on first render
-  await loadTemplates([
-    "modules/handy-dandy/templates/handy-dandy-window.hbs"
-  ]);
+  // Load and register templates with specific names
+  await loadTemplates({
+    "schema-tool": `${CONSTANTS.TEMPLATE_PATH}/schema-tool.hbs`,
+    "schema-node": `${CONSTANTS.TEMPLATE_PATH}/schema-node.hbs`
+  });
 });
+
 
 // ---------- SETUP -----------------------------------------------------------
 Hooks.once("setup", () => {
   // Provide a place other modules/macros can grab the SDK from
-  game.handyDandy = { openai: null };
+  game.handyDandy = { openai: null, applications: { schemaTool: new SchemaTool } };
 });
 
 // ---------- READY -----------------------------------------------------------
