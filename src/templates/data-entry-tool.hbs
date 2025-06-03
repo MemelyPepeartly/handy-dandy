@@ -1,0 +1,46 @@
+<form class="data-entry-form">
+  <div class="flexcol" style="height: 100%; gap: 0.5em;">
+
+    <!-- Options Panel -->
+    <fieldset>
+      <legend><strong>Options</strong></legend>
+      <div class="flexrow" style="flex-wrap: wrap; gap: 1em;">
+        <label><input type="checkbox" name="thirdParty" {{#if flags.thirdParty}}checked{{/if}}> Third-Party Source</label>
+        <label><input type="checkbox" name="monsterParts" {{#if flags.monsterParts}}checked{{/if}}> Monster Parts</label>
+        <label><input type="checkbox" name="companion" {{#if flags.companion}}checked{{/if}}> Companion</label>
+        <label><input type="checkbox" name="eidolon" {{#if flags.eidolon}}checked{{/if}}> Eidolon</label>
+        <label><input type="checkbox" name="ancestry" {{#if flags.ancestry}}checked{{/if}}> Ancestry</label>
+        <label><input type="checkbox" name="replacementMode" {{#if flags.replacementMode}}checked{{/if}}> Replacement Mode</label>
+        <label><input type="checkbox" name="useClipboard" {{#if flags.useClipboard}}checked{{/if}}> Auto-Copy Output</label>
+        <label><input type="checkbox" name="addGMText" {{#if flags.addGMText}}checked{{/if}}> GM-Only Triggers</label>
+        <label><input type="checkbox" name="inlineRolls" {{#if flags.inlineRolls}}checked{{/if}}> Inline Rolls</label>
+        <label><input type="checkbox" name="addConditions" {{#if flags.addConditions}}checked{{/if}}> Condition Links</label>
+        <label><input type="checkbox" name="addActions" {{#if flags.addActions}}checked{{/if}}> Action Links</label>
+        <label><input type="checkbox" name="addInlineChecks" {{#if flags.addInlineChecks}}checked{{/if}}> Inline Checks</label>
+        <label><input type="checkbox" name="starfinderMode" {{#if flags.starfinderMode}}checked{{/if}}> Starfinder Mode</label>
+        <label><input type="checkbox" name="addInlineTemplates" {{#if flags.addInlineTemplates}}checked{{/if}}> AoE Templates</label>
+        <label><input type="checkbox" name="removeNonASCII" {{#if flags.removeNonASCII}}checked{{/if}}> Normalize Quotes</label>
+        <label><input type="checkbox" name="eldamonMode" {{#if flags.eldamonMode}}checked{{/if}}> Eldamon Mode</label>
+        <label><input type="checkbox" name="deity" {{#if flags.deity}}checked{{/if}}> Deity Formatting</label>
+      </div>
+    </fieldset>
+
+    <!-- Textareas -->
+    <div class="flexrow" style="flex: 1 1 auto; gap: 0.5em;">
+      <div class="flexcol" style="flex: 1 1 50%;">
+        <label><strong>Raw Input</strong></label>
+        <textarea name="input" style="height: 100%; resize: none;">{{input}}</textarea>
+      </div>
+      <div class="flexcol" style="flex: 1 1 50%;">
+        <label><strong>Foundry Output</strong></label>
+        <textarea name="output" readonly style="height: 100%; resize: none;">{{output}}</textarea>
+      </div>
+    </div>
+
+    <!-- Buttons -->
+    <div class="flexrow" style="gap: 1em; justify-content: flex-end;">
+      <button type="button" data-action="clear"><i class="fas fa-eraser"></i> Clear</button>
+      <button type="button" data-action="process" class="highlight"><i class="fas fa-magic"></i> Reformat</button>
+    </div>
+  </div>
+</form>
