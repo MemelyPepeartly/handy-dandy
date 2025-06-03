@@ -4,14 +4,16 @@ import { CONSTANTS } from "./constants";
 import { OpenAI } from "openai";
 import { insertSidebarButtons } from "./setup/sidebarButtons";
 import { SchemaTool } from "./tools/schema-tool";
+import { DataEntryTool } from "./tools/data-entry-tool";
 
 // ---------- module namespace ----------
 declare global {
   interface Game {
-    handyDandy?: { 
+    handyDandy?: {
       openai: OpenAI | null,
       applications: {
-        schemaTool: Application
+        schemaTool: SchemaTool,
+        dataEntryTool: DataEntryTool
       }
     };
   }
@@ -25,7 +27,8 @@ Hooks.once("init", async () => {
   // Load and register templates with specific names
   await loadTemplates({
     "schema-tool": `${CONSTANTS.TEMPLATE_PATH}/schema-tool.hbs`,
-    "schema-node": `${CONSTANTS.TEMPLATE_PATH}/schema-node.hbs`
+    "schema-node": `${CONSTANTS.TEMPLATE_PATH}/schema-node.hbs`,
+    "data-entry-tool": `${CONSTANTS.TEMPLATE_PATH}/data-entry-tool.hbs`
   });
 });
 
@@ -33,7 +36,12 @@ Hooks.once("init", async () => {
 // ---------- SETUP -----------------------------------------------------------
 Hooks.once("setup", () => {
   // Provide a place other modules/macros can grab the SDK from
-  game.handyDandy = { openai: null, applications: { schemaTool: new SchemaTool } };
+  game.handyDandy = {
+    openai: null, applications: {
+      schemaTool: new SchemaTool,
+      dataEntryTool: new DataEntryTool
+    }
+  };
 });
 
 // ---------- READY -----------------------------------------------------------
