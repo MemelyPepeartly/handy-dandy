@@ -1,4 +1,5 @@
 import { CONSTANTS } from "../constants";
+import { SchemaTool } from "../tools/schema-tool";
 
 export function insertSidebarButtons(controls: SceneControl[]) {
     const handyGroup: SceneControl = {
@@ -7,16 +8,25 @@ export function insertSidebarButtons(controls: SceneControl[]) {
     icon: "fas fa-screwdriver-wrench",
     layer: "controls",                // Any existing layer is fine
     visible: true,
-    activeTool: "prompt",             // Mandatory in v12 :contentReference[oaicite:0]{index=0}
+    activeTool: "schema-tool",             // Mandatory in v12 :contentReference[oaicite:0]{index=0}
     tools: <SceneControlTool[]>[
       {
-        name: "prompt",
-        title: "Prompt Tool",
+        name: "schema-tool",
+        title: "Schema Tool",
         icon: "fas fa-magic",
         button: true,
         onClick: () => {
-          ui.notifications?.info("Prompt tool clicked");
-          // TODO: launch your application window here
+          console.debug(`${CONSTANTS.MODULE_NAME} | Opening Schema Tool`);
+          if (!game.handyDandy) {
+            ui.notifications?.error("Handy Dandy module is not initialized.");
+            return;
+          }
+          if (!game.handyDandy.applications?.schemaTool) {
+            game.handyDandy.applications = {
+              schemaTool: new SchemaTool()
+            };
+          }
+          game.handyDandy.applications.schemaTool.render(true);
         }
       },
       {
