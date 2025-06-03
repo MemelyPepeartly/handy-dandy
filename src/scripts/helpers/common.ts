@@ -22,6 +22,14 @@ export function getCurrentUser(): User {
   return user;
 }
 
+export function getUiControls(): SceneControls {
+    const controls = ui.controls;
+    if (!controls) {
+        throw new Error('UI controls are not initialized');
+    }
+    return controls;
+}
+
 /**
  * Returns the game.settings object with proper typing
  * This removes the need for nullish assertions when accessing settings
