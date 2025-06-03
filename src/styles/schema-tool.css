@@ -1,0 +1,18 @@
+.schema-tool details {
+  margin-left: 1em;
+}
+
+.schema-key {
+  font-weight: bold;
+}
+
+.schema-type {
+  color: #007bff;
+  font-weight: bold;
+}
+
+.schema-detail {
+  color: #6c757d;
+  font-style: italic;
+  font-size: smaller;
+}
