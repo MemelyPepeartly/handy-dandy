@@ -34,6 +34,10 @@ export default {
         {
           from: "src/templates",
           to: "templates"
+        },
+        {
+          from: "src/styles",
+          to: "styles"
         }
       ]
     }),
