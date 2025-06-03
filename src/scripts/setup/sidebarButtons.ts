@@ -21,21 +21,22 @@ export function insertSidebarButtons(controls: SceneControl[]) {
             ui.notifications?.error("Handy Dandy module is not initialized.");
             return;
           }
-          if (!game.handyDandy.applications?.schemaTool) {
-            game.handyDandy.applications = {
-              schemaTool: new SchemaTool()
-            };
-          }
           game.handyDandy.applications.schemaTool.render(true);
         }
       },
       {
-        name: "toggle-test",
-        title: "Toggle Test",
-        icon: "fas fa-bug",
-        toggle: true,
-        onClick: (active: boolean) =>
-          console.debug(`${CONSTANTS.MODULE_NAME} | Toggle ${active ? "ON" : "OFF"}`)
+        name: "data-entry-tool",
+        title: "Data Entry Tool",
+        icon: "fas fa-edit",
+        button: true,
+        onClick: () => {
+          console.debug(`${CONSTANTS.MODULE_NAME} | Opening Data Entry Tool`);
+          if (!game.handyDandy) {
+            ui.notifications?.error("Handy Dandy module is not initialized.");
+            return;
+          }
+          game.handyDandy.applications.dataEntryTool.render(true);
+        }
       }
     ]
   };
