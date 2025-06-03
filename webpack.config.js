@@ -30,6 +30,10 @@ export default {
               .replace(/<%= id %>/g, packageJson.name)
               .replace(/<%= version %>/g, packageJson.version);
           }
+        },
+        {
+          from: "src/templates",
+          to: "templates"
         }
       ]
     }),
