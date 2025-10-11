@@ -189,7 +189,7 @@ export const actorSchema = {
     img: { type: "string", nullable: true, default: null },
     source: { type: "string", default: "" }
   }
-} satisfies JSONSchemaType<ActorSchemaData>;
+} as unknown as JSONSchemaType<ActorSchemaData>;
 
 export const packEntrySchema = {
   $id: "PackEntry",
