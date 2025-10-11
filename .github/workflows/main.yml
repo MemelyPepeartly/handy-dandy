@@ -4,9 +4,12 @@ permissions:
   contents: write
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
+    inputs:
+      release_notes:
+        description: Optional notes for the release
+        required: false
+        default: ''
 
 jobs:
   build-and-release:
@@ -47,6 +50,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           artifacts: './dist/module.json,./module.zip'
           tag: latest
+          body: ${{ github.event.inputs.release_notes }}
       
       - name: Create Version Release
         id: create_version_release
@@ -59,3 +63,4 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           artifacts: './dist/module.json,./module.zip'
           tag: ${{ steps.get_version.outputs.version }}
+          body: ${{ github.event.inputs.release_notes }}
