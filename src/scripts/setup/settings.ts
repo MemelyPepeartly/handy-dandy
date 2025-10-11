@@ -1,6 +1,7 @@
 // scripts/settings.ts
 import { CONSTANTS } from "../constants";
 import { ToolOverview } from "../ui/tool-overview";
+import { DEFAULT_GPT_MODEL, GPT_MODEL_CHOICES } from "../gpt/models";
 
 export function registerSettings(): void {
   const settings = game.settings!;
@@ -29,7 +30,8 @@ export function registerSettings(): void {
     scope: "client",
     config: true,
     type: String,
-    default: "gpt-4.1-mini"
+    choices: GPT_MODEL_CHOICES,
+    default: DEFAULT_GPT_MODEL,
   });
 
   settings.register(CONSTANTS.MODULE_ID, "GPTTemperature", {
