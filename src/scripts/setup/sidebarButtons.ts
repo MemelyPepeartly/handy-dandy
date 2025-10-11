@@ -15,19 +15,13 @@ export function insertSidebarButtons(controls: SceneControl[]): void {
         name: "tool-guide",
         title: "Tool Guide",
         icon: "fas fa-compass",
-        toggle: true,
-        onClick: toggled => {
+        button: true,
+        onClick: () => {
           if (!game.handyDandy) {
             ui.notifications?.error("Handy Dandy module is not initialized.");
             return;
           }
-
-          const toolOverview = game.handyDandy.applications.toolOverview;
-          if (toggled) {
-            toolOverview.render(true);
-          } else {
-            toolOverview.close();
-          }
+          game.handyDandy.applications.toolOverview.render(true);
         }
       },
       {
