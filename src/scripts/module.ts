@@ -2,7 +2,7 @@
 import { registerSettings } from "./setup/settings";
 import { CONSTANTS } from "./constants";
 import { OpenAI } from "openai";
-import { insertSidebarButtons } from "./setup/sidebarButtons";
+import { insertSidebarButtons, type ControlCollection } from "./setup/sidebarButtons";
 import { SchemaTool } from "./tools/schema-tool";
 import { DataEntryTool } from "./tools/data-entry-tool";
 import { GPTClient } from "./gpt/client";
@@ -180,12 +180,15 @@ Hooks.once("ready", () => {
 });
 
 // ---------- SCENE-CONTROL GROUP --------------------------------------------
-Hooks.on("getSceneControlButtons", (controls: SceneControl[]) => {
+Hooks.on("getSceneControlButtons", (controls: ControlCollection) => {
   // GM-only tool-palette
   if (!game.user?.isGM) return;
 
   // Hot-module reloading: guard against double-insertion
-  if (controls.some(c => c.name === "handy-dandy")) return;
+  const alreadyPresent = Array.isArray(controls)
+    ? controls.some(c => c.name === "handy-dandy")
+    : Object.prototype.hasOwnProperty.call(controls, "handy-dandy");
+  if (alreadyPresent) return;
 
   insertSidebarButtons(controls);
 });
