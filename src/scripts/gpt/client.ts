@@ -60,8 +60,16 @@ async function hashPrompt(prompt: string): Promise<string> {
       .join("");
   }
 
-  const { createHash } = await import("node:crypto");
-  return createHash("sha256").update(prompt).digest("hex");
+  let hash = 0x811c9dc5;
+  let secondary = 0x1000193;
+  for (let index = 0; index < prompt.length; index += 1) {
+    const code = prompt.charCodeAt(index);
+    hash = Math.imul(hash ^ code, 0x01000193);
+    secondary = Math.imul(secondary ^ code, 0x01000193);
+  }
+  const primaryHex = (hash >>> 0).toString(16).padStart(8, "0");
+  const secondaryHex = (secondary >>> 0).toString(16).padStart(8, "0");
+  return `${primaryHex}${secondaryHex}`;
 }
 
 interface GPTGenerationAttempt<T> {
@@ -114,17 +122,17 @@ export class GPTClient {
     schema: JsonSchemaDefinition,
     options?: GenerateWithSchemaOptions,
   ): Promise<GPTGenerationAttempt<T>> {
-    const seed = options?.seed ?? this.#config.seed;
     const response = await this.#openai.responses.create({
       model: this.#config.model,
       input: prompt,
       temperature: this.#config.temperature,
       top_p: this.#config.top_p,
-      seed,
-      response_format: {
-        type: "json_schema",
-        json_schema: {
+      metadata: this.#createMetadata(options?.seed),
+      text: {
+        format: {
+          type: "json_schema",
           name: schema.name,
+          description: schema.description ?? "Return JSON matching the provided schema.",
           schema: schema.schema,
           strict: true,
         },
@@ -142,12 +150,11 @@ export class GPTClient {
     schema: JsonSchemaDefinition,
     options?: GenerateWithSchemaOptions,
   ): Promise<GPTGenerationAttempt<T>> {
-    const seed = options?.seed ?? this.#config.seed;
     const response = await this.#openai.responses.create({
       model: this.#config.model,
       temperature: this.#config.temperature,
       top_p: this.#config.top_p,
-      seed,
+      metadata: this.#createMetadata(options?.seed),
       input: [
         {
           role: "system",
@@ -158,15 +165,13 @@ export class GPTClient {
       tools: [
         {
           type: "function",
-          function: {
-            name: schema.name,
-            description: schema.description ?? "Return JSON matching the provided schema.",
-            parameters: schema.schema,
-            strict: true,
-          },
+          name: schema.name,
+          description: schema.description ?? "Return JSON matching the provided schema.",
+          parameters: schema.schema,
+          strict: true,
         },
       ],
-      tool_choice: { type: "function", function: { name: schema.name } },
+      tool_choice: { type: "function", name: schema.name },
     });
 
     return {
@@ -251,6 +256,14 @@ export class GPTClient {
       usage: payload.usage,
       error: payload.error,
     });
+  }
+
+  #createMetadata(seedOverride: number | undefined): Record<string, string> | undefined {
+    const seed = seedOverride ?? this.#config.seed;
+    if (typeof seed !== "number") {
+      return undefined;
+    }
+    return { handy_dandy_seed: String(seed) };
   }
 
   #extractUsage(response: unknown): GPTUsageMetrics | undefined {

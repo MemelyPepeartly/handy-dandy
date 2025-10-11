@@ -53,33 +53,33 @@ type BaseEntity<TType extends EntityType> = {
 
 export interface ActionSchemaData extends BaseEntity<"action"> {
   actionType: ActionExecution;
-  traits?: string[];
-  requirements?: string;
+  traits?: string[] | null;
+  requirements?: string | null;
   description: string;
-  img?: string;
-  rarity?: Rarity;
-  source?: string;
+  img?: string | null;
+  rarity?: Rarity | null;
+  source?: string | null;
 }
 
 export interface ItemSchemaData extends BaseEntity<"item"> {
   itemType: ItemCategory;
   rarity: Rarity;
   level: number;
-  price?: number;
-  traits?: string[];
-  description?: string;
-  img?: string;
-  source?: string;
+  price?: number | null;
+  traits?: string[] | null;
+  description?: string | null;
+  img?: string | null;
+  source?: string | null;
 }
 
 export interface ActorSchemaData extends BaseEntity<"actor"> {
   actorType: ActorCategory;
   rarity: Rarity;
   level: number;
-  traits?: string[];
-  languages?: string[];
-  img?: string;
-  source?: string;
+  traits?: string[] | null;
+  languages?: string[] | null;
+  img?: string | null;
+  source?: string | null;
 }
 
 export interface PackEntrySchemaData {
@@ -89,8 +89,8 @@ export interface PackEntrySchemaData {
   entityType: EntityType;
   name: string;
   slug: string;
-  img?: string;
-  sort?: number;
+  img?: string | null;
+  sort?: number | null;
   folder?: string | null;
 }
 
@@ -117,13 +117,14 @@ export const actionSchema = {
     traits: {
       type: "array",
       items: { type: "string", minLength: 1 },
+      nullable: true,
       default: [] as const
     },
-    requirements: { type: "string", default: "" },
+    requirements: { type: "string", nullable: true, default: "" },
     description: { type: "string", minLength: 1 },
-    img: { type: "string", format: "uri-reference", default: "" },
-    rarity: { type: "string", enum: RARITIES, default: "common" as const },
-    source: { type: "string", default: "" }
+    img: { type: "string", format: "uri-reference", nullable: true, default: "" },
+    rarity: { type: "string", enum: RARITIES, nullable: true, default: "common" as const },
+    source: { type: "string", nullable: true, default: "" }
   }
 } satisfies JSONSchemaType<ActionSchemaData>;
 
@@ -138,15 +139,16 @@ export const itemSchema = {
     itemType: { type: "string", enum: ITEM_CATEGORIES },
     rarity: { type: "string", enum: RARITIES },
     level: { type: "integer", minimum: 0 },
-    price: { type: "number", minimum: 0, default: 0 },
+    price: { type: "number", minimum: 0, nullable: true, default: 0 },
     traits: {
       type: "array",
       items: { type: "string", minLength: 1 },
+      nullable: true,
       default: [] as const
     },
-    description: { type: "string", default: "" },
-    img: { type: "string", format: "uri-reference", default: "" },
-    source: { type: "string", default: "" }
+    description: { type: "string", nullable: true, default: "" },
+    img: { type: "string", format: "uri-reference", nullable: true, default: "" },
+    source: { type: "string", nullable: true, default: "" }
   }
 } satisfies JSONSchemaType<ItemSchemaData>;
 
@@ -164,15 +166,17 @@ export const actorSchema = {
     traits: {
       type: "array",
       items: { type: "string", minLength: 1 },
+      nullable: true,
       default: [] as const
     },
     languages: {
       type: "array",
       items: { type: "string", minLength: 1 },
+      nullable: true,
       default: [] as const
     },
-    img: { type: "string", format: "uri-reference", default: "" },
-    source: { type: "string", default: "" }
+    img: { type: "string", format: "uri-reference", nullable: true, default: "" },
+    source: { type: "string", nullable: true, default: "" }
   }
 } satisfies JSONSchemaType<ActorSchemaData>;
 
@@ -188,8 +192,8 @@ export const packEntrySchema = {
     entityType: { type: "string", enum: ENTITY_TYPES },
     name: baseMeta.name,
     slug: baseMeta.slug,
-    img: { type: "string", format: "uri-reference", default: "" },
-    sort: { type: "integer", default: 0 },
+    img: { type: "string", format: "uri-reference", nullable: true, default: "" },
+    sort: { type: "integer", nullable: true, default: 0 },
     folder: { type: "string", nullable: true, default: null }
   }
 } satisfies JSONSchemaType<PackEntrySchemaData>;
@@ -230,5 +234,19 @@ export const validators: {
 export type ValidatorMap = typeof validators;
 export type ValidatorKey = keyof ValidatorMap;
 export type EntityValidator = ValidatorMap[keyof ValidatorMap];
+
+export type CanonicalEntityMap = {
+  action: ActionSchemaData;
+  item: ItemSchemaData;
+  actor: ActorSchemaData;
+};
+
+export type SchemaDataFor<K extends ValidatorKey> = K extends "action"
+  ? ActionSchemaData
+  : K extends "item"
+    ? ItemSchemaData
+    : K extends "actor"
+      ? ActorSchemaData
+      : PackEntrySchemaData;
 
 export { ajv as ajvInstance };

@@ -7,5 +7,6 @@
     "moduleResolution": "bundler",
     "types": ["fvtt-types"],
     "strict": true
-  }
+  },
+  "include": ["src/scripts/**/*", "src/types/**/*"]
 }
