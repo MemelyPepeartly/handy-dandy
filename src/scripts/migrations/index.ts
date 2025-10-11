@@ -14,7 +14,7 @@ const MIGRATIONS: MigrationRegistry = {
     1: withSourceDefault,
   },
   actor: {
-    1: withSourceDefault,
+    1: withActorDefaults,
   },
   packEntry: {
     1: upgradeSchemaVersion,
@@ -67,6 +67,29 @@ function withSourceDefault(data: MutableRecord): MutableRecord {
   if (typeof next.source !== "string") {
     next.source = "";
   }
+  return next;
+}
+
+function withActorDefaults(data: MutableRecord): MutableRecord {
+  const next = withSourceDefault(data);
+
+  const traits = Array.isArray(next.traits)
+    ? next.traits.filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+    : [];
+  next.traits = traits.map((value) => value.trim());
+
+  const languages = Array.isArray(next.languages)
+    ? next.languages.filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+    : [];
+  next.languages = languages.map((value) => value.trim());
+
+  if (typeof next.img === "string") {
+    const trimmed = next.img.trim();
+    next.img = trimmed.length ? trimmed : null;
+  } else {
+    next.img = null;
+  }
+
   return next;
 }
 

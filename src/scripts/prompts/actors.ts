@@ -32,10 +32,10 @@ function buildActorSchemaSection(): string {
     `- actorType: string enum (${categories}).`,
     `- rarity: string enum (${rarities}).`,
     "- level: integer >= 0.",
-    `- traits: optional array of non-empty strings; defaults to ${traitsDefault}.`,
-    `- languages: optional array of non-empty strings; defaults to ${languagesDefault}.`,
-    `- img: optional string containing an image URL or Foundry asset path; defaults to ${imgDefault}.`,
-    `- source: optional string; defaults to "${sourceDefault}".`
+    `- traits: array of non-empty strings; defaults to ${traitsDefault}.`,
+    `- languages: array of non-empty strings; defaults to ${languagesDefault}.`,
+    `- img: string or null containing an image URL or Foundry asset path; defaults to ${imgDefault}.`,
+    `- source: string; defaults to "${sourceDefault}".`
   ].join("\n");
 }
 
