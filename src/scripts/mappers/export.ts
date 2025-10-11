@@ -524,7 +524,7 @@ export function fromFoundryActor(doc: FoundryActor): ActorSchemaData {
 
   const traitSource =
     doc.system?.traits?.traits?.value ?? doc.system?.traits?.value ?? doc.system?.traits;
-  const traits = normalizeTraits(traitSource);
+  const traits = normalizeTraits(traitSource) ?? [];
 
   const rarityValue = doc.system?.traits?.rarity;
 
@@ -565,7 +565,8 @@ export function fromFoundryActor(doc: FoundryActor): ActorSchemaData {
     languages.push(language);
   }
 
-  const source = normalizeSource(doc.system?.details?.source ?? doc.system?.source);
+  const source = normalizeSource(doc.system?.details?.source ?? doc.system?.source) ?? "";
+  const img = normalizeImg(doc.img) ?? null;
 
   const result: ActorSchemaData = {
     schema_version: DEFAULT_SCHEMA_VERSION,
@@ -575,25 +576,12 @@ export function fromFoundryActor(doc: FoundryActor): ActorSchemaData {
     name: doc.name,
     actorType: resolveActorType(doc.type),
     rarity: normalizeRarity(rarityValue),
-    level: Number.isFinite(level) ? Number(level) : 0
+    level: Number.isFinite(level) ? Number(level) : 0,
+    traits,
+    languages,
+    img,
+    source
   };
-
-  if (traits?.length) {
-    result.traits = traits;
-  }
-
-  if (languages?.length) {
-    result.languages = languages;
-  }
-
-  if (source) {
-    result.source = source;
-  }
-
-  const img = normalizeImg(doc.img);
-  if (img) {
-    result.img = img;
-  }
 
   return result;
 }
