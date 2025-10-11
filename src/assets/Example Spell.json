@@ -1,0 +1,142 @@
+{
+  "name": "Example Spell",
+  "type": "spell",
+  "effects": [],
+  "system": {
+    "description": {
+      "gm": "",
+      "value": "<p>Example spell info here</p>"
+    },
+    "rules": [],
+    "slug": null,
+    "_migration": {
+      "version": 0.946,
+      "lastMigration": null
+    },
+    "traits": {
+      "otherTags": [],
+      "value": [
+        "acid",
+        "air",
+        "aura",
+        "earth",
+        "electricity"
+      ],
+      "rarity": "common",
+      "traditions": [
+        "arcane",
+        "divine",
+        "occult",
+        "primal"
+      ]
+    },
+    "publication": {
+      "title": "/mlptg/ The Bannermanes",
+      "authors": "Memely",
+      "license": "OGL",
+      "remaster": false
+    },
+    "level": {
+      "value": 1
+    },
+    "requirements": "Extra requirements here",
+    "target": {
+      "value": "1"
+    },
+    "range": {
+      "value": "30 ft"
+    },
+    "area": {
+      "value": 10,
+      "type": "burst"
+    },
+    "time": {
+      "value": "2"
+    },
+    "duration": {
+      "value": "1 minute",
+      "sustained": false
+    },
+    "damage": {
+      "Iy1jOKR7VSgfvfyT": {
+        "formula": "1d4",
+        "kinds": [
+          "damage"
+        ],
+        "type": "bludgeoning",
+        "category": "persistent",
+        "materials": [],
+        "applyMod": false
+      },
+      "JLDqzgu3a8i6BWqT": {
+        "formula": "1d4",
+        "kinds": [
+          "damage"
+        ],
+        "type": "vitality",
+        "category": null,
+        "materials": [],
+        "applyMod": false
+      },
+      "ijwqZjUMGAc6iOVG": {
+        "formula": "1d4",
+        "kinds": [
+          "damage"
+        ],
+        "type": "untyped",
+        "category": "precision",
+        "materials": [],
+        "applyMod": true
+      }
+    },
+    "defense": {
+      "passive": {
+        "statistic": "fortitude-dc"
+      },
+      "save": {
+        "statistic": "fortitude",
+        "basic": true
+      }
+    },
+    "cost": {
+      "value": "123"
+    },
+    "location": {
+      "value": null
+    },
+    "counteraction": false,
+    "heightening": {
+      "type": "interval",
+      "interval": 1,
+      "damage": {
+        "Iy1jOKR7VSgfvfyT": "5",
+        "JLDqzgu3a8i6BWqT": "5",
+        "ijwqZjUMGAc6iOVG": "5"
+      },
+      "area": 5
+    }
+  },
+  "img": "systems/pf2e/icons/default-icons/spell.svg",
+  "folder": null,
+  "flags": {},
+  "_stats": {
+    "compendiumSource": null,
+    "duplicateSource": null,
+    "exportSource": {
+      "worldId": "bannermanes-pf2",
+      "uuid": "Item.2bOGycSLY9lgMN6B",
+      "coreVersion": "13.350",
+      "systemId": "pf2e",
+      "systemVersion": "7.6.2"
+    },
+    "coreVersion": "13.350",
+    "systemId": "pf2e",
+    "systemVersion": "7.6.2",
+    "createdTime": 1760223797008,
+    "modifiedTime": 1760223981292,
+    "lastModifiedBy": "tstGJ3x0JRVfhi4Q"
+  },
+  "ownership": {
+    "default": 0
+  }
+}

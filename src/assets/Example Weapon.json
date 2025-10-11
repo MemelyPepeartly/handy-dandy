@@ -1,0 +1,140 @@
+{
+  "name": "Example Weapon",
+  "type": "weapon",
+  "effects": [],
+  "system": {
+    "description": {
+      "gm": "",
+      "value": "<p>Example weapon text here</p>"
+    },
+    "rules": [],
+    "slug": null,
+    "_migration": {
+      "version": 0.946,
+      "lastMigration": null
+    },
+    "traits": {
+      "otherTags": [],
+      "value": [
+        "backstabber",
+        "backswing",
+        "disarm",
+        "unarmed"
+      ],
+      "rarity": "common"
+    },
+    "publication": {
+      "title": "/mlptg/ The Bannermanes",
+      "authors": "Memely",
+      "license": "OGL",
+      "remaster": false
+    },
+    "level": {
+      "value": 0
+    },
+    "quantity": 1,
+    "baseItem": "battle-axe",
+    "bulk": {
+      "value": 0.1
+    },
+    "hp": {
+      "value": 0,
+      "max": 0
+    },
+    "hardness": 0,
+    "price": {
+      "value": {
+        "pp": 0,
+        "gp": 123,
+        "sp": 0,
+        "cp": 0
+      }
+    },
+    "equipped": {
+      "carryType": "worn",
+      "invested": null,
+      "handsHeld": 0
+    },
+    "containerId": null,
+    "size": "med",
+    "material": {
+      "type": "adamantine",
+      "grade": "standard"
+    },
+    "identification": {
+      "status": "identified",
+      "unidentified": {
+        "name": "Unusual Weapon",
+        "img": "systems/pf2e/icons/unidentified_item_icons/weapon.webp",
+        "data": {
+          "description": {
+            "value": ""
+          }
+        }
+      },
+      "misidentified": {}
+    },
+    "usage": {
+      "value": "held-in-one-hand"
+    },
+    "category": "simple",
+    "group": "axe",
+    "bonus": {
+      "value": 0
+    },
+    "damage": {
+      "dice": 1,
+      "die": "d6",
+      "damageType": "slashing",
+      "persistent": {
+        "number": 5,
+        "faces": 4,
+        "type": "slashing"
+      }
+    },
+    "splashDamage": {
+      "value": 5
+    },
+    "range": 10,
+    "expend": 1,
+    "reload": {
+      "value": "1"
+    },
+    "grade": null,
+    "runes": {
+      "potency": 4,
+      "striking": 2,
+      "property": [
+        "wounding",
+        "conducting",
+        "greaterFlaming",
+        "greaterCorrosive"
+      ]
+    },
+    "specific": null,
+    "subitems": []
+  },
+  "img": "systems/pf2e/icons/default-icons/weapon.svg",
+  "folder": null,
+  "flags": {},
+  "_stats": {
+    "compendiumSource": null,
+    "duplicateSource": null,
+    "exportSource": {
+      "worldId": "bannermanes-pf2",
+      "uuid": "Item.pCUmzli7FAzggZDC",
+      "coreVersion": "13.350",
+      "systemId": "pf2e",
+      "systemVersion": "7.6.2"
+    },
+    "coreVersion": "13.350",
+    "systemId": "pf2e",
+    "systemVersion": "7.6.2",
+    "createdTime": 1760224686551,
+    "modifiedTime": 1760224845744,
+    "lastModifiedBy": "tstGJ3x0JRVfhi4Q"
+  },
+  "ownership": {
+    "default": 0
+  }
+}
