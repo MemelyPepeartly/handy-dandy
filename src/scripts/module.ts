@@ -8,6 +8,7 @@ import { DataEntryTool } from "./tools/data-entry-tool";
 import { GPTClient } from "./gpt/client";
 import { DeveloperConsole } from "./dev/developer-console";
 import { setDeveloperConsole } from "./dev/state";
+import { createDevNamespace, canUseDeveloperTools, type DevNamespace } from "./dev/tools";
 import {
   DEFAULT_GENERATION_SEED,
   generateAction,
@@ -18,6 +19,8 @@ import {
 import type { ActionPromptInput, ActorPromptInput, ItemPromptInput } from "./prompts";
 import type { ActionSchemaData, ActorSchemaData, ItemSchemaData } from "./schemas";
 import { exportSelectedEntities, generateAndImportBatch } from "./flows/batch";
+import { ensureValid } from "./validation/ensure-valid";
+import { importAction } from "./mappers/import";
 
 type GeneratorFunction<TInput, TResult> = (
   input: TInput,
@@ -79,6 +82,7 @@ declare global {
       developer: {
         console: DeveloperConsole,
       },
+      dev: DevNamespace,
       flows: {
         exportSelection: typeof exportSelectedEntities;
         generateBatch: typeof generateAndImportBatch;
@@ -105,28 +109,42 @@ Hooks.once("init", async () => {
 // ---------- SETUP -----------------------------------------------------------
 Hooks.once("setup", () => {
   // Provide a place other modules/macros can grab the SDK from
+  const generation = {
+    generateAction: bindGenerator(generateAction),
+    generateItem: bindGenerator(generateItem),
+    generateActor: bindGenerator(generateActor),
+  } as const;
+
+  const developerConsole = new DeveloperConsole();
+
+  const devNamespace = createDevNamespace({
+    canAccess: canUseDeveloperTools,
+    getGptClient: () => game.handyDandy?.gptClient ?? null,
+    generateAction: generation.generateAction,
+    ensureValid,
+    importAction,
+    console,
+  });
+
   game.handyDandy = {
     openai: null,
     gptClient: null,
-    generation: {
-      generateAction: bindGenerator(generateAction),
-      generateItem: bindGenerator(generateItem),
-      generateActor: bindGenerator(generateActor),
-    },
+    generation,
     applications: {
       schemaTool: new SchemaTool,
       dataEntryTool: new DataEntryTool,
     },
     developer: {
-      console: new DeveloperConsole(),
+      console: developerConsole,
     },
+    dev: devNamespace,
     flows: {
       exportSelection: exportSelectedEntities,
       generateBatch: generateAndImportBatch,
     },
   };
 
-  setDeveloperConsole(game.handyDandy!.developer.console);
+  setDeveloperConsole(developerConsole);
 });
 
 // ---------- READY -----------------------------------------------------------
