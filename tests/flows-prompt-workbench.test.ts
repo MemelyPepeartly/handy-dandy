@@ -83,7 +83,7 @@ test("generateWorkbenchEntry returns data and importer helpers", async () => {
 
     const slug = input.slug ?? input.title.toLowerCase().replace(/\s+/g, "-");
     return {
-      schema_version: 2,
+      schema_version: 3,
       systemId: input.systemId,
       type: "action",
       slug,

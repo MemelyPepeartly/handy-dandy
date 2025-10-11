@@ -59,7 +59,7 @@ test("fromFoundryAction produces a valid schema-compliant action", () => {
   };
 
   const action = fromFoundryAction(mockAction);
-  assert.equal(action.schema_version, 2);
+  assert.equal(action.schema_version, 3);
   assert.equal(action.systemId, "pf2e");
   assert.equal(action.slug, "power-attack");
   assert.equal(action.actionType, "one-action");
@@ -89,7 +89,7 @@ test("fromFoundryItem normalises PF2e specific fields", () => {
   };
 
   const item = fromFoundryItem(mockItem);
-  assert.equal(item.schema_version, 2);
+  assert.equal(item.schema_version, 3);
   assert.equal(item.systemId, "pf2e");
   assert.equal(item.slug, "resonant-blade");
   assert.equal(item.itemType, "weapon");

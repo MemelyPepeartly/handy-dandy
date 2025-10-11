@@ -10,14 +10,14 @@
   "size": "med",
   "traits": ["human", "scout"],
   "alignment": "neutral",
-  "languages": ["Common", "Mwangi"],
+  "languages": ["common", "mwangi"],
   "attributes": {
-    "hp": { "value": 55, "max": 55, "temp": 0, "details": "" },
+    "hp": { "value": 55, "max": 55, "temp": 0, "details": null },
     "ac": { "value": 19, "details": "Leather armor" },
     "perception": { "value": 12, "details": "darkvision", "senses": ["darkvision"] },
     "speed": {
       "value": 25,
-      "details": "",
+      "details": null,
       "other": [
         { "type": "climb", "value": 15, "details": null }
       ]
@@ -29,10 +29,10 @@
     },
     "immunities": [],
     "weaknesses": [
-      { "type": "fire", "value": 5, "exceptions": [], "details": null }
+      { "type": "fire", "exceptions": [], "details": null, "value": 5 }
     ],
     "resistances": [
-      { "type": "cold", "value": 5, "exceptions": [], "doubleVs": [], "details": null }
+      { "type": "cold", "exceptions": [], "details": null, "value": 5, "doubleVs": [] }
     ]
   },
   "abilities": { "str": 3, "dex": 2, "con": 2, "int": 1, "wis": 1, "cha": 0 },
@@ -65,7 +65,7 @@
     }
   ],
   "description": "A vigilant scout always ready to sound the alarm.",
-  "recallKnowledge": null,
+  "recallKnowledge": "",
   "img": "icons/actors/cautious-scout.webp",
   "source": "Pathfinder Bestiary"
 }

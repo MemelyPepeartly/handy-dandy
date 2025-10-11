@@ -9,6 +9,62 @@ export interface JsonSchemaDefinition {
   description?: string;
 }
 
+type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | JsonValue[]
+  | { [key: string]: JsonValue };
+
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+};
+
+function normalizeRequiredProperties(node: unknown): JsonValue {
+  if (Array.isArray(node)) {
+    return node.map((entry) => normalizeRequiredProperties(entry)) as JsonValue;
+  }
+
+  if (!isRecord(node)) {
+    return node as JsonValue;
+  }
+
+  const normalized: Record<string, JsonValue> = {};
+  let propertyKeys: string[] = [];
+
+  for (const [key, value] of Object.entries(node)) {
+    if (key === "properties" && isRecord(value)) {
+      const properties: Record<string, JsonValue> = {};
+      for (const [propertyKey, propertyValue] of Object.entries(value)) {
+        properties[propertyKey] = normalizeRequiredProperties(propertyValue);
+      }
+      normalized.properties = properties;
+      propertyKeys = Object.keys(properties);
+      continue;
+    }
+
+    normalized[key] = normalizeRequiredProperties(value) as JsonValue;
+  }
+
+  if (propertyKeys.length > 0) {
+    const requiredValue = normalized.required;
+    const required: string[] = Array.isArray(requiredValue)
+      ? requiredValue.filter((entry): entry is string => typeof entry === "string")
+      : [];
+
+    for (const propertyKey of propertyKeys) {
+      if (!required.includes(propertyKey)) {
+        required.push(propertyKey);
+      }
+    }
+
+    normalized.required = required as JsonValue;
+  }
+
+  return normalized;
+}
+
 export interface GPTClientConfig {
   model: string;
   temperature: number;
@@ -122,6 +178,7 @@ export class GPTClient {
     schema: JsonSchemaDefinition,
     options?: GenerateWithSchemaOptions,
   ): Promise<GPTGenerationAttempt<T>> {
+    const prepared = this.#prepareSchemaDefinition(schema);
     const response = await this.#openai.responses.create({
       model: this.#config.model,
       input: prompt,
@@ -131,9 +188,9 @@ export class GPTClient {
       text: {
         format: {
           type: "json_schema",
-          name: schema.name,
-          description: schema.description ?? "Return JSON matching the provided schema.",
-          schema: schema.schema,
+          name: prepared.name,
+          description: prepared.description ?? "Return JSON matching the provided schema.",
+          schema: prepared.schema,
           strict: true,
         },
       },
@@ -150,6 +207,7 @@ export class GPTClient {
     schema: JsonSchemaDefinition,
     options?: GenerateWithSchemaOptions,
   ): Promise<GPTGenerationAttempt<T>> {
+    const prepared = this.#prepareSchemaDefinition(schema);
     const response = await this.#openai.responses.create({
       model: this.#config.model,
       temperature: this.#config.temperature,
@@ -165,19 +223,26 @@ export class GPTClient {
       tools: [
         {
           type: "function",
-          name: schema.name,
-          description: schema.description ?? "Return JSON matching the provided schema.",
-          parameters: schema.schema,
+          name: prepared.name,
+          description: prepared.description ?? "Return JSON matching the provided schema.",
+          parameters: prepared.schema,
           strict: true,
         },
       ],
-      tool_choice: { type: "function", name: schema.name },
+      tool_choice: { type: "function", name: prepared.name },
     });
 
     return {
       response,
       result: this.#extractJson<T>(response, schema),
     } satisfies GPTGenerationAttempt<T>;
+  }
+
+  #prepareSchemaDefinition(schema: JsonSchemaDefinition): JsonSchemaDefinition {
+    return {
+      ...schema,
+      schema: normalizeRequiredProperties(schema.schema) as Record<string, unknown>,
+    } satisfies JsonSchemaDefinition;
   }
 
   #shouldFallback(error: unknown): boolean {

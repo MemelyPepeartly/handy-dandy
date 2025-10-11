@@ -4,6 +4,7 @@ import {
   ACTOR_CATEGORIES,
   ACTOR_SIZES,
   ENTITY_TYPES,
+  LATEST_SCHEMA_VERSION,
   ITEM_CATEGORIES,
   RARITIES,
   SYSTEM_IDS,
@@ -308,11 +309,7 @@ function pruneUnknownFields(
 }
 
 function coerceSchemaVersion(value: Record<string, unknown>): void {
-  if (!Object.hasOwn(value, "schema_version")) return;
-  const coerced = coerceInteger(value.schema_version);
-  if (coerced !== undefined) {
-    value.schema_version = coerced;
-  }
+  value.schema_version = LATEST_SCHEMA_VERSION;
 }
 
 function coerceSystemId(value: Record<string, unknown>): void {
