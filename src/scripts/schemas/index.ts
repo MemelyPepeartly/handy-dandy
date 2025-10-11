@@ -122,7 +122,7 @@ export const actionSchema = {
     },
     requirements: { type: "string", nullable: true, default: "" },
     description: { type: "string", minLength: 1 },
-    img: { type: "string", format: "uri-reference", nullable: true, default: "" },
+    img: { type: "string", nullable: true, default: null },
     rarity: { type: "string", enum: RARITIES, nullable: true, default: "common" as const },
     source: { type: "string", nullable: true, default: "" }
   }
@@ -147,7 +147,7 @@ export const itemSchema = {
       default: [] as const
     },
     description: { type: "string", nullable: true, default: "" },
-    img: { type: "string", format: "uri-reference", nullable: true, default: "" },
+    img: { type: "string", nullable: true, default: null },
     source: { type: "string", nullable: true, default: "" }
   }
 } satisfies JSONSchemaType<ItemSchemaData>;
@@ -175,7 +175,7 @@ export const actorSchema = {
       nullable: true,
       default: [] as const
     },
-    img: { type: "string", format: "uri-reference", nullable: true, default: "" },
+    img: { type: "string", nullable: true, default: null },
     source: { type: "string", nullable: true, default: "" }
   }
 } satisfies JSONSchemaType<ActorSchemaData>;
@@ -192,7 +192,7 @@ export const packEntrySchema = {
     entityType: { type: "string", enum: ENTITY_TYPES },
     name: baseMeta.name,
     slug: baseMeta.slug,
-    img: { type: "string", format: "uri-reference", nullable: true, default: "" },
+    img: { type: "string", nullable: true, default: null },
     sort: { type: "integer", nullable: true, default: 0 },
     folder: { type: "string", nullable: true, default: null }
   }
