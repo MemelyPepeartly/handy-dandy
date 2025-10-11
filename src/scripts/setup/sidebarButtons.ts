@@ -1,5 +1,5 @@
 import { CONSTANTS } from "../constants";
-import { runBatchGenerationFlow, runExportSelectionFlow } from "../flows/batch-ui";
+import { runPromptWorkbenchFlow, runExportSelectionFlow } from "../flows/prompt-workbench-ui";
 
 type LegacyTool = SceneControls.Tool & {
   onChange?: (...args: unknown[]) => void;
@@ -143,12 +143,12 @@ export function insertSidebarButtons(controls: ControlCollection): void {
   });
 
   compatibilityAddTool(handyGroup.tools, {
-    name: "batch-generate",
-    title: "Batch Generate & Import",
-    icon: "fa-solid fa-diagram-project",
+    name: "prompt-workbench",
+    title: "Prompt Workbench",
+    icon: "fa-solid fa-hat-wizard",
     button: true,
     onClick: () => {
-      void runBatchGenerationFlow();
+      void runPromptWorkbenchFlow();
     },
     onChange: noop,
   });

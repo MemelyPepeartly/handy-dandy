@@ -4,9 +4,9 @@ import {
   collectFailureMessages,
   exportSelectedEntities,
   formatBatchSummary,
-  generateAndImportBatch,
-  type GenerationBatchOptions,
-} from "../src/scripts/flows/batch";
+  generateWorkbenchEntry,
+  type PromptWorkbenchRequest,
+} from "../src/scripts/flows/prompt-workbench";
 import type { ActionPromptInput } from "../src/scripts/prompts";
 import type { ActionSchemaData } from "../src/scripts/schemas";
 
@@ -75,29 +75,10 @@ test("exportSelectedEntities returns canonical JSON and failure details", () => 
   assert.deepEqual(failures, ["Broken: Document access failed"]);
 });
 
-test("generateAndImportBatch aggregates mixed success and failure", async () => {
-  const inputs: ActionPromptInput[] = [
-    {
-      systemId: "pf2e",
-      title: "Sure Strike",
-      referenceText: "Strike true.",
-    },
-    {
-      systemId: "pf2e",
-      title: "Failed Draft",
-      referenceText: "This will fail generation.",
-    },
-    {
-      systemId: "pf2e",
-      title: "Import Trouble",
-      referenceText: "Cause import failure.",
-      slug: "import-error",
-    },
-  ];
-
+test("generateWorkbenchEntry returns data and importer helpers", async () => {
   const generator = async (input: ActionPromptInput): Promise<ActionSchemaData> => {
-    if (input.title === "Failed Draft") {
-      throw new Error("Generation failed for Failed Draft");
+    if (input.title === "Unlucky Draft") {
+      throw new Error("Generation failed for Unlucky Draft");
     }
 
     const slug = input.slug ?? input.title.toLowerCase().replace(/\s+/g, "-");
@@ -124,28 +105,42 @@ test("generateAndImportBatch aggregates mixed success and failure", async () => 
     return { uuid: `Item.${data.slug}` } as any;
   };
 
-  const options: GenerationBatchOptions<"action"> = {
+  const request: PromptWorkbenchRequest<"action"> = {
     type: "action",
-    inputs,
+    systemId: "pf2e",
+    entryName: "Sure Strike",
+    referenceText: "Strike true.",
     dependencies: {
       generators: { action: generator },
       importers: { action: importer },
     },
   };
 
-  const result = await generateAndImportBatch(options);
+  const result = await generateWorkbenchEntry(request);
 
-  assert.equal(result.entries.length, 3);
-  assert.equal(result.successCount, 1);
-  assert.equal(result.failureCount, 2);
-  assert.equal(result.summary, "Processed 3 actions: 1 succeeded, 2 failed.");
+  assert.equal(result.name, "Sure Strike");
+  assert.equal(result.data.slug, "sure-strike");
+  assert.equal(result.data.type, "action");
 
-  const failures = collectFailureMessages(result.entries);
-  assert.deepEqual(failures, [
-    "Failed Draft: Generation failed for Failed Draft",
-    "Import Trouble: Import failed for import-error",
-  ]);
+  assert.ok(result.importer, "Importer helper should be provided when available");
+  const document = await result.importer?.();
+  assert.deepEqual(document, { uuid: "Item.sure-strike" });
 
   const summaryAllSuccess = formatBatchSummary("actions", 2, 2, 0);
   assert.equal(summaryAllSuccess, "Processed 2 actions: all succeeded.");
+
+  const failureRequest: PromptWorkbenchRequest<"action"> = {
+    type: "action",
+    systemId: "pf2e",
+    entryName: "Import Trouble",
+    referenceText: "Cause import failure.",
+    slug: "import-error",
+    dependencies: {
+      generators: { action: generator },
+      importers: { action: importer },
+    },
+  };
+
+  const failureResult = await generateWorkbenchEntry(failureRequest);
+  await assert.rejects(() => failureResult.importer?.(), /Import failed for import-error/);
 });
