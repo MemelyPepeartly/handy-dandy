@@ -1,4 +1,4 @@
-import { ACTOR_CATEGORIES, RARITIES, actorSchema, type SystemId } from "../schemas/index";
+import { ACTOR_CATEGORIES, ACTOR_SIZES, RARITIES, actorSchema, type SystemId } from "../schemas/index";
 import { type CorrectionContext, wrapPrompt } from "./common";
 
 export interface ActorPromptInput {
@@ -12,6 +12,7 @@ export interface ActorPromptInput {
 function buildActorSchemaSection(): string {
   const categories = ACTOR_CATEGORIES.join(", ");
   const rarities = RARITIES.join(", ");
+  const sizes = ACTOR_SIZES.join(", ");
   const schemaVersion = (actorSchema.properties.schema_version as { enum: readonly [number] }).enum[0];
   const traitsDefault = JSON.stringify(
     (actorSchema.properties.traits as { default: readonly string[] }).default
@@ -32,8 +33,24 @@ function buildActorSchemaSection(): string {
     `- actorType: string enum (${categories}).`,
     `- rarity: string enum (${rarities}).`,
     "- level: integer >= 0.",
-    `- traits: array of non-empty strings; defaults to ${traitsDefault}.`,
-    `- languages: array of non-empty strings; defaults to ${languagesDefault}.`,
+    `- size: string enum (${sizes}).`,
+    `- traits: array of lowercase strings; defaults to ${traitsDefault}.`,
+    "- alignment: optional string; defaults to null.",
+    `- languages: array of strings; defaults to ${languagesDefault}.`,
+    "- attributes: object describing defences and movement.",
+    "  - hp: { value, max, temp, details } with non-negative integers for value, max, and temp.",
+    "  - ac: { value, details } with integer value.",
+    "  - perception: { value, details, senses } where senses is an array of lowercase strings.",
+    "  - speed: { value, details, other } with other = array of { type, value, details } entries.",
+    "  - saves: { fortitude, reflex, will } each { value, details }.",
+    "  - immunities/weaknesses/resistances: arrays of objects with typed entries; defaults to [].",
+    "- abilities: object with str, dex, con, int, wis, cha modifiers (integers).",
+    "- skills: array of { slug, modifier, details } entries; defaults to [].",
+    "- strikes: array of attacks { name, type (melee|ranged), attackBonus, traits, damage[], effects, description } with each damage entry { formula, damageType, notes }.",
+    "- actions: array of special abilities { name, actionCost (one-action|two-actions|three-actions|free|reaction|passive), traits, requirements, trigger, frequency, description }.",
+    "- spellcasting: optional array of entries { name, tradition, castingType (prepared|spontaneous|innate|focus|ritual), attackBonus, saveDC, notes, spells[] } where spells are { level, name, description, tradition }.",
+    "- description: optional string; defaults to null.",
+    "- recallKnowledge: optional string; defaults to null.",
     `- img: string or null containing an image URL or Foundry asset path; defaults to ${imgDefault}.`,
     `- source: string; defaults to "${sourceDefault}".`
   ].join("\n");
