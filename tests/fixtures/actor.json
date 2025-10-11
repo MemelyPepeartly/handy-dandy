@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "systemId": "pf2e",
+  "type": "actor",
+  "slug": "cautious-scout",
+  "name": "Cautious Scout",
+  "actorType": "npc",
+  "rarity": "common",
+  "level": 3,
+  "traits": ["human", "scout"],
+  "languages": ["Common", "Mwangi"],
+  "img": "icons/actors/cautious-scout.webp"
+}

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "systemId": "pf2e",
+  "id": "pack-entry-stunning-strike",
+  "entityType": "action",
+  "name": "Stunning Strike",
+  "slug": "stunning-strike",
+  "img": "icons/items/mirror-shield.webp",
+  "sort": 100,
+  "folder": null
+}

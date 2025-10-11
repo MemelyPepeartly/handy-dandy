@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "systemId": "pf2e",
+  "type": "item",
+  "slug": "mirror-shield",
+  "name": "Mirror Shield",
+  "itemType": "armor",
+  "rarity": "rare",
+  "level": 9,
+  "price": 650,
+  "traits": ["invested", "magical"],
+  "description": "A gleaming shield that reflects hostile magic toward its source.",
+  "img": "icons/items/mirror-shield.webp"
+}

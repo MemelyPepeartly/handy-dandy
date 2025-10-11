@@ -7,66 +7,33 @@ import type {
   PackEntrySchemaData
 } from "../src/scripts/schemas";
 import { formatError, formatErrorPath, validate } from "../src/scripts/helpers/validation";
+import { cloneFixture, loadFixture } from "./helpers/fixtures";
 
-const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
+const actionFixture = loadFixture<ActionSchemaData>("action.json");
+const itemFixture = loadFixture<ItemSchemaData>("item.json");
+const actorFixture = loadFixture<ActorSchemaData>("actor.json");
+const packEntryFixture = loadFixture<PackEntrySchemaData>("pack-entry.json");
 
-const validAction: ActionSchemaData = {
-  schema_version: 1,
-  systemId: "pf2e",
-  type: "action",
-  slug: "test-action",
-  name: "Test Action",
-  actionType: "one-action",
-  traits: ["attack"],
-  description: "You do something impressive.",
-  requirements: ""
-};
+test("canonical fixtures validate against their schemas", () => {
+  const cases: Array<{
+    type: "action" | "item" | "actor" | "packEntry";
+    fixture: ActionSchemaData | ItemSchemaData | ActorSchemaData | PackEntrySchemaData;
+    file: string;
+  }> = [
+    { type: "action", fixture: actionFixture, file: "tests/fixtures/action.json" },
+    { type: "item", fixture: itemFixture, file: "tests/fixtures/item.json" },
+    { type: "actor", fixture: actorFixture, file: "tests/fixtures/actor.json" },
+    { type: "packEntry", fixture: packEntryFixture, file: "tests/fixtures/pack-entry.json" }
+  ];
 
-const validItem: ItemSchemaData = {
-  schema_version: 1,
-  systemId: "pf2e",
-  type: "item",
-  slug: "test-item",
-  name: "Test Item",
-  itemType: "equipment",
-  rarity: "common",
-  level: 1,
-  price: 10,
-  traits: ["magical"],
-  description: "A handy trinket."
-};
-
-const validActor: ActorSchemaData = {
-  schema_version: 1,
-  systemId: "pf2e",
-  type: "actor",
-  slug: "test-actor",
-  name: "Test Actor",
-  actorType: "npc",
-  rarity: "common",
-  level: 3,
-  traits: ["humanoid"],
-  languages: ["Common"]
-};
-
-const validPackEntry: PackEntrySchemaData = {
-  schema_version: 1,
-  systemId: "pf2e",
-  id: "entry-1",
-  entityType: "action",
-  name: "Test Entry",
-  slug: "test-entry"
-};
-
-test("valid fixtures pass validation", () => {
-  assert.deepStrictEqual(validate("action", clone(validAction)), { ok: true });
-  assert.deepStrictEqual(validate("item", clone(validItem)), { ok: true });
-  assert.deepStrictEqual(validate("actor", clone(validActor)), { ok: true });
-  assert.deepStrictEqual(validate("packEntry", clone(validPackEntry)), { ok: true });
+  for (const { type, fixture, file } of cases) {
+    const result = validate(type, cloneFixture(fixture));
+    assert.deepStrictEqual(result, { ok: true }, `${file} should conform to the ${type} schema`);
+  }
 });
 
 test("invalid action enum produces helpful error", () => {
-  const result = validate("action", { ...clone(validAction), actionType: "quad-action" as any });
+  const result = validate("action", { ...cloneFixture(actionFixture), actionType: "quad-action" as any });
   assert.equal(result.ok, false);
   if (!result.ok) {
     const [error] = result.errors;
@@ -77,7 +44,7 @@ test("invalid action enum produces helpful error", () => {
 });
 
 test("extra fields are reported for items", () => {
-  const result = validate("item", { ...clone(validItem), extra: true } as Record<string, unknown>);
+  const result = validate("item", { ...cloneFixture(itemFixture), extra: true } as Record<string, unknown>);
   assert.equal(result.ok, false);
   if (!result.ok) {
     const paths = result.errors.map((error) => formatErrorPath(error));
