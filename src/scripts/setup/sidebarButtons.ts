@@ -7,9 +7,9 @@ export function insertSidebarButtons(controls: SceneControl[]): void {
     name: "handy-dandy",
     title: "Handy Dandy Tools",
     icon: "fas fa-screwdriver-wrench",
-    layer: "controls", // Any existing layer is fine
+    layer: "interface",
     visible: true,
-    activeTool: "schema-tool", // Mandatory in v12 :contentReference[oaicite:0]{index=0}
+    activeTool: "tool-guide",
     tools: <SceneControlTool[]>[
       {
         name: "tool-guide",
