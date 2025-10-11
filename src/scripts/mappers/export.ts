@@ -18,6 +18,9 @@ import {
 const DEFAULT_SCHEMA_VERSION = LATEST_SCHEMA_VERSION;
 const DEFAULT_SYSTEM_ID = "pf2e" as const;
 
+type ActorSpellcastingEntry = NonNullable<ActorSchemaData["spellcasting"]>[number];
+type ActorSpellList = ActorSpellcastingEntry["spells"];
+
 const ACTION_TYPE_MAP: Record<string, ActionExecution> = {
   one: "one-action",
   "1": "one-action",
@@ -196,6 +199,478 @@ function normalizeTraits(value: unknown): string[] | undefined {
   }
 
   return items.length ? items : undefined;
+}
+
+function collectLanguages(doc: FoundryActor): string[] {
+  const sources: unknown[] = [];
+  const traitLanguages = doc.system?.traits?.languages;
+  if (traitLanguages !== undefined) {
+    if (typeof traitLanguages === "object" && traitLanguages !== null && "value" in traitLanguages) {
+      sources.push((traitLanguages as { value?: unknown }).value);
+    } else {
+      sources.push(traitLanguages);
+    }
+  }
+
+  const detailLanguages = doc.system?.details?.languages;
+  if (detailLanguages !== undefined) {
+    if (typeof detailLanguages === "object" && detailLanguages !== null && "value" in detailLanguages) {
+      sources.push((detailLanguages as { value?: unknown }).value);
+    } else {
+      sources.push(detailLanguages);
+    }
+  }
+
+  const languagesList = sources
+    .map((source) => normalizeLanguages(source))
+    .filter((value): value is string[] => Array.isArray(value) && value.length > 0)
+    .flat();
+
+  const result: string[] = [];
+  const seen = new Set<string>();
+  for (const language of languagesList) {
+    const key = language.toLowerCase();
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    result.push(language);
+  }
+  return result;
+}
+
+function extractValueProperty<T>(value: unknown): T | undefined {
+  if (value && typeof value === "object" && "value" in value) {
+    return (value as { value?: T }).value;
+  }
+  return undefined;
+}
+
+const ACTOR_SIZE_VALUES = new Set(["tiny", "sm", "med", "lg", "huge", "grg"]);
+
+function normalizeActorSize(value: unknown): ActorSchemaData["size"] {
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (ACTOR_SIZE_VALUES.has(normalized)) {
+      return normalized as ActorSchemaData["size"];
+    }
+  }
+  return "med";
+}
+
+function normalizeAlignment(value: unknown): string | null {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed ? trimmed : null;
+  }
+  if (typeof value === "object" && value !== null && "value" in value) {
+    return normalizeAlignment((value as { value?: unknown }).value ?? null);
+  }
+  return null;
+}
+
+function extractActorAttributes(doc: FoundryActor): ActorSchemaData["attributes"] {
+  const attributes = (doc.system?.attributes ?? {}) as Record<string, unknown>;
+  const hpSource = (attributes.hp ?? {}) as Record<string, unknown>;
+  const acSource = (attributes.ac ?? {}) as Record<string, unknown>;
+  const speedSource = (attributes.speed ?? {}) as Record<string, unknown>;
+  const savesSource = (doc.system?.saves ?? {}) as Record<string, unknown>;
+  const perceptionSource = (doc.system?.perception ?? {}) as Record<string, unknown>;
+
+  const hpValue = coerceNonNegativeInteger(hpSource.value, 1);
+  const hpMax = coerceNonNegativeInteger(hpSource.max, hpValue);
+  const hpTemp = coerceNonNegativeInteger(hpSource.temp, 0);
+
+  return {
+    hp: {
+      value: hpValue,
+      max: hpMax,
+      temp: hpTemp,
+      details: coerceOptionalString(hpSource.details),
+    },
+    ac: {
+      value: coerceInteger(hpSource.ac ?? acSource.value, 10),
+      details: coerceOptionalString(acSource.details),
+    },
+    perception: {
+      value: coerceInteger(perceptionSource.mod ?? perceptionSource.value, 0),
+      details: coerceOptionalString(perceptionSource.details),
+      senses: extractSenses(perceptionSource.senses),
+    },
+    speed: {
+      value: coerceNonNegativeInteger(speedSource.value, 0),
+      details: coerceOptionalString(speedSource.details),
+      other: extractOtherSpeeds(speedSource.otherSpeeds),
+    },
+    saves: {
+      fortitude: {
+        value: coerceInteger((savesSource.fortitude as { value?: unknown })?.value, 0),
+        details: coerceOptionalString((savesSource.fortitude as { saveDetail?: unknown })?.saveDetail),
+      },
+      reflex: {
+        value: coerceInteger((savesSource.reflex as { value?: unknown })?.value, 0),
+        details: coerceOptionalString((savesSource.reflex as { saveDetail?: unknown })?.saveDetail),
+      },
+      will: {
+        value: coerceInteger((savesSource.will as { value?: unknown })?.value, 0),
+        details: coerceOptionalString((savesSource.will as { saveDetail?: unknown })?.saveDetail),
+      },
+    },
+    immunities: extractDamageAdjustments(attributes.immunities),
+    weaknesses: extractDamageAdjustments(attributes.weaknesses, true) as ActorSchemaData["attributes"]["weaknesses"],
+    resistances: extractDamageAdjustments(attributes.resistances, false, true) as ActorSchemaData["attributes"]["resistances"],
+  };
+}
+
+function extractSenses(value: unknown): string[] {
+  if (!value) {
+    return [];
+  }
+  if (Array.isArray(value)) {
+    return value
+      .map((entry) => {
+        if (typeof entry === "string") {
+          return entry.trim();
+        }
+        if (typeof entry === "object" && entry !== null) {
+          const type = (entry as { type?: unknown }).type;
+          if (typeof type === "string") {
+            return type.trim();
+          }
+        }
+        return "";
+      })
+      .filter((entry) => entry.length > 0);
+  }
+  if (typeof value === "string") {
+    return value
+      .split(/[,;\n]/)
+      .map((entry) => entry.trim())
+      .filter((entry) => entry.length > 0);
+  }
+  return [];
+}
+
+function extractOtherSpeeds(value: unknown): ActorSchemaData["attributes"]["speed"]["other"] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map((entry) => {
+      if (!entry || typeof entry !== "object") {
+        return null;
+      }
+      const record = entry as { type?: unknown; value?: unknown; label?: unknown; details?: unknown };
+      const type = typeof record.type === "string" ? record.type.trim() : typeof record.label === "string" ? record.label.trim() : "";
+      const distance = coerceNonNegativeInteger(record.value, 0);
+      if (!type || !distance) {
+        return null;
+      }
+      return { type: type.toLowerCase(), value: distance, details: coerceOptionalString(record.details) };
+    })
+    .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+}
+
+function extractDamageAdjustments(
+  value: unknown,
+  requireValue = false,
+  includeDoubleVs = false,
+): { type: string; value?: number; exceptions: string[]; doubleVs?: string[]; details?: string | null }[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map((entry) => {
+      if (!entry || typeof entry !== "object") {
+        return null;
+      }
+      const record = entry as { type?: unknown; value?: unknown; exceptions?: unknown; doubleVs?: unknown; notes?: unknown; details?: unknown };
+      const type = typeof record.type === "string" ? record.type.trim().toLowerCase() : "";
+      if (!type) {
+        return null;
+      }
+      const result: { type: string; value?: number; exceptions: string[]; doubleVs?: string[]; details?: string | null } = {
+        type,
+        exceptions: normalizeLanguages(record.exceptions) ?? [],
+        details: coerceOptionalString(record.details ?? record.notes),
+      };
+      const amount = coerceNonNegativeInteger(record.value, 0);
+      if (!requireValue || amount > 0) {
+        result.value = amount;
+      }
+      if (includeDoubleVs) {
+        result.doubleVs = normalizeLanguages(record.doubleVs) ?? [];
+      }
+      return result;
+    })
+    .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+}
+
+function extractActorAbilities(source: unknown): ActorSchemaData["abilities"] {
+  const abilities = (source ?? {}) as Record<string, unknown>;
+  return {
+    str: extractAbility(abilities.str),
+    dex: extractAbility(abilities.dex),
+    con: extractAbility(abilities.con),
+    int: extractAbility(abilities.int),
+    wis: extractAbility(abilities.wis),
+    cha: extractAbility(abilities.cha),
+  };
+}
+
+function extractAbility(value: unknown): number {
+  if (typeof value === "number") {
+    return Math.trunc(value);
+  }
+  if (typeof value === "string") {
+    const parsed = Number(value.trim());
+    return Number.isFinite(parsed) ? Math.trunc(parsed) : 0;
+  }
+  if (value && typeof value === "object") {
+    const record = value as { mod?: unknown; value?: unknown };
+    const mod = extractAbility(record.mod);
+    if (mod) {
+      return mod;
+    }
+    return extractAbility(record.value);
+  }
+  return 0;
+}
+
+function extractActorSkills(source: unknown): ActorSchemaData["skills"] {
+  if (!source || typeof source !== "object") {
+    return [];
+  }
+  const entries = Object.entries(source as Record<string, unknown>);
+  return entries.map(([slug, value]) => {
+    const record = (value ?? {}) as { value?: unknown; base?: unknown; mod?: unknown; details?: unknown };
+    const modifier = coerceInteger(record.value, coerceInteger(record.base, coerceInteger(record.mod, 0)));
+    const normalizedSlug = slug.trim().toLowerCase();
+    return {
+      slug: normalizedSlug,
+      modifier,
+      details: coerceOptionalString(record.details),
+    } satisfies ActorSchemaData["skills"][number];
+  });
+}
+
+function extractActorStrikes(items: unknown): ActorSchemaData["strikes"] {
+  if (!Array.isArray(items)) {
+    return [];
+  }
+  return items
+    .filter((item): item is { type?: string; name?: string; system?: Record<string, unknown> } =>
+      !!item && typeof item === "object" && (item as { type?: string }).type === "melee",
+    )
+    .map((item) => {
+      const system = (item.system ?? {}) as Record<string, unknown>;
+      const traitsSource = extractValueProperty<unknown>(system.traits) ?? system.traits;
+      const traits = normalizeTraits(traitsSource) ?? [];
+      const attackBonus = coerceInteger((system.bonus as { value?: unknown })?.value ?? system.bonus, 0);
+      const damageRolls = extractDamageRolls(system.damageRolls);
+      const effectsSource = extractValueProperty<unknown>(system.attackEffects) ?? system.attackEffects;
+      const effects = normalizeLanguages(effectsSource) ?? [];
+      const descriptionSource = extractValueProperty<string>(system.description) ?? system.description;
+      const description = normalizeHtml(descriptionSource);
+      const type = determineStrikeType(traits);
+      return {
+        name: item.name ?? "Unnamed Strike",
+        type,
+        attackBonus,
+        traits,
+        damage: damageRolls,
+        effects,
+        description: description || null,
+      } satisfies ActorSchemaData["strikes"][number];
+    });
+}
+
+function extractDamageRolls(value: unknown): ActorSchemaData["strikes"][number]["damage"] {
+  if (!value || typeof value !== "object") {
+    return [];
+  }
+  const entries = Array.isArray(value)
+    ? value
+    : Object.values(value as Record<string, unknown>);
+  return entries
+    .map((entry) => {
+      if (!entry || typeof entry !== "object") {
+        return null;
+      }
+      const record = entry as { damage?: unknown; damageType?: unknown; category?: unknown };
+      const formula = typeof record.damage === "string" ? record.damage.trim() : "";
+      if (!formula) {
+        return null;
+      }
+      return {
+        formula,
+        damageType: typeof record.damageType === "string" ? record.damageType.trim() : null,
+        notes: null,
+      } satisfies ActorSchemaData["strikes"][number]["damage"][number];
+    })
+    .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+}
+
+function determineStrikeType(traits: string[]): ActorSchemaData["strikes"][number]["type"] {
+  const rangedTraits = traits.filter((trait) => trait.startsWith("range") || trait.includes("thrown"));
+  return rangedTraits.length ? "ranged" : "melee";
+}
+
+function extractActorActions(items: unknown): ActorSchemaData["actions"] {
+  if (!Array.isArray(items)) {
+    return [];
+  }
+  return items
+    .filter((item): item is { type?: string; name?: string; system?: Record<string, unknown> } =>
+      !!item && typeof item === "object" && (item as { type?: string }).type === "action",
+    )
+    .map((item) => {
+      const system = (item.system ?? {}) as Record<string, unknown>;
+      const actionType = (typeof system.actionType === "string"
+        ? system.actionType
+        : extractValueProperty<string>(system.actionType)) as string | undefined;
+      const actionCountRaw =
+        typeof system.actions === "number" || typeof system.actions === "string"
+          ? system.actions
+          : extractValueProperty<unknown>(system.actions);
+      const actionCost = resolveActorActionCost(actionType, actionCountRaw);
+      const traitsSource = extractValueProperty<unknown>(system.traits) ?? system.traits;
+      const traits = normalizeTraits(traitsSource) ?? [];
+      return {
+        name: item.name ?? "Unnamed Action",
+        actionCost,
+        traits,
+        description: normalizeHtml(extractValueProperty<string>(system.description) ?? system.description) || "",
+        requirements:
+          normalizeHtml(extractValueProperty<string>(system.requirements) ?? system.requirements) || null,
+        trigger: normalizeHtml(extractValueProperty<string>(system.trigger) ?? system.trigger) || null,
+        frequency: normalizeHtml(extractValueProperty<string>(system.frequency) ?? system.frequency) || null,
+      } satisfies ActorSchemaData["actions"][number];
+    });
+}
+
+function resolveActorActionCost(actionType: string | undefined, count: unknown): ActorSchemaData["actions"][number]["actionCost"] {
+  const normalizedType = typeof actionType === "string" ? actionType.trim().toLowerCase() : "";
+  const numericCount = coerceInteger(count, 0);
+  if (normalizedType === "reaction") {
+    return "reaction";
+  }
+  if (normalizedType === "free") {
+    return "free";
+  }
+  if (normalizedType === "passive") {
+    return "passive";
+  }
+  if (numericCount >= 3) {
+    return "three-actions";
+  }
+  if (numericCount === 2) {
+    return "two-actions";
+  }
+  if (numericCount === 1) {
+    return "one-action";
+  }
+  return "passive";
+}
+
+function extractActorSpellcasting(items: unknown): ActorSpellcastingEntry[] {
+  if (!Array.isArray(items)) {
+    return [];
+  }
+  const entries = items.filter((item): item is { type?: string; name?: string; system?: Record<string, unknown> } =>
+    !!item && typeof item === "object" && (item as { type?: string }).type === "spellcastingEntry",
+  );
+
+  return entries.map((item) => {
+    const system = (item.system ?? {}) as Record<string, unknown>;
+    const traditionRaw = extractValueProperty<unknown>(system.tradition) ?? system.tradition;
+    const castingTypeRaw =
+      extractValueProperty<unknown>(system.prepared) ??
+      system.prepared ??
+      extractValueProperty<unknown>(system.castingType) ??
+      system.castingType;
+    const attackBonus = coerceInteger((system.spellAttack as { value?: unknown })?.value ?? system.spellAttack, 0);
+    const saveDCRecord = (system.spelldc as { value?: unknown; dc?: unknown }) ?? {};
+    const saveDC = coerceInteger(saveDCRecord.dc ?? saveDCRecord.value, 0);
+    const spells = extractSpellList(system.slots);
+    return {
+      name: item.name ?? "Spellcasting",
+      tradition: typeof traditionRaw === "string" ? traditionRaw.trim().toLowerCase() : "arcane",
+      castingType: typeof castingTypeRaw === "string"
+        ? (castingTypeRaw.trim().toLowerCase() as ActorSpellcastingEntry["castingType"])
+        : "innate",
+      attackBonus,
+      saveDC,
+      notes: null,
+      spells,
+    } satisfies ActorSpellcastingEntry;
+  });
+}
+
+function extractSpellList(value: unknown): ActorSpellList {
+  if (!value || typeof value !== "object") {
+    return [];
+  }
+  const slots = value as Record<string, unknown>;
+  const result: ActorSpellList = [];
+  for (const [key, slotValue] of Object.entries(slots)) {
+    const match = key.match(/slot(\d+)/i);
+    if (!match) {
+      continue;
+    }
+    const level = Number(match[1] ?? 0);
+    const preparedSource = (slotValue as { prepared?: unknown }).prepared;
+    const prepared = Array.isArray(preparedSource)
+      ? preparedSource
+      : extractValueProperty<unknown>(preparedSource) ?? preparedSource;
+    if (!Array.isArray(prepared)) {
+      continue;
+    }
+    for (const entry of prepared) {
+      if (!entry || typeof entry !== "object") {
+        continue;
+      }
+      const record = entry as { spell?: { name?: string; system?: { description?: { value?: string } } }; id?: string };
+      const name = record.spell?.name ?? "";
+      if (!name) {
+        continue;
+      }
+      const description = normalizeHtml(record.spell?.system?.description?.value ?? "");
+      result.push({
+        level,
+        name,
+        description: description || null,
+        tradition: null,
+      });
+    }
+  }
+  return result;
+}
+
+function coerceOptionalString(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function coerceInteger(value: unknown, fallback: number): number {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return Math.trunc(value);
+  }
+  if (typeof value === "string") {
+    const parsed = Number(value.trim());
+    if (Number.isFinite(parsed)) {
+      return Math.trunc(parsed);
+    }
+  }
+  return fallback;
+}
+
+function coerceNonNegativeInteger(value: unknown, fallback: number): number {
+  const result = coerceInteger(value, fallback);
+  return result < 0 ? fallback : result;
 }
 
 const COIN_VALUES: Record<string, number> = {
@@ -380,6 +855,12 @@ export type FoundryItem = FoundryBaseDocument & {
   } & Record<string, unknown>;
 };
 
+export type FoundryActorItem = {
+  type?: string;
+  name?: string;
+  system?: Record<string, unknown>;
+};
+
 export type FoundryActor = FoundryBaseDocument & {
   type?: string;
   system?: {
@@ -389,6 +870,7 @@ export type FoundryActor = FoundryBaseDocument & {
       rarity?: string | null;
       traits?: { value?: unknown };
       languages?: { value?: unknown } | unknown;
+      size?: { value?: string | null } | string | null;
     };
     details?: {
       level?: { value?: number | string | null } | number | string | null;
@@ -396,6 +878,7 @@ export type FoundryActor = FoundryBaseDocument & {
       source?: { value?: string | null } | string | null;
     } & Record<string, unknown>;
   } & Record<string, unknown>;
+  items?: FoundryActorItem[] | null;
 };
 
 export function fromFoundryAction(doc: FoundryAction): ActionSchemaData {
@@ -528,43 +1011,7 @@ export function fromFoundryActor(doc: FoundryActor): ActorSchemaData {
 
   const rarityValue = doc.system?.traits?.rarity;
 
-  const languagesSources: unknown[] = [];
-  const languagesSource = doc.system?.traits?.languages;
-  const traitLanguages =
-    typeof languagesSource === "object" && languagesSource !== null && "value" in languagesSource
-      ? (languagesSource as { value?: unknown }).value
-      : languagesSource;
-  if (traitLanguages !== undefined) {
-    languagesSources.push(traitLanguages);
-  }
-
-  const detailLanguages =
-    doc.system?.details?.languages &&
-    typeof doc.system?.details?.languages === "object" &&
-    doc.system?.details?.languages !== null &&
-    "value" in doc.system?.details?.languages
-      ? (doc.system?.details?.languages as { value?: unknown }).value
-      : doc.system?.details?.languages;
-  if (detailLanguages !== undefined) {
-    languagesSources.push(detailLanguages);
-  }
-
-  const languagesList = languagesSources
-    .map((source) => normalizeLanguages(source))
-    .filter((value): value is string[] => Array.isArray(value) && value.length > 0)
-    .flat();
-
-  const languages: string[] = [];
-  const seenLanguages = new Set<string>();
-  for (const language of languagesList) {
-    const key = language.toLowerCase();
-    if (seenLanguages.has(key)) {
-      continue;
-    }
-    seenLanguages.add(key);
-    languages.push(language);
-  }
-
+  const languages = collectLanguages(doc);
   const source = normalizeSource(doc.system?.details?.source ?? doc.system?.source) ?? "";
   const img = normalizeImg(doc.img) ?? null;
 
@@ -577,11 +1024,29 @@ export function fromFoundryActor(doc: FoundryActor): ActorSchemaData {
     actorType: resolveActorType(doc.type),
     rarity: normalizeRarity(rarityValue),
     level: Number.isFinite(level) ? Number(level) : 0,
+    size: normalizeActorSize(
+      typeof doc.system?.traits?.size === "string"
+        ? doc.system.traits.size
+        : extractValueProperty<string>(doc.system?.traits?.size),
+    ),
     traits,
+    alignment: normalizeAlignment(doc.system?.details?.alignment),
     languages,
+    attributes: extractActorAttributes(doc),
+    abilities: extractActorAbilities(doc.system?.abilities),
+    skills: extractActorSkills(doc.system?.skills),
+    strikes: extractActorStrikes(doc.items),
+    actions: extractActorActions(doc.items),
+    spellcasting: extractActorSpellcasting(doc.items),
+    description: normalizeHtml(doc.system?.details?.publicNotes),
+    recallKnowledge: normalizeHtml(doc.system?.details?.privateNotes),
     img,
-    source
+    source,
   };
+
+  if (!result.spellcasting?.length) {
+    delete result.spellcasting;
+  }
 
   return result;
 }

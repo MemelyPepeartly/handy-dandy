@@ -126,16 +126,22 @@ test("fromFoundryActor converts actor documents", () => {
   };
 
   const actor = fromFoundryActor(mockActor);
-  assert.equal(actor.schema_version, 2);
+  assert.equal(actor.schema_version, 3);
   assert.equal(actor.systemId, "pf2e");
   assert.equal(actor.slug, "goblin-warrior");
   assert.equal(actor.actorType, "npc");
   assert.equal(actor.rarity, "common");
   assert.equal(actor.level, 3);
+  assert.equal(actor.size, "med");
   assert.deepEqual(actor.traits, ["goblin", "humanoid"]);
   assert.deepEqual(actor.languages, ["Goblin", "Goblin Sign", "Common"]);
   assert.equal(actor.source, "Bestiary");
   assert.equal(actor.img, null);
+  assert.equal(actor.attributes.hp.value, 1);
+  assert.equal(actor.abilities.str, 0);
+  assert.deepEqual(actor.skills, []);
+  assert.deepEqual(actor.strikes, []);
+  assert.deepEqual(actor.actions, []);
 
   const validation = validate("actor", actor);
   assert.deepEqual(validation, { ok: true });

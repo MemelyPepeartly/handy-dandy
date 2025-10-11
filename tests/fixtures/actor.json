@@ -1,5 +1,5 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "systemId": "pf2e",
   "type": "actor",
   "slug": "cautious-scout",
@@ -7,8 +7,65 @@
   "actorType": "npc",
   "rarity": "common",
   "level": 3,
+  "size": "med",
   "traits": ["human", "scout"],
+  "alignment": "neutral",
   "languages": ["Common", "Mwangi"],
+  "attributes": {
+    "hp": { "value": 55, "max": 55, "temp": 0, "details": "" },
+    "ac": { "value": 19, "details": "Leather armor" },
+    "perception": { "value": 12, "details": "darkvision", "senses": ["darkvision"] },
+    "speed": {
+      "value": 25,
+      "details": "",
+      "other": [
+        { "type": "climb", "value": 15, "details": null }
+      ]
+    },
+    "saves": {
+      "fortitude": { "value": 11, "details": null },
+      "reflex": { "value": 10, "details": null },
+      "will": { "value": 8, "details": null }
+    },
+    "immunities": [],
+    "weaknesses": [
+      { "type": "fire", "value": 5, "exceptions": [], "details": null }
+    ],
+    "resistances": [
+      { "type": "cold", "value": 5, "exceptions": [], "doubleVs": [], "details": null }
+    ]
+  },
+  "abilities": { "str": 3, "dex": 2, "con": 2, "int": 1, "wis": 1, "cha": 0 },
+  "skills": [
+    { "slug": "stealth", "modifier": 12, "details": "forest terrain" },
+    { "slug": "survival", "modifier": 11, "details": null }
+  ],
+  "strikes": [
+    {
+      "name": "Longspear",
+      "type": "melee",
+      "attackBonus": 13,
+      "traits": ["reach", "deadly-d8"],
+      "damage": [
+        { "formula": "1d8+3 piercing", "damageType": "piercing", "notes": null }
+      ],
+      "effects": [],
+      "description": "A precise spear thrust."
+    }
+  ],
+  "actions": [
+    {
+      "name": "Skirmish Strike",
+      "actionCost": "one-action",
+      "description": "Stride and Strike.",
+      "traits": ["attack"],
+      "requirements": null,
+      "trigger": null,
+      "frequency": null
+    }
+  ],
+  "description": "A vigilant scout always ready to sound the alarm.",
+  "recallKnowledge": null,
   "img": "icons/actors/cautious-scout.webp",
   "source": "Pathfinder Bestiary"
 }

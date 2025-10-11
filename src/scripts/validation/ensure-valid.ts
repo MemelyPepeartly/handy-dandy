@@ -2,6 +2,7 @@ import type { ErrorObject } from "ajv";
 import {
   ACTION_EXECUTIONS,
   ACTOR_CATEGORIES,
+  ACTOR_SIZES,
   ENTITY_TYPES,
   ITEM_CATEGORIES,
   RARITIES,
@@ -57,6 +58,10 @@ export interface EnsureValidRepairOptions<K extends ValidatorKey> {
   schema?: JsonSchemaDefinition;
 }
 
+type ActorSpellcastingEntry = NonNullable<ActorSchemaData["spellcasting"]>[number];
+type ActorSpellcastingList = ActorSpellcastingEntry[];
+type ActorSpellList = ActorSpellcastingEntry["spells"];
+
 export class EnsureValidError<K extends ValidatorKey> extends Error {
   public readonly diagnostics: EnsureValidDiagnostics<K>[];
   public readonly originalPayload: unknown;
@@ -100,6 +105,7 @@ const ITEM_TYPE_LOOKUP = createEnumLookup(ITEM_CATEGORIES, {
 });
 
 const ACTOR_TYPE_LOOKUP = createEnumLookup(ACTOR_CATEGORIES);
+const ACTOR_SIZE_LOOKUP = createEnumLookup(ACTOR_SIZES);
 const RARITY_LOOKUP = createEnumLookup(RARITIES);
 const SYSTEM_ID_LOOKUP = createEnumLookup(SYSTEM_IDS);
 const ENTITY_TYPE_LOOKUP = createEnumLookup(ENTITY_TYPES);
@@ -366,30 +372,494 @@ function coerceActor(value: Record<string, unknown>): void {
   assignEnum(value, "actorType", ACTOR_TYPE_LOOKUP);
   assignEnum(value, "rarity", RARITY_LOOKUP);
   assignInteger(value, "level");
+  assignEnum(value, "size", ACTOR_SIZE_LOOKUP);
   assignStringArray(value, "traits");
   assignStringArray(value, "languages");
+  assignOptionalString(value, "alignment");
   assignOptionalString(value, "img", { allowEmpty: true });
   assignOptionalString(value, "source", { allowEmpty: true });
+  assignOptionalString(value, "description");
+  assignOptionalString(value, "recallKnowledge");
 
-  if (!Array.isArray(value.traits)) {
-    value.traits = [];
+  if (typeof value.size !== "string") {
+    value.size = "med";
   }
 
-  if (!Array.isArray(value.languages)) {
-    value.languages = [];
-  }
+  value.traits = normalizeLowercaseArray(value.traits);
+  value.languages = normalizeStringArray(value.languages);
+  value.alignment = normalizeNullableString(value.alignment);
+  value.img = normalizeImage(value.img);
+  value.source = normalizeOptionalText(value.source);
+  value.description = normalizeNullableString(value.description);
+  value.recallKnowledge = normalizeNullableString(value.recallKnowledge);
 
-  if (typeof value.img !== "string" || value.img.trim().length === 0) {
-    value.img = null;
+  value.attributes = normalizeActorAttributes(value.attributes);
+  value.abilities = normalizeActorAbilityScores(value.abilities);
+  value.skills = normalizeActorSkills(value.skills);
+  value.strikes = normalizeActorStrikes(value.strikes);
+  value.actions = normalizeActorActions(value.actions);
+  const spellcasting = normalizeSpellcastingEntries(value.spellcasting);
+  if (spellcasting.length) {
+    value.spellcasting = spellcasting;
   } else {
-    value.img = value.img.trim();
+    delete value.spellcasting;
+  }
+}
+
+function normalizeActorAttributes(raw: unknown): ActorSchemaData["attributes"] {
+  const source = isRecord(raw) ? raw : {};
+  const hpSource = isRecord(source.hp) ? source.hp : {};
+  const acSource = isRecord(source.ac) ? source.ac : {};
+  const perceptionSource = isRecord(source.perception) ? source.perception : {};
+  const speedSource = isRecord(source.speed) ? source.speed : {};
+  const savesSource = isRecord(source.saves) ? source.saves : {};
+
+  const hpValue = normalizeNonNegativeInteger(hpSource.value, 1);
+  const hpMax = normalizeNonNegativeInteger(hpSource.max, hpValue);
+  const hpTemp = normalizeNonNegativeInteger(hpSource.temp, 0);
+
+  const result: ActorSchemaData["attributes"] = {
+    hp: {
+      value: hpValue,
+      max: hpMax,
+      temp: hpTemp,
+      details: normalizeNullableString(hpSource.details),
+    },
+    ac: {
+      value: normalizeInteger(acSource.value, 10),
+      details: normalizeNullableString(acSource.details),
+    },
+    perception: {
+      value: normalizeInteger(perceptionSource.value, 0),
+      details: normalizeNullableString(perceptionSource.details),
+      senses: normalizeLowercaseArray(perceptionSource.senses),
+    },
+    speed: {
+      value: normalizeNonNegativeInteger(speedSource.value, 0),
+      details: normalizeNullableString(speedSource.details),
+      other: normalizeSpeedEntries(speedSource.other),
+    },
+    saves: {
+      fortitude: normalizeSave(savesSource.fortitude),
+      reflex: normalizeSave(savesSource.reflex),
+      will: normalizeSave(savesSource.will),
+    },
+    immunities: normalizeImmunities(source.immunities),
+    weaknesses: normalizeWeaknesses(source.weaknesses),
+    resistances: normalizeResistances(source.resistances),
+  };
+
+  return result;
+}
+
+function normalizeSave(raw: unknown): ActorSchemaData["attributes"]["saves"]["fortitude"] {
+  const source = isRecord(raw) ? raw : {};
+  return {
+    value: normalizeInteger(source.value, 0),
+    details: normalizeNullableString(source.details ?? source.saveDetail),
+  };
+}
+
+function normalizeImmunities(raw: unknown): ActorSchemaData["attributes"]["immunities"] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  const result: NonNullable<ActorSchemaData["attributes"]["immunities"]> = [];
+  for (const entry of raw) {
+    const item = isRecord(entry) ? entry : {};
+    const type = normalizeKeyString(item.type);
+    if (!type) continue;
+    result.push({
+      type,
+      exceptions: normalizeLowercaseArray(item.exceptions),
+      details: normalizeNullableString(item.details),
+    });
+  }
+  return result;
+}
+
+function normalizeWeaknesses(raw: unknown): ActorSchemaData["attributes"]["weaknesses"] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  const result: NonNullable<ActorSchemaData["attributes"]["weaknesses"]> = [];
+  for (const entry of raw) {
+    const item = isRecord(entry) ? entry : {};
+    const type = normalizeKeyString(item.type);
+    const value = normalizeNonNegativeInteger(item.value, 0);
+    if (!type || value <= 0) continue;
+    result.push({
+      type,
+      value,
+      exceptions: normalizeLowercaseArray(item.exceptions),
+      details: normalizeNullableString(item.details),
+    });
+  }
+  return result;
+}
+
+function normalizeResistances(raw: unknown): ActorSchemaData["attributes"]["resistances"] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  const result: NonNullable<ActorSchemaData["attributes"]["resistances"]> = [];
+  for (const entry of raw) {
+    const item = isRecord(entry) ? entry : {};
+    const type = normalizeKeyString(item.type);
+    const value = normalizeNonNegativeInteger(item.value, 0);
+    if (!type || value <= 0) continue;
+    result.push({
+      type,
+      value,
+      exceptions: normalizeLowercaseArray(item.exceptions),
+      doubleVs: normalizeLowercaseArray(item.doubleVs),
+      details: normalizeNullableString(item.details),
+    });
+  }
+  return result;
+}
+
+function normalizeSpeedEntries(raw: unknown): ActorSchemaData["attributes"]["speed"]["other"] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  const result: NonNullable<ActorSchemaData["attributes"]["speed"]["other"]> = [];
+  for (const entry of raw) {
+    const item = isRecord(entry) ? entry : {};
+    const type = normalizeKeyString(item.type);
+    const value = normalizeNonNegativeInteger(item.value, 0);
+    if (!type || value <= 0) continue;
+    result.push({
+      type,
+      value,
+      details: normalizeNullableString(item.details),
+    });
+  }
+  return result;
+}
+
+function normalizeActorAbilityScores(raw: unknown): ActorSchemaData["abilities"] {
+  const source = isRecord(raw) ? raw : {};
+  return {
+    str: normalizeAbilityScore(source.str),
+    dex: normalizeAbilityScore(source.dex),
+    con: normalizeAbilityScore(source.con),
+    int: normalizeAbilityScore(source.int),
+    wis: normalizeAbilityScore(source.wis),
+    cha: normalizeAbilityScore(source.cha),
+  };
+}
+
+function normalizeAbilityScore(raw: unknown): number {
+  if (isRecord(raw)) {
+    const mod = normalizeOptionalInteger(raw.mod);
+    if (mod !== null) {
+      return mod;
+    }
+    const value = normalizeOptionalInteger(raw.value);
+    if (value !== null) {
+      return value;
+    }
+  }
+  return normalizeInteger(raw, 0);
+}
+
+function normalizeActorSkills(raw: unknown): ActorSchemaData["skills"] {
+  const result: ActorSchemaData["skills"] = [];
+  if (Array.isArray(raw)) {
+    for (const entry of raw) {
+      const skill = normalizeSkillEntry(entry);
+      if (skill) {
+        result.push(skill);
+      }
+    }
+    return result;
   }
 
-  if (typeof value.source !== "string") {
-    value.source = "";
-  } else {
-    value.source = value.source.trim();
+  if (isRecord(raw)) {
+    for (const [slug, entry] of Object.entries(raw)) {
+      const skill = normalizeSkillEntry({ slug, ...((isRecord(entry) ? entry : {}) as Record<string, unknown>) });
+      if (skill) {
+        result.push(skill);
+      }
+    }
   }
+
+  return result;
+}
+
+function normalizeSkillEntry(raw: unknown): ActorSchemaData["skills"][number] | null {
+  const source = isRecord(raw) ? raw : {};
+  const slug = normalizeKeyString(source.slug ?? source.name);
+  const modifier = normalizeInteger(source.modifier ?? source.value ?? source.base, 0);
+  if (!slug) {
+    return null;
+  }
+  return {
+    slug,
+    modifier,
+    details: normalizeNullableString(source.details ?? source.note ?? source.notes),
+  };
+}
+
+const STRIKE_TYPE_LOOKUP = createEnumLookup(["melee", "ranged"], {
+  close: "melee",
+  reach: "melee",
+  thrown: "ranged",
+});
+
+function normalizeActorStrikes(raw: unknown): ActorSchemaData["strikes"] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  const result: ActorSchemaData["strikes"] = [];
+  for (const entry of raw) {
+    const strike = isRecord(entry) ? entry : {};
+    const name = normalizeTitle(strike.name ?? strike.label);
+    const type = coerceEnum(strike.type ?? strike.category, STRIKE_TYPE_LOOKUP) ?? "melee";
+    const attackBonus = normalizeInteger(strike.attackBonus ?? strike.bonus ?? strike.modifier, 0);
+    const damage = normalizeStrikeDamage(strike.damage ?? strike.damageRolls ?? strike.formulae);
+    if (!name || damage.length === 0) {
+      continue;
+    }
+    result.push({
+      name,
+      type: type as "melee" | "ranged",
+      attackBonus,
+      traits: normalizeLowercaseArray(strike.traits ?? strike.tags),
+      damage,
+      effects: normalizeLowercaseArray(strike.effects ?? strike.special ?? strike.additionalEffects),
+      description: normalizeNullableString(strike.description ?? strike.note ?? strike.notes),
+    });
+  }
+  return result;
+}
+
+function normalizeStrikeDamage(raw: unknown): ActorSchemaData["strikes"][number]["damage"] {
+  const result: ActorSchemaData["strikes"][number]["damage"] = [];
+  if (Array.isArray(raw)) {
+    for (const entry of raw) {
+      const normalized = normalizeDamageEntry(entry);
+      if (normalized) {
+        result.push(normalized);
+      }
+    }
+    return result;
+  }
+
+  if (isRecord(raw)) {
+    const entries = Array.isArray(raw.list)
+      ? raw.list
+      : Object.values(raw);
+    for (const entry of entries) {
+      const normalized = normalizeDamageEntry(entry);
+      if (normalized) {
+        result.push(normalized);
+      }
+    }
+  }
+
+  return result;
+}
+
+function normalizeDamageEntry(raw: unknown): ActorSchemaData["strikes"][number]["damage"][number] | null {
+  const source = isRecord(raw) ? raw : {};
+  const formula = normalizeFormula(source.formula ?? source.damage ?? source.value);
+  if (!formula) {
+    return null;
+  }
+  return {
+    formula,
+    damageType: normalizeKeyString(source.damageType ?? source.type),
+    notes: normalizeNullableString(source.notes ?? source.description),
+  };
+}
+
+const ACTOR_ACTION_COST_LOOKUP = createEnumLookup([...ACTION_EXECUTIONS, "passive"]);
+
+function normalizeActorActions(raw: unknown): ActorSchemaData["actions"] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  const result: ActorSchemaData["actions"] = [];
+  for (const entry of raw) {
+    const source = isRecord(entry) ? entry : {};
+    const name = normalizeTitle(source.name ?? source.title);
+    if (!name) {
+      continue;
+    }
+    const actionCost =
+      coerceEnum(source.actionCost ?? source.actions ?? source.cost, ACTOR_ACTION_COST_LOOKUP) ?? "passive";
+    const descriptionRaw = normalizeTextBlock(source.description ?? source.details ?? source.text);
+    const description = descriptionRaw || "No description provided.";
+    result.push({
+      name,
+      actionCost: actionCost as ActorSchemaData["actions"][number]["actionCost"],
+      description,
+      traits: normalizeLowercaseArray(source.traits ?? source.tags),
+      requirements: normalizeNullableString(source.requirements),
+      trigger: normalizeNullableString(source.trigger),
+      frequency: normalizeNullableString(source.frequency),
+    });
+  }
+  return result;
+}
+
+const SPELLCASTING_TYPE_LOOKUP = createEnumLookup(["prepared", "spontaneous", "innate", "focus", "ritual"]);
+
+function normalizeSpellcastingEntries(raw: unknown): ActorSpellcastingList {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  const result: ActorSpellcastingList = [];
+  for (const spellcastingSource of raw) {
+    const source = isRecord(spellcastingSource) ? spellcastingSource : {};
+    const name = normalizeTitle(source.name ?? source.label);
+    const tradition = normalizeKeyString(
+      (isRecord(source.tradition) ? source.tradition.value : source.tradition) ?? source.traditionValue ?? source.traditionName,
+    );
+    const castingType =
+      coerceEnum(source.castingType ?? source.prepared ?? source.type, SPELLCASTING_TYPE_LOOKUP) ?? "innate";
+    const spells = normalizeSpellList(source.spells ?? source.list ?? source.entries);
+    if (!name || !tradition) {
+      continue;
+    }
+    const normalizedEntry: ActorSpellcastingEntry = {
+      name,
+      tradition,
+      castingType: castingType as ActorSpellcastingEntry["castingType"],
+      spells,
+    };
+    const attackBonus = normalizeOptionalInteger(
+      (isRecord(source.spelldc) ? source.spelldc.value : undefined) ?? source.attackBonus ?? source.bonus ?? source.spellAttack,
+    );
+    if (attackBonus !== null) {
+      normalizedEntry.attackBonus = attackBonus;
+    }
+    const saveDC = normalizeOptionalInteger(
+      (isRecord(source.spelldc) ? source.spelldc.dc : undefined) ?? source.saveDC ?? source.dc,
+    );
+    if (saveDC !== null) {
+      normalizedEntry.saveDC = saveDC;
+    }
+    const notes = normalizeNullableString(source.notes ?? source.description);
+    if (notes) {
+      normalizedEntry.notes = notes;
+    }
+    result.push(normalizedEntry);
+  }
+  return result;
+}
+
+function normalizeSpellList(raw: unknown): ActorSpellList {
+  const result: ActorSpellList = [];
+  if (!Array.isArray(raw)) {
+    return result;
+  }
+  for (const entry of raw) {
+    const source = isRecord(entry) ? entry : {};
+    const name = normalizeTitle(source.name ?? source.spell);
+    const level = normalizeNonNegativeInteger(source.level ?? source.rank, 0);
+    if (!name) {
+      continue;
+    }
+    result.push({
+      level,
+      name,
+      description: normalizeNullableString(source.description ?? source.details),
+      tradition: normalizeNullableString(source.tradition),
+    });
+  }
+  return result;
+}
+
+function normalizeLowercaseArray(value: unknown): string[] {
+  const entries = normalizeStringArray(value);
+  return entries.map((entry) => entry.toLowerCase());
+}
+
+function normalizeStringArray(value: unknown): string[] {
+  const result = coerceStringArray(value);
+  if (!result) {
+    return [];
+  }
+  return result.map((entry) => entry.trim()).filter((entry) => entry.length > 0);
+}
+
+function normalizeNullableString(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function normalizeOptionalText(value: unknown): string {
+  if (typeof value !== "string") {
+    return "";
+  }
+  return value.trim();
+}
+
+function normalizeImage(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function normalizeNonNegativeInteger(value: unknown, fallback: number): number {
+  const coerced = coerceInteger(value);
+  if (coerced === undefined || coerced < 0) {
+    return fallback;
+  }
+  return coerced;
+}
+
+function normalizeInteger(value: unknown, fallback = 0): number {
+  const coerced = coerceInteger(value);
+  return coerced === undefined ? fallback : coerced;
+}
+
+function normalizeOptionalInteger(value: unknown): number | null {
+  const coerced = coerceInteger(value);
+  return coerced === undefined ? null : coerced;
+}
+
+function normalizeFormula(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function normalizeTitle(value: unknown): string {
+  if (typeof value !== "string") {
+    return "";
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : "";
+}
+
+function normalizeTextBlock(value: unknown): string {
+  if (typeof value !== "string") {
+    return "";
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : "";
+}
+
+function normalizeKeyString(value: unknown): string {
+  if (typeof value !== "string") {
+    return "";
+  }
+  return normalizeEnumKey(value);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
 
 function coercePackEntry(value: Record<string, unknown>): void {

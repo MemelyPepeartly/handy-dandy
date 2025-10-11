@@ -4,6 +4,9 @@ import { validate, formatError } from "../helpers/validation";
 const DEFAULT_ACTION_IMAGE = "systems/pf2e/icons/default-icons/action.svg" as const;
 const DEFAULT_ITEM_IMAGE = "systems/pf2e/icons/default-icons/item.svg" as const;
 const DEFAULT_ACTOR_IMAGE = "systems/pf2e/icons/default-icons/monster.svg" as const;
+const DEFAULT_STRIKE_IMAGE = "systems/pf2e/icons/default-icons/melee.svg" as const;
+
+type ActorSpellcastingEntry = NonNullable<ActorSchemaData["spellcasting"]>[number];
 
 const ACTION_TYPE_MAP: Record<ActionSchemaData["actionType"], { value: string; count: number | null }> = {
   "one-action": { value: "one", count: 1 },
@@ -21,6 +24,25 @@ const GLYPH_MAP: Record<string, string> = {
   "free-action": "f",
   free: "f"
 };
+
+function generateId(): string {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  const bytes = typeof globalThis.crypto?.getRandomValues === "function" ? new Uint32Array(16) : undefined;
+  if (bytes) {
+    globalThis.crypto.getRandomValues(bytes);
+    let id = "";
+    for (const byte of bytes) {
+      id += alphabet[byte % alphabet.length];
+    }
+    return id;
+  }
+  let id = "";
+  for (let index = 0; index < 16; index += 1) {
+    const random = Math.floor(Math.random() * alphabet.length);
+    id += alphabet[random];
+  }
+  return id;
+}
 
 interface PackIndexEntry {
   _id?: string;
@@ -70,16 +92,102 @@ type FoundryItemSource = {
   folder?: string;
 };
 
+type FoundryActorStrikeSource = {
+  _id: string;
+  name: string;
+  type: "melee";
+  img: string;
+  system: {
+    slug: string;
+    bonus: { value: number };
+    damageRolls: Record<string, { damage: string; damageType: string | null; category: string | null }>;
+    traits: { value: string[]; otherTags: string[] };
+    rules: unknown[];
+    description: { value: string; gm: string };
+    publication: { title: string; authors: string; license: string; remaster: boolean };
+    attackEffects: { value: string[] };
+  };
+  effects: unknown[];
+  folder: null;
+  sort: number;
+  flags: Record<string, unknown>;
+};
+
+type FoundryActorActionSource = {
+  _id: string;
+  name: string;
+  type: "action";
+  img: string;
+  system: {
+    actionType: { value: string };
+    actions: { value: number | null };
+    category: string;
+    traits: { value: string[]; otherTags: string[] };
+    description: { value: string; gm: string };
+    requirements: { value: string };
+    trigger: { value: string };
+    frequency: { value: string };
+    rules: unknown[];
+    publication: { title: string; authors: string; license: string; remaster: boolean };
+  };
+  effects: unknown[];
+  folder: null;
+  sort: number;
+  flags: Record<string, unknown>;
+};
+
+type FoundryActorItemSource = FoundryActorStrikeSource | FoundryActorActionSource;
+
 type FoundryActorSource = {
   name: string;
   type: string;
   img: string;
   system: {
     slug: string;
-    traits: { value: string[]; rarity: string; languages: { value: string[] } };
-    details: { level: { value: number }; source: { value: string } };
+    traits: {
+      value: string[];
+      rarity: string;
+      size: { value: string };
+      languages: { value: string[] };
+      otherTags: string[];
+    };
+    details: {
+      level: { value: number };
+      alignment: { value: string | null };
+      publicNotes: string;
+      privateNotes: string;
+      blurb: string;
+      source: { value: string };
+      languages: { value: string[]; details: string };
+    };
+    initiative: { statistic: string };
+    attributes: {
+      hp: { value: number; max: number; temp: number; details: string | null };
+      ac: { value: number; details: string | null };
+      speed: {
+        value: number;
+        details: string | null;
+        otherSpeeds: { type: string; value: number; details: string | null }[];
+      };
+      immunities: { type: string; exceptions: string[]; notes?: string | null }[];
+      weaknesses: { type: string; value: number; exceptions: string[]; notes?: string | null }[];
+      resistances: { type: string; value: number; exceptions: string[]; doubleVs: string[]; notes?: string | null }[];
+      allSaves: { value: string };
+    };
+    perception: { mod: number; details: string | null; senses: string[]; vision: boolean };
+    saves: {
+      fortitude: { value: number; saveDetail: string | null };
+      reflex: { value: number; saveDetail: string | null };
+      will: { value: number; saveDetail: string | null };
+    };
+    abilities: Record<string, { mod: number }>;
+    skills: Record<string, { value: number; base: number; details: string | null }>;
   };
-  folder?: string;
+  prototypeToken: Record<string, unknown>;
+  items: FoundryActorItemSource[];
+  effects: unknown[];
+  folder: string | null;
+  flags: Record<string, unknown>;
 };
 
 function ensureValidAction(data: ActionSchemaData): void {
@@ -381,9 +489,22 @@ function prepareItemSource(item: ItemSchemaData): FoundryItemSource {
 }
 
 function prepareActorSource(actor: ActorSchemaData): FoundryActorSource {
-  const traits = trimArray(actor.traits);
-  const languages = trimArray(actor.languages);
+  const traits = trimArray(actor.traits).map((value) => value.toLowerCase());
+  const languages = trimArray(actor.languages).map((value) => value.toLowerCase());
   const source = actor.source.trim();
+  const description = toRichText(actor.description);
+  const privateNotes = toRichText(actor.recallKnowledge);
+
+  const strikes = actor.strikes.map((strike) => createStrikeItem(actor, strike));
+  const actions = actor.actions.map((action) => createActionItem(action));
+  const spellcastingActions = actor.spellcasting
+    ?.map((entry) => createSpellcastingAction(entry))
+    .filter((entry): entry is FoundryActorActionSource => entry !== null);
+
+  const items: FoundryActorItemSource[] = [...strikes, ...actions];
+  if (spellcastingActions?.length) {
+    items.push(...spellcastingActions);
+  }
 
   return {
     name: actor.name,
@@ -394,13 +515,295 @@ function prepareActorSource(actor: ActorSchemaData): FoundryActorSource {
       traits: {
         value: traits,
         rarity: actor.rarity,
-        languages: { value: languages }
+        size: { value: actor.size },
+        languages: { value: languages },
+        otherTags: [],
       },
       details: {
         level: { value: actor.level },
-        source: { value: source }
-      }
+        alignment: { value: actor.alignment?.trim() || null },
+        publicNotes: description,
+        privateNotes,
+        blurb: "",
+        source: { value: source },
+        languages: { value: languages, details: "" },
+      },
+      initiative: { statistic: "perception" },
+      attributes: {
+        hp: {
+          value: actor.attributes.hp.value,
+          max: actor.attributes.hp.max,
+          temp: actor.attributes.hp.temp ?? 0,
+          details: actor.attributes.hp.details ?? null,
+        },
+        ac: {
+          value: actor.attributes.ac.value,
+          details: actor.attributes.ac.details ?? null,
+        },
+        speed: {
+          value: actor.attributes.speed.value,
+          details: actor.attributes.speed.details ?? null,
+          otherSpeeds: (actor.attributes.speed.other ?? []).map((entry) => ({
+            type: entry.type,
+            value: entry.value,
+            details: entry.details ?? null,
+          })),
+        },
+        immunities: (actor.attributes.immunities ?? []).map((entry) => ({
+          type: entry.type,
+          exceptions: trimArray(entry.exceptions).map((value) => value.toLowerCase()),
+          notes: entry.details ?? null,
+        })),
+        weaknesses: (actor.attributes.weaknesses ?? []).map((entry) => ({
+          type: entry.type,
+          value: entry.value,
+          exceptions: trimArray(entry.exceptions).map((value) => value.toLowerCase()),
+          notes: entry.details ?? null,
+        })),
+        resistances: (actor.attributes.resistances ?? []).map((entry) => ({
+          type: entry.type,
+          value: entry.value,
+          exceptions: trimArray(entry.exceptions).map((value) => value.toLowerCase()),
+          doubleVs: trimArray(entry.doubleVs).map((value) => value.toLowerCase()),
+          notes: entry.details ?? null,
+        })),
+        allSaves: { value: "" },
+      },
+      perception: {
+        mod: actor.attributes.perception.value,
+        details: actor.attributes.perception.details ?? null,
+        senses: (actor.attributes.perception.senses ?? []).map((sense) => sense.toLowerCase()),
+        vision: true,
+      },
+      saves: {
+        fortitude: {
+          value: actor.attributes.saves.fortitude.value,
+          saveDetail: actor.attributes.saves.fortitude.details ?? null,
+        },
+        reflex: {
+          value: actor.attributes.saves.reflex.value,
+          saveDetail: actor.attributes.saves.reflex.details ?? null,
+        },
+        will: {
+          value: actor.attributes.saves.will.value,
+          saveDetail: actor.attributes.saves.will.details ?? null,
+        },
+      },
+      abilities: {
+        str: { mod: actor.abilities.str },
+        dex: { mod: actor.abilities.dex },
+        con: { mod: actor.abilities.con },
+        int: { mod: actor.abilities.int },
+        wis: { mod: actor.abilities.wis },
+        cha: { mod: actor.abilities.cha },
+      },
+      skills: buildSkillMap(actor.skills),
+    },
+    prototypeToken: buildPrototypeToken(actor),
+    items,
+    effects: [],
+    folder: null,
+    flags: {},
+  };
+}
+
+function toSlug(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+const ACTION_COST_SYSTEM_MAP: Record<ActorSchemaData["actions"][number]["actionCost"], { type: string; value: number | null }> = {
+  "one-action": { type: "action", value: 1 },
+  "two-actions": { type: "action", value: 2 },
+  "three-actions": { type: "action", value: 3 },
+  free: { type: "free", value: null },
+  reaction: { type: "reaction", value: null },
+  passive: { type: "passive", value: null },
+};
+
+function createStrikeItem(actor: ActorSchemaData, strike: ActorSchemaData["strikes"][number]): FoundryActorStrikeSource {
+  const damageRolls: FoundryActorStrikeSource["system"]["damageRolls"] = {};
+  for (const damage of strike.damage) {
+    const id = generateId();
+    damageRolls[id] = {
+      damage: damage.formula,
+      damageType: damage.damageType ? damage.damageType.toLowerCase() : null,
+      category: null,
+    };
+  }
+
+  const slug = toSlug(strike.name) || toSlug(generateId());
+
+  return {
+    _id: generateId(),
+    name: strike.name,
+    type: "melee",
+    img: DEFAULT_STRIKE_IMAGE,
+    system: {
+      slug,
+      bonus: { value: strike.attackBonus },
+      damageRolls,
+      traits: {
+        value: (strike.traits ?? []).map((trait) => trait.toLowerCase()),
+        otherTags: [],
+      },
+      rules: [],
+      description: { value: toRichText(strike.description), gm: "" },
+      publication: { title: "", authors: "", license: "OGL", remaster: false },
+      attackEffects: { value: (strike.effects ?? []).map((effect) => effect.toLowerCase()) },
+    },
+    effects: [],
+    folder: null,
+    sort: 0,
+    flags: {},
+  };
+}
+
+function createActionItem(action: ActorSchemaData["actions"][number]): FoundryActorActionSource {
+  const { type, value } = ACTION_COST_SYSTEM_MAP[action.actionCost];
+  const details: string[] = [];
+  if (action.requirements) {
+    details.push(`**Requirements** ${action.requirements}`);
+  }
+  if (action.trigger) {
+    details.push(`**Trigger** ${action.trigger}`);
+  }
+  if (action.frequency) {
+    details.push(`**Frequency** ${action.frequency}`);
+  }
+  details.push(action.description);
+  const description = toRichText(details.join("\n"));
+
+  return {
+    _id: generateId(),
+    name: action.name,
+    type: "action",
+    img: DEFAULT_ACTION_IMAGE,
+    system: {
+      actionType: { value: type },
+      actions: { value },
+      category: "offensive",
+      traits: {
+        value: (action.traits ?? []).map((trait) => trait.toLowerCase()),
+        otherTags: [],
+      },
+      description: { value: description, gm: "" },
+      requirements: { value: action.requirements ?? "" },
+      trigger: { value: action.trigger ?? "" },
+      frequency: { value: action.frequency ?? "" },
+      rules: [],
+      publication: { title: "", authors: "", license: "OGL", remaster: false },
+    },
+    effects: [],
+    folder: null,
+    sort: 0,
+    flags: {},
+  };
+}
+
+function createSpellcastingAction(entry: ActorSpellcastingEntry): FoundryActorActionSource | null {
+  const lines: string[] = [];
+  if (entry.notes) {
+    lines.push(entry.notes);
+  }
+  if (entry.attackBonus !== undefined && entry.attackBonus !== null) {
+    lines.push(`**Spell Attack** ${entry.attackBonus}`);
+  }
+  if (entry.saveDC !== undefined && entry.saveDC !== null) {
+    lines.push(`**Spell DC** ${entry.saveDC}`);
+  }
+  if (entry.spells.length) {
+    const grouped = new Map<number, string[]>();
+    for (const spell of entry.spells) {
+      const list = grouped.get(spell.level) ?? [];
+      list.push(spell.name + (spell.description ? ` — ${spell.description}` : ""));
+      grouped.set(spell.level, list);
     }
+    const levels = Array.from(grouped.keys()).sort((a, b) => a - b);
+    for (const level of levels) {
+      const spells = grouped.get(level)!;
+      lines.push(`**Level ${level}** ${spells.join("; ")}`);
+    }
+  }
+  if (!lines.length) {
+    return null;
+  }
+
+  const description = toRichText(lines.join("\n"));
+  const traits = [entry.tradition.toLowerCase(), "spellcasting"];
+
+  return {
+    _id: generateId(),
+    name: `${entry.name} Spellcasting`,
+    type: "action",
+    img: DEFAULT_ACTION_IMAGE,
+    system: {
+      actionType: { value: "passive" },
+      actions: { value: null },
+      category: "spell", 
+      traits: { value: traits, otherTags: [] },
+      description: { value: description, gm: "" },
+      requirements: { value: "" },
+      trigger: { value: "" },
+      frequency: { value: "" },
+      rules: [],
+      publication: { title: "", authors: "", license: "OGL", remaster: false },
+    },
+    effects: [],
+    folder: null,
+    sort: 0,
+    flags: {},
+  };
+}
+
+function buildSkillMap(
+  skills: ActorSchemaData["skills"],
+): FoundryActorSource["system"]["skills"] {
+  const result: FoundryActorSource["system"]["skills"] = {};
+  for (const skill of skills) {
+    result[skill.slug] = {
+      value: skill.modifier,
+      base: skill.modifier,
+      details: skill.details ?? null,
+    };
+  }
+  return result;
+}
+
+function buildPrototypeToken(actor: ActorSchemaData): Record<string, unknown> {
+  const img = actor.img?.trim() || DEFAULT_ACTOR_IMAGE;
+  return {
+    name: actor.name,
+    displayName: 20,
+    actorLink: true,
+    width: 1,
+    height: 1,
+    texture: {
+      src: img,
+      scaleX: 1,
+      scaleY: 1,
+      rotation: 0,
+      offsetX: 0,
+      offsetY: 0,
+    },
+    bar1: { attribute: "attributes.hp" },
+    bar2: { attribute: null },
+    disposition: -1,
+    light: {
+      alpha: 0.5,
+      bright: 0,
+      dim: 0,
+      color: null,
+    },
+    sight: {
+      enabled: false,
+      range: 0,
+      angle: 360,
+      visionMode: "basic",
+    },
   };
 }
 
