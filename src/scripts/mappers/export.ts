@@ -18,6 +18,9 @@ import {
 const DEFAULT_SCHEMA_VERSION = LATEST_SCHEMA_VERSION;
 const DEFAULT_SYSTEM_ID = "pf2e" as const;
 
+type ActorSpellcastingEntry = NonNullable<ActorSchemaData["spellcasting"]>[number];
+type ActorSpellList = ActorSpellcastingEntry["spells"];
+
 const ACTION_TYPE_MAP: Record<string, ActionExecution> = {
   one: "one-action",
   "1": "one-action",
@@ -234,6 +237,13 @@ function collectLanguages(doc: FoundryActor): string[] {
     result.push(language);
   }
   return result;
+}
+
+function extractValueProperty<T>(value: unknown): T | undefined {
+  if (value && typeof value === "object" && "value" in value) {
+    return (value as { value?: T }).value;
+  }
+  return undefined;
 }
 
 const ACTOR_SIZE_VALUES = new Set(["tiny", "sm", "med", "lg", "huge", "grg"]);
@@ -454,11 +464,14 @@ function extractActorStrikes(items: unknown): ActorSchemaData["strikes"] {
     )
     .map((item) => {
       const system = (item.system ?? {}) as Record<string, unknown>;
-      const traits = normalizeTraits(system.traits?.value ?? system.traits) ?? [];
+      const traitsSource = extractValueProperty<unknown>(system.traits) ?? system.traits;
+      const traits = normalizeTraits(traitsSource) ?? [];
       const attackBonus = coerceInteger((system.bonus as { value?: unknown })?.value ?? system.bonus, 0);
       const damageRolls = extractDamageRolls(system.damageRolls);
-      const effects = normalizeLanguages((system.attackEffects as { value?: unknown })?.value ?? system.attackEffects) ?? [];
-      const description = normalizeHtml((system.description as { value?: unknown })?.value ?? system.description);
+      const effectsSource = extractValueProperty<unknown>(system.attackEffects) ?? system.attackEffects;
+      const effects = normalizeLanguages(effectsSource) ?? [];
+      const descriptionSource = extractValueProperty<string>(system.description) ?? system.description;
+      const description = normalizeHtml(descriptionSource);
       const type = determineStrikeType(traits);
       return {
         name: item.name ?? "Unnamed Strike",
@@ -515,21 +528,23 @@ function extractActorActions(items: unknown): ActorSchemaData["actions"] {
       const system = (item.system ?? {}) as Record<string, unknown>;
       const actionType = (typeof system.actionType === "string"
         ? system.actionType
-        : (system.actionType as { value?: unknown })?.value) as string | undefined;
+        : extractValueProperty<string>(system.actionType)) as string | undefined;
       const actionCountRaw =
         typeof system.actions === "number" || typeof system.actions === "string"
           ? system.actions
-          : (system.actions as { value?: unknown })?.value;
+          : extractValueProperty<unknown>(system.actions);
       const actionCost = resolveActorActionCost(actionType, actionCountRaw);
-      const traits = normalizeTraits((system.traits as { value?: unknown })?.value ?? system.traits) ?? [];
+      const traitsSource = extractValueProperty<unknown>(system.traits) ?? system.traits;
+      const traits = normalizeTraits(traitsSource) ?? [];
       return {
         name: item.name ?? "Unnamed Action",
         actionCost,
         traits,
-        description: normalizeHtml((system.description as { value?: unknown })?.value ?? system.description) || "",
-        requirements: normalizeHtml((system.requirements as { value?: unknown })?.value ?? system.requirements) || null,
-        trigger: normalizeHtml((system.trigger as { value?: unknown })?.value ?? system.trigger) || null,
-        frequency: normalizeHtml((system.frequency as { value?: unknown })?.value ?? system.frequency) || null,
+        description: normalizeHtml(extractValueProperty<string>(system.description) ?? system.description) || "",
+        requirements:
+          normalizeHtml(extractValueProperty<string>(system.requirements) ?? system.requirements) || null,
+        trigger: normalizeHtml(extractValueProperty<string>(system.trigger) ?? system.trigger) || null,
+        frequency: normalizeHtml(extractValueProperty<string>(system.frequency) ?? system.frequency) || null,
       } satisfies ActorSchemaData["actions"][number];
     });
 }
@@ -558,7 +573,7 @@ function resolveActorActionCost(actionType: string | undefined, count: unknown):
   return "passive";
 }
 
-function extractActorSpellcasting(items: unknown): ActorSchemaData["spellcasting"] {
+function extractActorSpellcasting(items: unknown): ActorSpellcastingEntry[] {
   if (!Array.isArray(items)) {
     return [];
   }
@@ -568,8 +583,12 @@ function extractActorSpellcasting(items: unknown): ActorSchemaData["spellcasting
 
   return entries.map((item) => {
     const system = (item.system ?? {}) as Record<string, unknown>;
-    const traditionRaw = (system.tradition as { value?: unknown })?.value ?? system.tradition;
-    const castingTypeRaw = (system.prepared as { value?: unknown })?.value ?? system.prepared ?? system.castingType;
+    const traditionRaw = extractValueProperty<unknown>(system.tradition) ?? system.tradition;
+    const castingTypeRaw =
+      extractValueProperty<unknown>(system.prepared) ??
+      system.prepared ??
+      extractValueProperty<unknown>(system.castingType) ??
+      system.castingType;
     const attackBonus = coerceInteger((system.spellAttack as { value?: unknown })?.value ?? system.spellAttack, 0);
     const saveDCRecord = (system.spelldc as { value?: unknown; dc?: unknown }) ?? {};
     const saveDC = coerceInteger(saveDCRecord.dc ?? saveDCRecord.value, 0);
@@ -577,28 +596,33 @@ function extractActorSpellcasting(items: unknown): ActorSchemaData["spellcasting
     return {
       name: item.name ?? "Spellcasting",
       tradition: typeof traditionRaw === "string" ? traditionRaw.trim().toLowerCase() : "arcane",
-      castingType: typeof castingTypeRaw === "string" ? castingTypeRaw.trim().toLowerCase() as ActorSchemaData["spellcasting"][number]["castingType"] : "innate",
+      castingType: typeof castingTypeRaw === "string"
+        ? (castingTypeRaw.trim().toLowerCase() as ActorSpellcastingEntry["castingType"])
+        : "innate",
       attackBonus,
       saveDC,
       notes: null,
       spells,
-    } satisfies ActorSchemaData["spellcasting"][number];
+    } satisfies ActorSpellcastingEntry;
   });
 }
 
-function extractSpellList(value: unknown): ActorSchemaData["spellcasting"][number]["spells"] {
+function extractSpellList(value: unknown): ActorSpellList {
   if (!value || typeof value !== "object") {
     return [];
   }
   const slots = value as Record<string, unknown>;
-  const result: ActorSchemaData["spellcasting"][number]["spells"] = [];
+  const result: ActorSpellList = [];
   for (const [key, slotValue] of Object.entries(slots)) {
     const match = key.match(/slot(\d+)/i);
     if (!match) {
       continue;
     }
     const level = Number(match[1] ?? 0);
-    const prepared = (slotValue as { prepared?: unknown }).prepared;
+    const preparedSource = (slotValue as { prepared?: unknown }).prepared;
+    const prepared = Array.isArray(preparedSource)
+      ? preparedSource
+      : extractValueProperty<unknown>(preparedSource) ?? preparedSource;
     if (!Array.isArray(prepared)) {
       continue;
     }
@@ -831,6 +855,12 @@ export type FoundryItem = FoundryBaseDocument & {
   } & Record<string, unknown>;
 };
 
+export type FoundryActorItem = {
+  type?: string;
+  name?: string;
+  system?: Record<string, unknown>;
+};
+
 export type FoundryActor = FoundryBaseDocument & {
   type?: string;
   system?: {
@@ -840,6 +870,7 @@ export type FoundryActor = FoundryBaseDocument & {
       rarity?: string | null;
       traits?: { value?: unknown };
       languages?: { value?: unknown } | unknown;
+      size?: { value?: string | null } | string | null;
     };
     details?: {
       level?: { value?: number | string | null } | number | string | null;
@@ -847,6 +878,7 @@ export type FoundryActor = FoundryBaseDocument & {
       source?: { value?: string | null } | string | null;
     } & Record<string, unknown>;
   } & Record<string, unknown>;
+  items?: FoundryActorItem[] | null;
 };
 
 export function fromFoundryAction(doc: FoundryAction): ActionSchemaData {
@@ -992,7 +1024,11 @@ export function fromFoundryActor(doc: FoundryActor): ActorSchemaData {
     actorType: resolveActorType(doc.type),
     rarity: normalizeRarity(rarityValue),
     level: Number.isFinite(level) ? Number(level) : 0,
-    size: normalizeActorSize(doc.system?.traits?.size?.value),
+    size: normalizeActorSize(
+      typeof doc.system?.traits?.size === "string"
+        ? doc.system.traits.size
+        : extractValueProperty<string>(doc.system?.traits?.size),
+    ),
     traits,
     alignment: normalizeAlignment(doc.system?.details?.alignment),
     languages,

@@ -6,6 +6,8 @@ const DEFAULT_ITEM_IMAGE = "systems/pf2e/icons/default-icons/item.svg" as const;
 const DEFAULT_ACTOR_IMAGE = "systems/pf2e/icons/default-icons/monster.svg" as const;
 const DEFAULT_STRIKE_IMAGE = "systems/pf2e/icons/default-icons/melee.svg" as const;
 
+type ActorSpellcastingEntry = NonNullable<ActorSchemaData["spellcasting"]>[number];
+
 const ACTION_TYPE_MAP: Record<ActionSchemaData["actionType"], { value: string; count: number | null }> = {
   "one-action": { value: "one", count: 1 },
   "two-actions": { value: "two", count: 2 },
@@ -702,9 +704,7 @@ function createActionItem(action: ActorSchemaData["actions"][number]): FoundryAc
   };
 }
 
-function createSpellcastingAction(
-  entry: ActorSchemaData["spellcasting"][number],
-): FoundryActorActionSource | null {
+function createSpellcastingAction(entry: ActorSpellcastingEntry): FoundryActorActionSource | null {
   const lines: string[] = [];
   if (entry.notes) {
     lines.push(entry.notes);

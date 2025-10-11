@@ -58,6 +58,10 @@ export interface EnsureValidRepairOptions<K extends ValidatorKey> {
   schema?: JsonSchemaDefinition;
 }
 
+type ActorSpellcastingEntry = NonNullable<ActorSchemaData["spellcasting"]>[number];
+type ActorSpellcastingList = ActorSpellcastingEntry[];
+type ActorSpellList = ActorSpellcastingEntry["spells"];
+
 export class EnsureValidError<K extends ValidatorKey> extends Error {
   public readonly diagnostics: EnsureValidDiagnostics<K>[];
   public readonly originalPayload: unknown;
@@ -703,13 +707,13 @@ function normalizeActorActions(raw: unknown): ActorSchemaData["actions"] {
 
 const SPELLCASTING_TYPE_LOOKUP = createEnumLookup(["prepared", "spontaneous", "innate", "focus", "ritual"]);
 
-function normalizeSpellcastingEntries(raw: unknown): ActorSchemaData["spellcasting"] {
+function normalizeSpellcastingEntries(raw: unknown): ActorSpellcastingList {
   if (!Array.isArray(raw)) {
     return [];
   }
-  const result: ActorSchemaData["spellcasting"] = [];
-  for (const entry of raw) {
-    const source = isRecord(entry) ? entry : {};
+  const result: ActorSpellcastingList = [];
+  for (const spellcastingSource of raw) {
+    const source = isRecord(spellcastingSource) ? spellcastingSource : {};
     const name = normalizeTitle(source.name ?? source.label);
     const tradition = normalizeKeyString(
       (isRecord(source.tradition) ? source.tradition.value : source.tradition) ?? source.traditionValue ?? source.traditionName,
@@ -720,35 +724,35 @@ function normalizeSpellcastingEntries(raw: unknown): ActorSchemaData["spellcasti
     if (!name || !tradition) {
       continue;
     }
-    const entry: ActorSchemaData["spellcasting"][number] = {
+    const normalizedEntry: ActorSpellcastingEntry = {
       name,
       tradition,
-      castingType: castingType as ActorSchemaData["spellcasting"][number]["castingType"],
+      castingType: castingType as ActorSpellcastingEntry["castingType"],
       spells,
     };
     const attackBonus = normalizeOptionalInteger(
       (isRecord(source.spelldc) ? source.spelldc.value : undefined) ?? source.attackBonus ?? source.bonus ?? source.spellAttack,
     );
     if (attackBonus !== null) {
-      entry.attackBonus = attackBonus;
+      normalizedEntry.attackBonus = attackBonus;
     }
     const saveDC = normalizeOptionalInteger(
       (isRecord(source.spelldc) ? source.spelldc.dc : undefined) ?? source.saveDC ?? source.dc,
     );
     if (saveDC !== null) {
-      entry.saveDC = saveDC;
+      normalizedEntry.saveDC = saveDC;
     }
     const notes = normalizeNullableString(source.notes ?? source.description);
     if (notes) {
-      entry.notes = notes;
+      normalizedEntry.notes = notes;
     }
-    result.push(entry);
+    result.push(normalizedEntry);
   }
   return result;
 }
 
-function normalizeSpellList(raw: unknown): ActorSchemaData["spellcasting"][number]["spells"] {
-  const result: ActorSchemaData["spellcasting"][number]["spells"] = [];
+function normalizeSpellList(raw: unknown): ActorSpellList {
+  const result: ActorSpellList = [];
   if (!Array.isArray(raw)) {
     return result;
   }
