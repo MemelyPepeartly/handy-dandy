@@ -1,5 +1,6 @@
 import { CONSTANTS } from "../constants";
 import { flattenSchema, listDocumentConstructors, getDocumentSchema } from "../helpers/utils";
+import { runBatchGenerationFlow, runExportSelectionFlow } from "../flows/batch-ui";
 
 /**
  * A lightweight window that lets the GM choose a Foundry document type
@@ -47,6 +48,14 @@ export class SchemaTool extends Application {
       const text = (ev.currentTarget as HTMLElement).dataset["path"] ?? "";
       navigator.clipboard.writeText(text);
       ui.notifications?.info(`Copied path ${text}`);
+    });
+
+    html.find<HTMLButtonElement>("button[data-action='export-selection']").on("click", () => {
+      void runExportSelectionFlow();
+    });
+
+    html.find<HTMLButtonElement>("button[data-action='batch-generate']").on("click", () => {
+      void runBatchGenerationFlow();
     });
   }
 }

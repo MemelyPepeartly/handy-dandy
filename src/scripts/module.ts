@@ -15,6 +15,7 @@ import {
 } from "./generation";
 import type { ActionPromptInput, ActorPromptInput, ItemPromptInput } from "./prompts";
 import type { ActionSchemaData, ActorSchemaData, ItemSchemaData } from "./schemas";
+import { exportSelectedEntities, generateAndImportBatch } from "./flows/batch";
 
 type GeneratorFunction<TInput, TResult> = (
   input: TInput,
@@ -71,8 +72,12 @@ declare global {
       },
       applications: {
         schemaTool: SchemaTool,
-        dataEntryTool: DataEntryTool
-      }
+        dataEntryTool: DataEntryTool,
+      },
+      flows: {
+        exportSelection: typeof exportSelectedEntities;
+        generateBatch: typeof generateAndImportBatch;
+      };
     };
   }
 }
@@ -104,8 +109,12 @@ Hooks.once("setup", () => {
     },
     applications: {
       schemaTool: new SchemaTool,
-      dataEntryTool: new DataEntryTool
-    }
+      dataEntryTool: new DataEntryTool,
+    },
+    flows: {
+      exportSelection: exportSelectedEntities,
+      generateBatch: generateAndImportBatch,
+    },
   };
 });
 
