@@ -1,77 +1,150 @@
 import { CONSTANTS } from "../constants";
 import { runBatchGenerationFlow, runExportSelectionFlow } from "../flows/batch-ui";
-import { SchemaTool } from "../tools/schema-tool";
 
-export function insertSidebarButtons(controls: SceneControl[]): void {
-  const handyGroup: SceneControl = {
-    name: "handy-dandy",
-    title: "Handy Dandy Tools",
-    icon: "fas fa-screwdriver-wrench",
-    layer: "controls", // Any existing layer is fine
-    visible: true,
-    activeTool: "schema-tool", // Mandatory in v12 :contentReference[oaicite:0]{index=0}
-    tools: <SceneControlTool[]>[
-      {
-        name: "schema-tool",
-        title: "Schema Tool",
-        icon: "fas fa-magic",
-        button: true,
-        onClick: () => {
-          console.debug(`${CONSTANTS.MODULE_NAME} | Opening Schema Tool`);
-          if (!game.handyDandy) {
-            ui.notifications?.error("Handy Dandy module is not initialized.");
-            return;
-          }
-          game.handyDandy.applications.schemaTool.render(true);
-        }
-      },
-      {
-        name: "data-entry-tool",
-        title: "Data Entry Tool",
-        icon: "fas fa-edit",
-        button: true,
-        onClick: () => {
-          console.debug(`${CONSTANTS.MODULE_NAME} | Opening Data Entry Tool`);
-          if (!game.handyDandy) {
-            ui.notifications?.error("Handy Dandy module is not initialized.");
-            return;
-          }
-          game.handyDandy.applications.dataEntryTool.render(true);
-        }
-      },
-      {
-        name: "export-selection",
-        title: "Export Selection",
-        icon: "fas fa-file-export",
-        button: true,
-        onClick: () => {
-          void runExportSelectionFlow();
-        }
-      },
-      {
-        name: "batch-generate",
-        title: "Batch Generate & Import",
-        icon: "fas fa-diagram-project",
-        button: true,
-        onClick: () => {
-          void runBatchGenerationFlow();
-        }
-      },
-      {
-        name: "developer-console",
-        title: "Developer Console",
-        icon: "fas fa-terminal",
-        button: true,
-        onClick: () => {
-          if (!game.handyDandy) {
-            ui.notifications?.error("Handy Dandy module is not initialized.");
-            return;
-          }
-          game.handyDandy.developer.console.render(true);
-        }
-      }
-    ]
+type LegacyTool = SceneControls.Tool & {
+  onChange?: (...args: unknown[]) => void;
+};
+
+type ToolCollection = LegacyTool[] | Record<string, LegacyTool>;
+export type ControlCollection = SceneControls.Control[] | Record<string, ControlWithToolCollection>;
+
+type ControlWithToolCollection = Omit<SceneControls.Control, "tools"> & {
+  tools: ToolCollection;
+  onChange?: (activeTool: string) => void;
+  onToolChange?: (activeTool: string) => void;
+};
+
+function useArrayTools(): boolean {
+  const releaseGeneration = Number(game.release?.generation ?? game.version?.split(".")[0] ?? 0);
+  return Number.isFinite(releaseGeneration) && releaseGeneration >= 12;
+}
+
+function compatibilityAddControl(collection: ControlCollection, control: ControlWithToolCollection): void {
+  if (Array.isArray(collection)) {
+    collection.push(control as unknown as SceneControls.Control);
+  } else {
+    collection[control.name] = control;
+  }
+}
+
+function compatibilityAddTool(collection: ToolCollection, tool: LegacyTool): void {
+  if (Array.isArray(collection)) {
+    collection.push(tool);
+  } else {
+    collection[tool.name] = tool;
+  }
+}
+
+function requireNamespace(): NonNullable<Game["handyDandy"]> {
+  const namespace = game.handyDandy;
+  if (!namespace) {
+    ui.notifications?.error("Handy Dandy module is not initialized.");
+    throw new Error("Handy Dandy module is not initialized.");
+  }
+  return namespace;
+}
+
+export function insertSidebarButtons(controls: ControlCollection): void {
+  const tools: ToolCollection = useArrayTools() ? [] : {};
+
+  const noop = (): void => {
+    /* noop for legacy Foundry compatibility */
   };
 
-  controls.push(handyGroup); // Mutate in-place per docs :contentReference[oaicite:1]{index=1}
+  const handyGroup: ControlWithToolCollection = {
+    name: "handy-dandy",
+    title: "Handy Dandy Tools",
+    icon: "fa-solid fa-screwdriver-wrench",
+    layer: "interface",
+    visible: true,
+    activeTool: "tool-guide",
+    onChange: noop,
+    onToolChange: noop,
+    tools,
+  };
+
+  compatibilityAddTool(handyGroup.tools, {
+    name: "tool-guide",
+    title: "Tool Guide",
+    icon: "fa-solid fa-compass",
+    toggle: true,
+    active: true,
+    onClick: toggled => {
+      const handyDandy = requireNamespace();
+      const toolOverview = handyDandy.applications.toolOverview;
+      if (toggled) {
+        toolOverview.render(true);
+      } else {
+        toolOverview.close();
+      }
+    },
+    onChange: toggled => {
+      const handyDandy = requireNamespace();
+      const toolOverview = handyDandy.applications.toolOverview;
+      if (toggled) {
+        toolOverview.render(true);
+      } else {
+        toolOverview.close();
+      }
+    },
+  });
+
+  compatibilityAddTool(handyGroup.tools, {
+    name: "schema-tool",
+    title: "Schema Tool",
+    icon: "fa-solid fa-wand-magic-sparkles",
+    button: true,
+    onClick: () => {
+      console.debug(`${CONSTANTS.MODULE_NAME} | Opening Schema Tool`);
+      requireNamespace().applications.schemaTool.render(true);
+    },
+    onChange: noop,
+  });
+
+  compatibilityAddTool(handyGroup.tools, {
+    name: "data-entry-tool",
+    title: "Data Entry Tool",
+    icon: "fa-solid fa-pen-to-square",
+    button: true,
+    onClick: () => {
+      console.debug(`${CONSTANTS.MODULE_NAME} | Opening Data Entry Tool`);
+      requireNamespace().applications.dataEntryTool.render(true);
+    },
+    onChange: noop,
+  });
+
+  compatibilityAddTool(handyGroup.tools, {
+    name: "export-selection",
+    title: "Export Selection",
+    icon: "fa-solid fa-file-export",
+    button: true,
+    onClick: () => {
+      void runExportSelectionFlow();
+    },
+    onChange: noop,
+  });
+
+  compatibilityAddTool(handyGroup.tools, {
+    name: "batch-generate",
+    title: "Batch Generate & Import",
+    icon: "fa-solid fa-diagram-project",
+    button: true,
+    onClick: () => {
+      void runBatchGenerationFlow();
+    },
+    onChange: noop,
+  });
+
+  compatibilityAddTool(handyGroup.tools, {
+    name: "developer-console",
+    title: "Developer Console",
+    icon: "fa-solid fa-terminal",
+    button: true,
+    onClick: () => {
+      requireNamespace().developer.console.render(true);
+    },
+    onChange: noop,
+  });
+
+  compatibilityAddControl(controls, handyGroup);
 }
