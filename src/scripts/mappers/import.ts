@@ -383,7 +383,7 @@ function prepareItemSource(item: ItemSchemaData): FoundryItemSource {
 function prepareActorSource(actor: ActorSchemaData): FoundryActorSource {
   const traits = trimArray(actor.traits);
   const languages = trimArray(actor.languages);
-  const source = actor.source?.trim() ?? "";
+  const source = actor.source.trim();
 
   return {
     name: actor.name,

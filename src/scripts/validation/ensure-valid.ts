@@ -370,6 +370,26 @@ function coerceActor(value: Record<string, unknown>): void {
   assignStringArray(value, "languages");
   assignOptionalString(value, "img", { allowEmpty: true });
   assignOptionalString(value, "source", { allowEmpty: true });
+
+  if (!Array.isArray(value.traits)) {
+    value.traits = [];
+  }
+
+  if (!Array.isArray(value.languages)) {
+    value.languages = [];
+  }
+
+  if (typeof value.img !== "string" || value.img.trim().length === 0) {
+    value.img = null;
+  } else {
+    value.img = value.img.trim();
+  }
+
+  if (typeof value.source !== "string") {
+    value.source = "";
+  } else {
+    value.source = value.source.trim();
+  }
 }
 
 function coercePackEntry(value: Record<string, unknown>): void {

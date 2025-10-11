@@ -76,10 +76,10 @@ export interface ActorSchemaData extends BaseEntity<"actor"> {
   actorType: ActorCategory;
   rarity: Rarity;
   level: number;
-  traits?: string[] | null;
-  languages?: string[] | null;
-  img?: string | null;
-  source?: string | null;
+  traits: string[];
+  languages: string[];
+  img: string | null;
+  source: string;
 }
 
 export interface PackEntrySchemaData {
@@ -156,7 +156,20 @@ export const actorSchema = {
   $id: "Actor",
   type: "object",
   additionalProperties: false,
-  required: ["schema_version", "systemId", "type", "slug", "name", "actorType", "rarity", "level"],
+  required: [
+    "schema_version",
+    "systemId",
+    "type",
+    "slug",
+    "name",
+    "actorType",
+    "rarity",
+    "level",
+    "traits",
+    "languages",
+    "img",
+    "source"
+  ],
   properties: {
     ...baseMeta,
     type: { type: "string", enum: ["actor"] as const },
@@ -166,17 +179,15 @@ export const actorSchema = {
     traits: {
       type: "array",
       items: { type: "string", minLength: 1 },
-      nullable: true,
       default: [] as const
     },
     languages: {
       type: "array",
       items: { type: "string", minLength: 1 },
-      nullable: true,
       default: [] as const
     },
     img: { type: "string", nullable: true, default: null },
-    source: { type: "string", nullable: true, default: "" }
+    source: { type: "string", default: "" }
   }
 } satisfies JSONSchemaType<ActorSchemaData>;
 
