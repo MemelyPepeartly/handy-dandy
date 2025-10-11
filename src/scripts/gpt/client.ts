@@ -60,8 +60,13 @@ async function hashPrompt(prompt: string): Promise<string> {
       .join("");
   }
 
-  const { createHash } = await import("node:crypto");
-  return createHash("sha256").update(prompt).digest("hex");
+  // Fallback to a deterministic, non-cryptographic hash when Web Crypto is unavailable.
+  let hash = 0;
+  for (let i = 0; i < prompt.length; i += 1) {
+    hash = (hash << 5) - hash + prompt.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash).toString(16);
 }
 
 interface GPTGenerationAttempt<T> {
@@ -115,12 +120,11 @@ export class GPTClient {
     options?: GenerateWithSchemaOptions,
   ): Promise<GPTGenerationAttempt<T>> {
     const seed = options?.seed ?? this.#config.seed;
-    const response = await this.#openai.responses.create({
+    const payload: Record<string, unknown> = {
       model: this.#config.model,
       input: prompt,
       temperature: this.#config.temperature,
       top_p: this.#config.top_p,
-      seed,
       response_format: {
         type: "json_schema",
         json_schema: {
@@ -129,7 +133,13 @@ export class GPTClient {
           strict: true,
         },
       },
-    });
+    };
+
+    if (typeof seed === "number") {
+      payload.seed = seed;
+    }
+
+    const response = await this.#openai.responses.create(payload as any);
 
     return {
       response,
@@ -143,11 +153,10 @@ export class GPTClient {
     options?: GenerateWithSchemaOptions,
   ): Promise<GPTGenerationAttempt<T>> {
     const seed = options?.seed ?? this.#config.seed;
-    const response = await this.#openai.responses.create({
+    const payload: Record<string, unknown> = {
       model: this.#config.model,
       temperature: this.#config.temperature,
       top_p: this.#config.top_p,
-      seed,
       input: [
         {
           role: "system",
@@ -167,7 +176,13 @@ export class GPTClient {
         },
       ],
       tool_choice: { type: "function", function: { name: schema.name } },
-    });
+    };
+
+    if (typeof seed === "number") {
+      payload.seed = seed;
+    }
+
+    const response = await this.#openai.responses.create(payload as any);
 
     return {
       response,

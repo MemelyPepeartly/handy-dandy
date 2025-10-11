@@ -27,7 +27,8 @@ export function createEnsureValidRetryHandler<T extends EntityType>(
   return async () => {
     try {
       const repaired = await error.repair();
-      await importer(repaired, importerOptions);
+      const canonical = repaired as unknown as SchemaDataFor<T>;
+      await importer(canonical, importerOptions);
       ui.notifications?.info(`${CONSTANTS.MODULE_NAME} | Repaired ${type} "${name}" successfully.`);
     } catch (repairError) {
       const message = repairError instanceof Error ? repairError.message : String(repairError);

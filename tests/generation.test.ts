@@ -73,13 +73,13 @@ const baseActionInput: ActionPromptInput = {
 
 const baseItemInput: ItemPromptInput = {
   systemId: "pf2e",
-  title: "Mirror Shield",
+  name: "Mirror Shield",
   referenceText: "A polished shield that reflects magic.",
 };
 
 const baseActorInput: ActorPromptInput = {
   systemId: "pf2e",
-  title: "Cautious Scout",
+  name: "Cautious Scout",
   referenceText: "A nimble scout who excels at reconnaissance.",
 };
 

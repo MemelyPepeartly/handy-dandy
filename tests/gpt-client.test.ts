@@ -42,7 +42,7 @@ const schema = {
 } as const;
 
 beforeEach(() => {
-  globalThis.game = {
+  (globalThis as any).game = {
     settings: {
       get(moduleId: string, key: string) {
         if (moduleId !== "handy-dandy") throw new Error("Unknown module");

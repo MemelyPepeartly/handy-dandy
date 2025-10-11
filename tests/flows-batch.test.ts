@@ -112,6 +112,7 @@ test("generateAndImportBatch aggregates mixed success and failure", async () => 
       description: "Strike with precision.",
       rarity: "common",
       traits: [],
+      img: "",
     } satisfies ActionSchemaData;
   };
 

@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "rootDir": "./src/scripts",
+    "rootDir": "./",
     "outDir": "./dist",
     "target": "esnext",
     "module": "esnext",

@@ -90,7 +90,7 @@ beforeEach(() => {
     packs,
     items,
     user: { isGM: true }
-  } satisfies Partial<Game>;
+  };
 
   Object.defineProperty(globalThis, "Item", {
     configurable: true,
@@ -129,7 +129,8 @@ test("importAction updates an existing compendium entry with the same slug", asy
     system: { slug: "stunning-strike", description: { value: "<p>Old</p>" }, traits: { value: [], rarity: "common" }, actionType: { value: "one" }, actions: { value: 1 }, requirements: { value: "" }, source: { value: "" }, rules: [] }
   });
   pack.addDocument(existing);
-  (game.packs as Map<string, MockPack>).set("pf2e.actions", pack);
+  const packsMap = ((globalThis as any).game.packs as Map<string, MockPack>);
+  packsMap.set("pf2e.actions", pack);
 
   const result = await importAction(createAction(), { packId: "pf2e.actions", folderId: "folder-123" });
 
@@ -140,13 +141,14 @@ test("importAction updates an existing compendium entry with the same slug", asy
 
 test("importAction creates a new compendium entry when none exists", async () => {
   const pack = new MockPack("pf2e.actions");
-  (game.packs as Map<string, MockPack>).set("pf2e.actions", pack);
+  const packsMap = ((globalThis as any).game.packs as Map<string, MockPack>);
+  packsMap.set("pf2e.actions", pack);
 
   const result = await importAction(createAction(), { packId: "pf2e.actions" });
 
   assert.equal(result.name, "Stunning Strike");
   assert.equal(pack.index.length, 1);
-  assert.equal(result.system.slug, "stunning-strike");
+  assert.equal((result as any).system.slug, "stunning-strike");
 });
 
 test("importAction updates a world item when one with the slug is present", async () => {
@@ -157,7 +159,8 @@ test("importAction updates a world item when one with the slug is present", asyn
     system: { slug: "stunning-strike", description: { value: "<p>Old</p>" }, traits: { value: [], rarity: "common" }, actionType: { value: "one" }, actions: { value: 1 }, requirements: { value: "" }, source: { value: "" }, rules: [] }
   });
 
-  (game.items as MockCollection<MockItem>).set(existing.id, existing);
+  const itemsCollection = ((globalThis as any).game.items as MockCollection<MockItem>);
+  itemsCollection.set(existing.id, existing);
 
   const result = await importAction(createAction(), { folderId: "folder-999" });
 

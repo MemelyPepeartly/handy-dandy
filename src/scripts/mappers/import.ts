@@ -242,12 +242,12 @@ function extractIndexEntries(index: unknown): PackIndexEntry[] {
   return result;
 }
 
-async function findPackDocument(pack: CompendiumCollection<Item>, slug: string): Promise<Item | undefined> {
+async function findPackDocument(pack: CompendiumCollection<any>, slug: string): Promise<Item | undefined> {
   const indexEntries = extractIndexEntries(pack.index);
   let entry = indexEntries.find((item) => matchesSlug(item, slug));
 
   if (!entry && typeof pack.getIndex === "function") {
-    const index = await pack.getIndex({ fields: ["slug", "system.slug"] });
+    const index = await pack.getIndex({ fields: ["slug", "system.slug"] as string[] });
     const candidates = extractIndexEntries(index);
     entry = candidates.find((item) => matchesSlug(item, slug));
   }
@@ -262,7 +262,7 @@ async function findPackDocument(pack: CompendiumCollection<Item>, slug: string):
   }
 
   const existing = await pack.getDocument(id);
-  return existing ?? undefined;
+  return (existing as Item | undefined) ?? undefined;
 }
 
 function findWorldItem(slug: string): Item | undefined {
@@ -321,7 +321,7 @@ function prepareActionSource(action: ActionSchemaData): FoundryActionSource {
     system: {
       slug: action.slug,
       description: { value: description },
-      traits: { value: traits, rarity: action.rarity ?? "common" },
+      traits: { value: traits, rarity: action.rarity },
       actionType: { value: actionType.value },
       actions: { value: actionType.count },
       requirements: { value: requirements },
@@ -399,7 +399,7 @@ export async function importAction(
   }
 
   if (packId) {
-    const pack = game.packs?.get(packId) as CompendiumCollection<Item> | undefined;
+    const pack = game.packs?.get(packId) as CompendiumCollection<any> | undefined;
     if (!pack) {
       throw new Error(`Pack with id "${packId}" was not found.`);
     }
@@ -420,7 +420,7 @@ export async function importAction(
       throw new Error(`Failed to import action "${json.name}" into pack ${pack.collection}`);
     }
 
-    return imported;
+    return imported as Item;
   }
 
   const existing = findWorldItem(json.slug);
@@ -434,7 +434,8 @@ export async function importAction(
     return existing;
   }
 
-  const created = await Item.create(source, { keepId: true });
+  const created = await (Item as typeof Item & { create(data: unknown, options?: Record<string, unknown>): Promise<Item | undefined> })
+    .create(source, { keepId: true });
   if (!created) {
     throw new Error(`Failed to create action "${json.name}" in the world.`);
   }

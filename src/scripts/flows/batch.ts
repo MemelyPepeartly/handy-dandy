@@ -7,6 +7,7 @@ import type {
   ActorSchemaData,
   EntityType,
   ItemSchemaData,
+  SchemaDataFor,
 } from "../schemas";
 import type {
   ActionPromptInput,
@@ -14,17 +15,13 @@ import type {
   ItemPromptInput,
 } from "../prompts";
 
-type CanonicalEntityMap = {
-  action: ActionSchemaData;
-  item: ItemSchemaData;
-  actor: ActorSchemaData;
-};
+type CanonicalEntityFor<T extends EntityType> = SchemaDataFor<T>;
 
-type PromptInputMap = {
-  action: ActionPromptInput;
-  item: ItemPromptInput;
-  actor: ActorPromptInput;
-};
+type PromptInputFor<T extends EntityType> = T extends "action"
+  ? ActionPromptInput
+  : T extends "item"
+    ? ItemPromptInput
+    : ActorPromptInput;
 
 type BatchEntityType = EntityType | "unknown";
 
@@ -36,7 +33,7 @@ export interface ExportBatchEntry<T extends BatchEntityType = BatchEntityType> {
   readonly id?: string;
   readonly uuid?: string;
   readonly status: BatchStatus;
-  readonly data?: T extends EntityType ? CanonicalEntityMap[T] : never;
+  readonly data?: T extends EntityType ? CanonicalEntityFor<T> : never;
   readonly error?: Error;
 }
 
@@ -54,17 +51,17 @@ export interface ExportSelectionResult {
 
 export interface GenerationBatchEntry<T extends EntityType> {
   readonly type: T;
-  readonly input: PromptInputMap[T];
+  readonly input: PromptInputFor<T>;
   readonly name: string;
   readonly status: BatchStatus;
-  readonly data?: CanonicalEntityMap[T];
+  readonly data?: CanonicalEntityFor<T>;
   readonly documentUuid?: string;
   readonly error?: Error;
 }
 
 export interface GenerationBatchOptions<T extends EntityType> {
   readonly type: T;
-  readonly inputs: readonly PromptInputMap[T][];
+  readonly inputs: readonly PromptInputFor<T>[];
   readonly packId?: string;
   readonly folderId?: string;
   readonly seed?: number;
@@ -80,17 +77,18 @@ export interface GenerationBatchResult<T extends EntityType> {
   readonly summary: string;
 }
 
-interface GeneratorMap {
-  action: (input: ActionPromptInput, options?: BoundGenerationOptions) => Promise<ActionSchemaData>;
-  item: (input: ItemPromptInput, options?: BoundGenerationOptions) => Promise<ItemSchemaData>;
-  actor: (input: ActorPromptInput, options?: BoundGenerationOptions) => Promise<ActorSchemaData>;
-}
+type GeneratorFunction<T extends EntityType> = (
+  input: PromptInputFor<T>,
+  options?: BoundGenerationOptions,
+) => Promise<CanonicalEntityFor<T>>;
 
-interface ImporterMap {
-  action: (json: ActionSchemaData, options?: ImporterOptions) => Promise<ClientDocument>;
-  item: (json: ItemSchemaData, options?: ImporterOptions) => Promise<ClientDocument>;
-  actor: (json: ActorSchemaData, options?: ImporterOptions) => Promise<ClientDocument>;
-}
+type ImporterFunction<T extends EntityType> = (
+  json: CanonicalEntityFor<T>,
+  options?: ImporterOptions,
+) => Promise<ClientDocument>;
+
+type GeneratorMap = { [K in EntityType]: GeneratorFunction<K> };
+type ImporterMap = { [K in EntityType]: ImporterFunction<K> };
 
 interface BoundGenerationOptions {
   seed?: number;
@@ -183,18 +181,16 @@ export async function generateAndImportBatch<T extends EntityType>(
   const batchEntries: GenerationBatchEntry<T>[] = [];
 
   for (const input of inputs) {
-    const label = inferInputName(type, input as PromptInputMap[T]);
+    const label = inferInputName(type, input);
     try {
-      const data = await generator(input as PromptInputMap[T], { seed, maxAttempts });
-      const document = await importer(data as CanonicalEntityMap[T], { packId, folderId });
+      const data = await generator(input, { seed, maxAttempts });
+      const document = await importer(data, { packId, folderId });
       batchEntries.push({
         type,
-        input: input as PromptInputMap[T],
-        name: typeof (data as { name?: string }).name === "string" && (data as { name?: string }).name?.trim()
-          ? (data as { name: string }).name
-          : label,
+        input,
+        name: typeof data.name === "string" && data.name.trim() ? data.name : label,
         status: "success",
-        data: data as CanonicalEntityMap[T],
+        data,
         documentUuid: typeof document?.uuid === "string" ? document.uuid : undefined,
       });
     } catch (error) {
@@ -203,14 +199,14 @@ export async function generateAndImportBatch<T extends EntityType>(
           type,
           name: label,
           error,
-          importer: (json, options) => importer(json as CanonicalEntityMap[T], options),
+          importer: (json, importerOptions) => importer(json as CanonicalEntityFor<T>, importerOptions),
           importerOptions: { packId, folderId },
         });
       }
 
       batchEntries.push({
         type,
-        input: input as PromptInputMap[T],
+        input,
         name: label,
         status: "failure",
         error: normalizeError(error),
@@ -263,35 +259,54 @@ function normalizeError(error: unknown): Error {
 function resolveGenerator<T extends EntityType>(
   type: T,
   overrides: GenerationDependencyOverrides["generators"],
-): GeneratorMap[T] {
+): GeneratorFunction<T> {
   if (overrides?.[type]) {
-    return overrides[type] as GeneratorMap[T];
+    return overrides[type] as GeneratorFunction<T>;
   }
 
-  const generation = game.handyDandy?.generation;
+  const generation = game.handyDandy?.generation as
+    | {
+        generateAction?: GeneratorFunction<"action">;
+        generateItem?: GeneratorFunction<"item">;
+        generateActor?: GeneratorFunction<"actor">;
+      }
+    | undefined;
   if (!generation) {
     throw new Error("Handy Dandy generation helpers are unavailable.");
   }
 
-  const generator = generation[`generate${capitalize(type)}` as const];
-  if (!generator) {
-    throw new Error(`No generator available for ${type} entries.`);
+  switch (type) {
+    case "action": {
+      const fn = generation.generateAction;
+      if (!fn) throw new Error("No generator available for action entries.");
+      return fn as GeneratorFunction<T>;
+    }
+    case "item": {
+      const fn = generation.generateItem;
+      if (!fn) throw new Error("No generator available for item entries.");
+      return fn as GeneratorFunction<T>;
+    }
+    case "actor": {
+      const fn = generation.generateActor;
+      if (!fn) throw new Error("No generator available for actor entries.");
+      return fn as GeneratorFunction<T>;
+    }
+    default:
+      throw new Error(`No generator available for ${type} entries.`);
   }
-
-  return generator as GeneratorMap[T];
 }
 
 function resolveImporter<T extends EntityType>(
   type: T,
   overrides: GenerationDependencyOverrides["importers"],
-): ImporterMap[T] {
+): ImporterFunction<T> {
   if (overrides?.[type]) {
-    return overrides[type] as ImporterMap[T];
+    return overrides[type] as ImporterFunction<T>;
   }
 
   switch (type) {
     case "action":
-      return importAction as unknown as ImporterMap[T];
+      return importAction as unknown as ImporterFunction<T>;
     default:
       throw new Error(`No importer configured for ${type} entries.`);
   }
@@ -339,7 +354,7 @@ function collectCurrentSelection(): unknown[] {
   return documents;
 }
 
-function inferInputName<T extends EntityType>(type: T, input: PromptInputMap[T]): string {
+function inferInputName<T extends EntityType>(type: T, input: PromptInputFor<T>): string {
   switch (type) {
     case "action": {
       const actionInput = input as ActionPromptInput;

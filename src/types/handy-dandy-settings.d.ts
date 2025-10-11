@@ -12,6 +12,8 @@ declare module "fvtt-types/configuration" {
     "handy-dandy.GPTTemperature": number;
     "handy-dandy.GPTTopP": number;
     "handy-dandy.GPTSeed": number | null;
+    "handy-dandy.developerDumpInvalidJson": boolean;
+    "handy-dandy.developerDumpAjvErrors": boolean;
   }
 }
 

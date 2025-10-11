@@ -61,7 +61,8 @@ test("ensureValid normalises PF2e payloads before validation", async () => {
   assert.equal(result.requirements, "");
   assert.equal(result.img, "");
   assert.equal(result.rarity, "common");
-  assert.equal(Object.hasOwn(result as Record<string, unknown>, "extra"), false);
+  const record = result as unknown as Record<string, unknown>;
+  assert.equal(Object.hasOwn(record, "extra"), false);
 });
 
 test("ensureValid uses GPT repair when Ajv validation fails", async () => {
@@ -102,7 +103,8 @@ test("ensureValid uses GPT repair when Ajv validation fails", async () => {
   assert.equal(result.rarity, "common");
   assert.equal(result.price, 15);
   assert.deepEqual(result.traits, ["magical"]);
-  assert.equal(Object.hasOwn(result as Record<string, unknown>, "extra"), false);
+  const repaired = result as unknown as Record<string, unknown>;
+  assert.equal(Object.hasOwn(repaired, "extra"), false);
 });
 
 test("ensureValid throws typed error with diagnostics after exhausting retries", async () => {
@@ -141,7 +143,8 @@ test("ensureValid throws typed error with diagnostics after exhausting retries",
     assert.ok(error instanceof EnsureValidError);
     const ensureError = error as EnsureValidError<"item">;
     assert.equal(ensureError.diagnostics.length, 2);
-    assert.equal(ensureError.originalPayload?.slug, "broken-item");
+    const original = ensureError.originalPayload as { slug?: string } | undefined;
+    assert.equal(original?.slug, "broken-item");
     assert.equal((ensureError.lastPayload as { rarity?: string }).rarity, "legendary");
 
     const [firstAttempt] = ensureError.diagnostics as EnsureValidDiagnostics<"item">[];

@@ -51,30 +51,30 @@ type BaseEntity<TType extends EntityType> = {
 
 export interface ActionSchemaData extends BaseEntity<"action"> {
   actionType: ActionExecution;
-  traits?: string[];
-  requirements?: string;
+  traits: string[];
+  requirements: string;
   description: string;
-  img?: string;
-  rarity?: Rarity;
+  img: string;
+  rarity: Rarity;
 }
 
 export interface ItemSchemaData extends BaseEntity<"item"> {
   itemType: ItemCategory;
   rarity: Rarity;
   level: number;
-  price?: number;
-  traits?: string[];
-  description?: string;
-  img?: string;
+  price: number;
+  traits: string[];
+  description: string;
+  img: string;
 }
 
 export interface ActorSchemaData extends BaseEntity<"actor"> {
   actorType: ActorCategory;
   rarity: Rarity;
   level: number;
-  traits?: string[];
-  languages?: string[];
-  img?: string;
+  traits: string[];
+  languages: string[];
+  img: string;
 }
 
 export interface PackEntrySchemaData {
@@ -89,6 +89,12 @@ export interface PackEntrySchemaData {
   folder?: string | null;
 }
 
+export type SchemaDataFor<T extends EntityType> = T extends "action"
+  ? ActionSchemaData
+  : T extends "item"
+    ? ItemSchemaData
+    : ActorSchemaData;
+
 const baseMeta = {
   schema_version: { type: "integer", enum: [1], default: 1 as const },
   systemId: { type: "string", enum: SYSTEM_IDS, default: "pf2e" as const },
@@ -100,7 +106,19 @@ export const actionSchema = {
   $id: "Action",
   type: "object",
   additionalProperties: false,
-  required: ["schema_version", "systemId", "type", "slug", "name", "actionType", "description"],
+  required: [
+    "schema_version",
+    "systemId",
+    "type",
+    "slug",
+    "name",
+    "actionType",
+    "description",
+    "traits",
+    "requirements",
+    "img",
+    "rarity",
+  ],
   properties: {
     ...baseMeta,
     type: { type: "string", enum: ["action"] as const },
@@ -121,7 +139,20 @@ export const itemSchema = {
   $id: "Item",
   type: "object",
   additionalProperties: false,
-  required: ["schema_version", "systemId", "type", "slug", "name", "itemType", "rarity", "level"],
+  required: [
+    "schema_version",
+    "systemId",
+    "type",
+    "slug",
+    "name",
+    "itemType",
+    "rarity",
+    "level",
+    "price",
+    "traits",
+    "description",
+    "img",
+  ],
   properties: {
     ...baseMeta,
     type: { type: "string", enum: ["item"] as const },
@@ -143,7 +174,19 @@ export const actorSchema = {
   $id: "Actor",
   type: "object",
   additionalProperties: false,
-  required: ["schema_version", "systemId", "type", "slug", "name", "actorType", "rarity", "level"],
+  required: [
+    "schema_version",
+    "systemId",
+    "type",
+    "slug",
+    "name",
+    "actorType",
+    "rarity",
+    "level",
+    "traits",
+    "languages",
+    "img",
+  ],
   properties: {
     ...baseMeta,
     type: { type: "string", enum: ["actor"] as const },
@@ -180,7 +223,7 @@ export const packEntrySchema = {
     sort: { type: "integer", default: 0 },
     folder: { type: "string", nullable: true, default: null }
   }
-} satisfies JSONSchemaType<PackEntrySchemaData>;
+} as unknown as JSONSchemaType<PackEntrySchemaData>;
 
 export const schemas = {
   action: actionSchema,

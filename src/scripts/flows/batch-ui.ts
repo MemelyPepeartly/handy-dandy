@@ -123,7 +123,6 @@ async function promptBatchGeneration(): Promise<GenerationBatchOptions<EntityTyp
 
       return { entityType, payload, packId, folderId, seed, maxAttempts };
     },
-    options: { jQuery: true },
   });
 
   if (!response) {

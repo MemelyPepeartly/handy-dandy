@@ -11,6 +11,9 @@ import { ACTION_EXECUTIONS, ACTOR_CATEGORIES, ITEM_CATEGORIES, RARITIES } from "
 
 const DEFAULT_SCHEMA_VERSION = 1 as const;
 const DEFAULT_SYSTEM_ID = "pf2e" as const;
+const DEFAULT_ACTION_IMAGE = "systems/pf2e/icons/default-icons/action.svg" as const;
+const DEFAULT_ITEM_IMAGE = "systems/pf2e/icons/default-icons/item.svg" as const;
+const DEFAULT_ACTOR_IMAGE = "systems/pf2e/icons/default-icons/monster.svg" as const;
 
 const ACTION_TYPE_MAP: Record<string, ActionExecution> = {
   one: "one-action",
@@ -377,7 +380,7 @@ export function fromFoundryAction(doc: FoundryAction): ActionSchemaData {
   const description = rawDescription || doc.name;
 
   const traitsValue = doc.system?.traits?.value;
-  const traits = normalizeTraits(traitsValue);
+  const traits = normalizeTraits(traitsValue) ?? [];
 
   const actionTypeRaw =
     (typeof doc.system?.actionType === "string"
@@ -395,7 +398,9 @@ export function fromFoundryAction(doc: FoundryAction): ActionSchemaData {
 
   const rarity = normalizeRarity(doc.system?.traits?.rarity);
 
-  const result: ActionSchemaData = {
+  const img = normalizeImg(doc.img) || DEFAULT_ACTION_IMAGE;
+
+  return {
     schema_version: DEFAULT_SCHEMA_VERSION,
     systemId: DEFAULT_SYSTEM_ID,
     type: "action",
@@ -404,19 +409,10 @@ export function fromFoundryAction(doc: FoundryAction): ActionSchemaData {
     actionType: resolveActionType(actionTypeRaw),
     requirements,
     description,
-    rarity
-  };
-
-  const img = normalizeImg(doc.img);
-  if (img) {
-    result.img = img;
-  }
-
-  if (traits?.length) {
-    result.traits = traits;
-  }
-
-  return result;
+    rarity,
+    traits,
+    img,
+  } satisfies ActionSchemaData;
 }
 
 export function fromFoundryItem(doc: FoundryItem): ItemSchemaData {
@@ -425,7 +421,6 @@ export function fromFoundryItem(doc: FoundryItem): ItemSchemaData {
     typeof doc.system?.description === "string"
       ? normalizeHtml(doc.system.description)
       : normalizeHtml(doc.system?.description?.value);
-  const description = rawDescription || undefined;
 
   const levelRaw =
     typeof doc.system?.level === "number" || typeof doc.system?.level === "string"
@@ -435,13 +430,17 @@ export function fromFoundryItem(doc: FoundryItem): ItemSchemaData {
   const level = Number(levelRaw ?? 0);
 
   const traitsValue = doc.system?.traits?.value;
-  const traits = normalizeTraits(traitsValue);
+  const traits = normalizeTraits(traitsValue) ?? [];
 
   const rarityValue = doc.system?.traits?.rarity ??
     (typeof doc.system?.rarity === "string" ? doc.system.rarity : doc.system?.rarity?.value);
   const priceValue = doc.system?.price;
 
-  const result: ItemSchemaData = {
+  const price = normalizePrice(priceValue) ?? 0;
+  const description = rawDescription || "";
+  const img = normalizeImg(doc.img) || DEFAULT_ITEM_IMAGE;
+
+  return {
     schema_version: DEFAULT_SCHEMA_VERSION,
     systemId: DEFAULT_SYSTEM_ID,
     type: "item",
@@ -449,28 +448,12 @@ export function fromFoundryItem(doc: FoundryItem): ItemSchemaData {
     name: doc.name,
     itemType: resolveItemType(doc.type),
     rarity: normalizeRarity(rarityValue),
-    level: Number.isFinite(level) ? Number(level) : 0
-  };
-
-  const price = normalizePrice(priceValue);
-  if (typeof price === "number") {
-    result.price = price;
-  }
-
-  if (traits?.length) {
-    result.traits = traits;
-  }
-
-  if (description) {
-    result.description = description;
-  }
-
-  const img = normalizeImg(doc.img);
-  if (img) {
-    result.img = img;
-  }
-
-  return result;
+    level: Number.isFinite(level) ? Number(level) : 0,
+    price,
+    traits,
+    description,
+    img,
+  } satisfies ItemSchemaData;
 }
 
 export function fromFoundryActor(doc: FoundryActor): ActorSchemaData {
@@ -484,26 +467,25 @@ export function fromFoundryActor(doc: FoundryActor): ActorSchemaData {
 
   const traitSource =
     doc.system?.traits?.traits?.value ?? doc.system?.traits?.value ?? doc.system?.traits;
-  const traits = normalizeTraits(traitSource);
+  const traits = normalizeTraits(traitSource) ?? [];
 
   const rarityValue = doc.system?.traits?.rarity;
 
   const languagesSources: unknown[] = [];
+  const traitLanguagesSource = doc.system?.traits?.languages;
   const traitLanguages =
-    doc.system?.traits?.languages && "value" in (doc.system?.traits?.languages ?? {})
-      ? (doc.system?.traits?.languages as { value?: unknown }).value
-      : doc.system?.traits?.languages;
+    traitLanguagesSource && typeof traitLanguagesSource === "object" && "value" in traitLanguagesSource
+      ? (traitLanguagesSource as { value?: unknown }).value
+      : traitLanguagesSource;
   if (traitLanguages !== undefined) {
     languagesSources.push(traitLanguages);
   }
 
+  const detailLanguagesSource = doc.system?.details?.languages;
   const detailLanguages =
-    doc.system?.details?.languages &&
-    typeof doc.system?.details?.languages === "object" &&
-    doc.system?.details?.languages !== null &&
-    "value" in doc.system?.details?.languages
-      ? (doc.system?.details?.languages as { value?: unknown }).value
-      : doc.system?.details?.languages;
+    detailLanguagesSource && typeof detailLanguagesSource === "object" && "value" in detailLanguagesSource
+      ? (detailLanguagesSource as { value?: unknown }).value
+      : detailLanguagesSource;
   if (detailLanguages !== undefined) {
     languagesSources.push(detailLanguages);
   }
@@ -524,7 +506,9 @@ export function fromFoundryActor(doc: FoundryActor): ActorSchemaData {
     languages.push(language);
   }
 
-  const result: ActorSchemaData = {
+  const img = normalizeImg(doc.img) || DEFAULT_ACTOR_IMAGE;
+
+  return {
     schema_version: DEFAULT_SCHEMA_VERSION,
     systemId: DEFAULT_SYSTEM_ID,
     type: "actor",
@@ -532,21 +516,9 @@ export function fromFoundryActor(doc: FoundryActor): ActorSchemaData {
     name: doc.name,
     actorType: resolveActorType(doc.type),
     rarity: normalizeRarity(rarityValue),
-    level: Number.isFinite(level) ? Number(level) : 0
-  };
-
-  if (traits?.length) {
-    result.traits = traits;
-  }
-
-  if (languages?.length) {
-    result.languages = languages;
-  }
-
-  const img = normalizeImg(doc.img);
-  if (img) {
-    result.img = img;
-  }
-
-  return result;
+    level: Number.isFinite(level) ? Number(level) : 0,
+    traits,
+    languages,
+    img,
+  } satisfies ActorSchemaData;
 }
