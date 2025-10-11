@@ -40,6 +40,10 @@ export const readGPTSettings = (): GPTClientConfig => {
   return config;
 };
 
+export interface GenerateWithSchemaOptions {
+  seed?: number;
+}
+
 export class GPTClient {
   #openai: OpenAI;
   #config: GPTClientConfig;
@@ -53,22 +57,31 @@ export class GPTClient {
     return new GPTClient(openai, readGPTSettings());
   }
 
-  async generateWithSchema<T>(prompt: string, schema: JsonSchemaDefinition): Promise<T> {
+  async generateWithSchema<T>(
+    prompt: string,
+    schema: JsonSchemaDefinition,
+    options?: GenerateWithSchemaOptions,
+  ): Promise<T> {
     try {
-      return await this.#generateStructured<T>(prompt, schema);
+      return await this.#generateStructured<T>(prompt, schema, options);
     } catch (error) {
       if (!this.#shouldFallback(error)) throw error;
-      return await this.#generateWithTool<T>(prompt, schema);
+      return await this.#generateWithTool<T>(prompt, schema, options);
     }
   }
 
-  async #generateStructured<T>(prompt: string, schema: JsonSchemaDefinition): Promise<T> {
+  async #generateStructured<T>(
+    prompt: string,
+    schema: JsonSchemaDefinition,
+    options?: GenerateWithSchemaOptions,
+  ): Promise<T> {
+    const seed = options?.seed ?? this.#config.seed;
     const response = await this.#openai.responses.create({
       model: this.#config.model,
       input: prompt,
       temperature: this.#config.temperature,
       top_p: this.#config.top_p,
-      seed: this.#config.seed,
+      seed,
       response_format: {
         type: "json_schema",
         json_schema: {
@@ -82,12 +95,17 @@ export class GPTClient {
     return this.#extractJson<T>(response, schema);
   }
 
-  async #generateWithTool<T>(prompt: string, schema: JsonSchemaDefinition): Promise<T> {
+  async #generateWithTool<T>(
+    prompt: string,
+    schema: JsonSchemaDefinition,
+    options?: GenerateWithSchemaOptions,
+  ): Promise<T> {
+    const seed = options?.seed ?? this.#config.seed;
     const response = await this.#openai.responses.create({
       model: this.#config.model,
       temperature: this.#config.temperature,
       top_p: this.#config.top_p,
-      seed: this.#config.seed,
+      seed,
       input: [
         {
           role: "system",

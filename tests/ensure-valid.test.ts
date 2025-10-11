@@ -16,7 +16,11 @@ class StubGPTClient {
     this.responses.push(response);
   }
 
-  async generateWithSchema<T>(prompt: string, schema: JsonSchemaDefinition): Promise<T> {
+  async generateWithSchema<T>(
+    prompt: string,
+    schema: JsonSchemaDefinition,
+    _options?: { seed?: number },
+  ): Promise<T> {
     this.calls.push({ prompt, schema });
     const response = this.responses.shift();
     if (response instanceof Error) {
