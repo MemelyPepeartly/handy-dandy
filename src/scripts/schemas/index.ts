@@ -8,9 +8,8 @@ export const ACTION_EXECUTIONS = [
   "one-action",
   "two-actions",
   "three-actions",
-  "reaction",
-  "free-action",
-  "passive"
+  "free",
+  "reaction"
 ] as const;
 export type ActionExecution = (typeof ACTION_EXECUTIONS)[number];
 

@@ -6,7 +6,7 @@ import type {
   ItemSchemaData,
   PackEntrySchemaData
 } from "../src/scripts/schemas";
-import { validate } from "../src/scripts/helpers/validation";
+import { formatError, formatErrorPath, validate } from "../src/scripts/helpers/validation";
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
 
@@ -68,17 +68,25 @@ test("valid fixtures pass validation", () => {
 test("invalid action enum produces helpful error", () => {
   const result = validate("action", { ...clone(validAction), actionType: "quad-action" as any });
   assert.equal(result.ok, false);
-  assert.ok(
-    result.errors.includes("actionType: must be equal to one of the allowed values"),
-    `Unexpected errors: ${result.errors.join(", ")}`
-  );
+  if (!result.ok) {
+    const [error] = result.errors;
+    assert.equal(error.instancePath, "/actionType");
+    assert.equal(formatErrorPath(error), "actionType");
+    assert.equal(formatError(error), "actionType: must be equal to one of the allowed values");
+  }
 });
 
 test("extra fields are reported for items", () => {
   const result = validate("item", { ...clone(validItem), extra: true } as Record<string, unknown>);
   assert.equal(result.ok, false);
-  assert.ok(
-    result.errors.includes("extra: must NOT have additional properties"),
-    `Unexpected errors: ${result.errors.join(", ")}`
-  );
+  if (!result.ok) {
+    const paths = result.errors.map((error) => formatErrorPath(error));
+    assert.ok(paths.includes("extra"), `Unexpected paths: ${paths.join(", ")}`);
+
+    const messages = result.errors.map((error) => formatError(error));
+    assert.ok(
+      messages.includes("extra: must NOT have additional properties"),
+      `Unexpected errors: ${messages.join(", ")}`
+    );
+  }
 });
