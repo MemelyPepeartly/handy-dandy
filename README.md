@@ -78,6 +78,10 @@ All helpers write structured output to the developer console using collapsed
 console groups. Access is restricted to the GM or when a developer module/flag
 is active; otherwise the helpers emit a warning and throw an error.
 
+## Documentation
+
+- [Development Guide](docs/development.md) – walkthrough for adding new entity schemas, extending the normalisation helpers, and performing schema migrations.
+
 ## Compatibility
 
 The module targets Foundry **V12** and is tested with the **pf2e** system.  The
