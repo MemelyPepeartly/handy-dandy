@@ -1,5 +1,6 @@
 // scripts/settings.ts
 import { CONSTANTS } from "../constants";
+import { ToolOverview } from "../ui/tool-overview";
 
 export function registerSettings(): void {
   const settings = game.settings!;
@@ -56,6 +57,15 @@ export function registerSettings(): void {
     config: true,
     type: Number,
     default: null
+  });
+
+  settings.registerMenu(CONSTANTS.MODULE_ID, "toolGuide", {
+    name: "Handy Dandy Tool Guide",
+    label: "Open Tool Guide",
+    hint: "Open a quick reference that shows where to access each Handy Dandy tool inside Foundry.",
+    icon: "fas fa-compass",
+    type: ToolOverview,
+    restricted: false,
   });
 
   settings.register(CONSTANTS.MODULE_ID, "developerDumpInvalidJson", {

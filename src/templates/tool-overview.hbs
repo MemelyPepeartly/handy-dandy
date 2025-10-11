@@ -1,0 +1,36 @@
+<section class="handy-tool-guide flexcol">
+  <p class="scene-controls-hint">
+    <i class="fas fa-info-circle"></i>
+    <span>
+      Handy Dandy adds its tools to the <strong>Scene Controls</strong> toolbar on the left side of the canvas.
+      Look for the <i class="fas fa-screwdriver-wrench"></i> icon labelled <strong>Handy Dandy Tools</strong>.
+    </span>
+  </p>
+
+  <ol class="access-steps">
+    <li>Open any scene as a GM.</li>
+    <li>Hover over the left toolbar and click <strong>Handy Dandy Tools</strong>.</li>
+    <li>Choose the tool button you need from the palette.</li>
+  </ol>
+
+  <hr>
+
+  <div class="tool-grid">
+    {{#each tools}}
+      <article class="tool-card">
+        <header class="tool-card__header">
+          <h3><i class="{{icon}}" aria-hidden="true"></i> {{title}}</h3>
+        </header>
+        <p class="tool-card__location"><strong>Location:</strong> {{location}}</p>
+        <p class="tool-card__description">{{description}}</p>
+        {{#if buttonAction}}
+          <footer class="tool-card__actions">
+            <button type="button" data-action="{{buttonAction}}">
+              <i class="{{buttonIcon}}" aria-hidden="true"></i> {{buttonLabel}}
+            </button>
+          </footer>
+        {{/if}}
+      </article>
+    {{/each}}
+  </div>
+</section>
