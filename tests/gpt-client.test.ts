@@ -90,8 +90,8 @@ test("generateWithSchema returns parsed JSON from structured outputs", async () 
   assert.deepEqual(result, { value: 42 });
 
   const [call] = stub.responses.calls;
-  assert.equal(call.response_format?.json_schema?.name, schema.name);
-  assert.equal(call.response_format?.json_schema?.strict, true);
+  assert.equal(call.text?.format?.name, schema.name);
+  assert.equal(call.text?.format?.strict, true);
 });
 
 test("generateWithSchema falls back to tool calls when response_format unsupported", async () => {
@@ -124,5 +124,5 @@ test("generateWithSchema falls back to tool calls when response_format unsupport
 
   const [, fallbackCall] = stub.responses.calls;
   assert.equal(Array.isArray(fallbackCall.tools), true);
-  assert.equal(fallbackCall.tool_choice?.function?.name, schema.name);
+  assert.equal(fallbackCall.tool_choice?.name, schema.name);
 });

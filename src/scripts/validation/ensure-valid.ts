@@ -406,11 +406,15 @@ function assignOptionalString(
   }
   if (typeof value !== "string") return;
   const trimmed = value.trim();
-  if (!trimmed && !options.allowEmpty) {
-    delete target[key];
+  if (!trimmed) {
+    if (options.allowEmpty) {
+      target[key] = null;
+    } else {
+      delete target[key];
+    }
     return;
   }
-  target[key] = options.allowEmpty ? trimmed : trimmed;
+  target[key] = trimmed;
 }
 
 function assignOptionalNullableString(

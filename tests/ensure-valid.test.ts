@@ -59,7 +59,7 @@ test("ensureValid normalises PF2e payloads before validation", async () => {
   assert.equal(result.actionType, "one-action");
   assert.deepEqual(result.traits, ["attack"]);
   assert.equal(result.requirements, "");
-  assert.equal(result.img, "");
+  assert.equal(result.img, null);
   assert.equal(result.rarity, "common");
   assert.equal(result.source, "");
   assert.equal(Object.hasOwn(result as Record<string, unknown>, "extra"), false);

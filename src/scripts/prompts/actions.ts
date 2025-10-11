@@ -18,7 +18,9 @@ function buildActionSchemaSection(): string {
   const traitsDefault = JSON.stringify(
     (actionSchema.properties.traits as { default: readonly string[] }).default
   );
-  const imgDefault = (actionSchema.properties.img as { default: string }).default;
+  const imgDefault = JSON.stringify(
+    (actionSchema.properties.img as { default: string | null }).default
+  );
   const sourceDefault = (actionSchema.properties.source as { default: string }).default;
   return [
     "Action schema overview:",
@@ -30,7 +32,7 @@ function buildActionSchemaSection(): string {
     "- description: non-empty string containing the full action rules.",
     `- traits: optional array of non-empty strings; defaults to ${traitsDefault}.`,
     `- requirements: optional string; defaults to "${requirementsDefault}".`,
-    `- img: optional string formatted as a URI reference; defaults to "${imgDefault}".`,
+    `- img: optional string formatted as a URI reference; defaults to ${imgDefault}.`,
     `- rarity: optional string enum (${rarities}); defaults to "${rarityDefault}".`,
     `- source: optional string; defaults to "${sourceDefault}".`
   ].join("\n");
