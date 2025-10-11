@@ -14,14 +14,27 @@ type ControlWithToolCollection = Omit<SceneControls.Control, "tools"> & {
   onToolChange?: (activeTool: string) => void;
 };
 
-function useArrayTools(): boolean {
-  const releaseGeneration = Number(game.release?.generation ?? game.version?.split(".")[0] ?? 0);
-  return Number.isFinite(releaseGeneration) && releaseGeneration >= 12;
+function useObjectToolCollections(): boolean {
+  const releaseGeneration = Number(game.release?.generation ?? 0);
+  if (Number.isFinite(releaseGeneration) && releaseGeneration !== 0) {
+    return releaseGeneration >= 13;
+  }
+
+  const versionMajor = Number(game.version?.split(".")[0] ?? 0);
+  if (Number.isFinite(versionMajor) && versionMajor !== 0) {
+    return versionMajor >= 13;
+  }
+
+  return false;
 }
 
 function compatibilityAddControl(collection: ControlCollection, control: ControlWithToolCollection): void {
   if (Array.isArray(collection)) {
     collection.push(control as unknown as SceneControls.Control);
+    // Newer Foundry releases expect string lookups on the collection as well as
+    // array iteration. Assign the control by name to preserve backwards
+    // compatibility with either access pattern.
+    (collection as Record<string, ControlWithToolCollection>)[control.name] = control;
   } else {
     collection[control.name] = control;
   }
@@ -30,6 +43,9 @@ function compatibilityAddControl(collection: ControlCollection, control: Control
 function compatibilityAddTool(collection: ToolCollection, tool: LegacyTool): void {
   if (Array.isArray(collection)) {
     collection.push(tool);
+    // Provide property-style access on the array for Foundry versions which
+    // look up tools via their string name instead of iterating the array.
+    (collection as Record<string, LegacyTool>)[tool.name] = tool;
   } else {
     collection[tool.name] = tool;
   }
@@ -45,7 +61,7 @@ function requireNamespace(): NonNullable<Game["handyDandy"]> {
 }
 
 export function insertSidebarButtons(controls: ControlCollection): void {
-  const tools: ToolCollection = useArrayTools() ? [] : {};
+  const tools: ToolCollection = useObjectToolCollections() ? {} : [];
 
   const noop = (): void => {
     /* noop for legacy Foundry compatibility */
