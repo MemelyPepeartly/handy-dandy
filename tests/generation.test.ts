@@ -118,8 +118,12 @@ test("generateActor respects custom seeds for deterministic behaviour", async ()
   const first = await generateActor(baseActorInput, { gptClient: client, seed: 7 });
   const second = await generateActor(baseActorInput, { gptClient: client, seed: 7 });
 
-  assert.deepStrictEqual(first, actorFixture, "tests/fixtures/actor.json should be returned for actor generation");
-  assert.deepStrictEqual(second, actorFixture, "tests/fixtures/actor.json should be returned for actor generation");
+  const expected = cloneFixture(actorFixture) as ActorSchemaData;
+  expected.recallKnowledge = null;
+  expected.spellcasting = [];
+
+  assert.deepStrictEqual(first, expected, "tests/fixtures/actor.json should be returned for actor generation");
+  assert.deepStrictEqual(second, expected, "tests/fixtures/actor.json should be returned for actor generation");
   assert.equal(client.calls.length, 2);
   assert.ok(client.calls.every((call) => call.seed === 7));
 });

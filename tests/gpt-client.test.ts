@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { beforeEach, test } from "node:test";
 import type { OpenAI } from "openai";
-import { GPTClient, readGPTSettings } from "../src/scripts/gpt/client";
+import { GPTClient, readGPTSettings, type JsonSchemaDefinition } from "../src/scripts/gpt/client";
 
 type ResponsesCall = Record<string, any>;
 
@@ -92,6 +92,61 @@ test("generateWithSchema returns parsed JSON from structured outputs", async () 
   const [call] = stub.responses.calls;
   assert.equal(call.text?.format?.name, schema.name);
   assert.equal(call.text?.format?.strict, true);
+});
+
+test("generateWithSchema normalizes schema required properties for strict mode", async () => {
+  const stub = new StubOpenAI();
+  stub.responses.enqueue({
+    output: [
+      {
+        type: "message",
+        content: [
+          {
+            type: "output_json",
+            json: { attributes: { hp: { value: 10, temp: 0 } } }
+          }
+        ]
+      }
+    ]
+  });
+
+  const client = GPTClient.fromSettings(stub as unknown as OpenAI);
+  const complexSchema = {
+    name: "Complex",
+    schema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        attributes: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            hp: {
+              type: "object",
+              additionalProperties: false,
+              properties: {
+                value: { type: "integer" },
+                temp: { type: "integer", default: 0 },
+              },
+              required: ["value"],
+            },
+          },
+          required: ["hp"],
+        },
+      },
+      required: ["attributes"],
+    },
+  } as const satisfies JsonSchemaDefinition;
+
+  await client.generateWithSchema<{ attributes: { hp: { value: number; temp: number } } }>(
+    "Say hello",
+    complexSchema,
+  );
+
+  const [call] = stub.responses.calls;
+  const hpRequired =
+    call.text?.format?.schema?.properties?.attributes?.properties?.hp?.required;
+  assert.deepEqual(hpRequired, ["value", "temp"]);
 });
 
 test("generateWithSchema falls back to tool calls when response_format unsupported", async () => {

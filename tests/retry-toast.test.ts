@@ -22,7 +22,7 @@ test("createEnsureValidRetryHandler invokes repair and importer", async () => {
       repair: async () => {
         repairCalls += 1;
         return {
-          schema_version: 2,
+          schema_version: 3,
           systemId: "pf2e",
           type: "item",
           slug: "retry",

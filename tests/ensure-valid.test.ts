@@ -51,7 +51,7 @@ test("ensureValid normalises PF2e payloads before validation", async () => {
 
   const result = await ensureValid({ type: "action", payload });
 
-  assert.equal(result.schema_version, 2);
+  assert.equal(result.schema_version, 3);
   assert.equal(result.systemId, "pf2e");
   assert.equal(result.type, "action");
   assert.equal(result.slug, "test-action");
@@ -68,7 +68,7 @@ test("ensureValid normalises PF2e payloads before validation", async () => {
 test("ensureValid uses GPT repair when Ajv validation fails", async () => {
   const stub = new StubGPTClient();
   stub.enqueue({
-    schema_version: 2,
+    schema_version: 3,
     systemId: "pf2e",
     type: "item",
     slug: "test-item",
@@ -83,7 +83,7 @@ test("ensureValid uses GPT repair when Ajv validation fails", async () => {
   });
 
   const payload = {
-    schema_version: 2,
+    schema_version: 3,
     systemId: "pf2e",
     type: "item",
     slug: "test-item",
@@ -110,7 +110,7 @@ test("ensureValid uses GPT repair when Ajv validation fails", async () => {
 test("ensureValid throws typed error with diagnostics after exhausting retries", async () => {
   const stub = new StubGPTClient();
   stub.enqueue({
-    schema_version: 2,
+    schema_version: 3,
     systemId: "pf2e",
     type: "item",
     slug: "broken-item",
@@ -122,7 +122,7 @@ test("ensureValid throws typed error with diagnostics after exhausting retries",
   });
 
   const payload = {
-    schema_version: 2,
+    schema_version: 3,
     systemId: "pf2e",
     type: "item",
     slug: "broken-item",
@@ -156,7 +156,7 @@ test("ensureValid throws typed error with diagnostics after exhausting retries",
 test("EnsureValidError exposes a repair helper that retries GPT fixes", async () => {
   const stub = new StubGPTClient();
   stub.enqueue({
-    schema_version: 2,
+    schema_version: 3,
     systemId: "pf2e",
     type: "item",
     slug: "retry-item",
@@ -168,7 +168,7 @@ test("EnsureValidError exposes a repair helper that retries GPT fixes", async ()
   });
 
   const payload = {
-    schema_version: 2,
+    schema_version: 3,
     systemId: "pf2e",
     type: "item",
     slug: "retry-item",
@@ -192,7 +192,7 @@ test("EnsureValidError exposes a repair helper that retries GPT fixes", async ()
     assert.equal(stub.calls.length, 1);
 
     stub.enqueue({
-      schema_version: 2,
+      schema_version: 3,
       systemId: "pf2e",
       type: "item",
       slug: "retry-item",
