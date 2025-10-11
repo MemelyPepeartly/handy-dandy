@@ -2,6 +2,7 @@ import type { OpenAI } from "openai";
 import { CONSTANTS } from "../constants";
 import { getDeveloperConsole } from "../dev/state";
 import type { GPTUsageMetrics } from "../dev/developer-console";
+import { DEFAULT_GPT_MODEL, isValidGPTModel } from "./models";
 
 export interface JsonSchemaDefinition {
   name: string;
@@ -85,7 +86,7 @@ export const readGPTSettings = (): GPTClientConfig => {
   const seedSetting = settings?.get(CONSTANTS.MODULE_ID, "GPTSeed");
 
   const config: GPTClientConfig = {
-    model: model ?? "gpt-4.1-mini",
+    model: isValidGPTModel(model) ? model : DEFAULT_GPT_MODEL,
     temperature: sanitizeNumber(temperature) ?? 0,
     top_p: sanitizeNumber(top_p) ?? 1,
   };
