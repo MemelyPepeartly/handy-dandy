@@ -22,6 +22,10 @@ function useArrayTools(): boolean {
 function compatibilityAddControl(collection: ControlCollection, control: ControlWithToolCollection): void {
   if (Array.isArray(collection)) {
     collection.push(control as unknown as SceneControls.Control);
+    // Newer Foundry releases expect string lookups on the collection as well as
+    // array iteration. Assign the control by name to preserve backwards
+    // compatibility with either access pattern.
+    (collection as Record<string, ControlWithToolCollection>)[control.name] = control;
   } else {
     collection[control.name] = control;
   }
@@ -30,6 +34,9 @@ function compatibilityAddControl(collection: ControlCollection, control: Control
 function compatibilityAddTool(collection: ToolCollection, tool: LegacyTool): void {
   if (Array.isArray(collection)) {
     collection.push(tool);
+    // Provide property-style access on the array for Foundry versions which
+    // look up tools via their string name instead of iterating the array.
+    (collection as Record<string, LegacyTool>)[tool.name] = tool;
   } else {
     collection[tool.name] = tool;
   }
