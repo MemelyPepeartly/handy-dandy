@@ -2,13 +2,14 @@
 import { registerSettings } from "./setup/settings";
 import { CONSTANTS } from "./constants";
 import { OpenAI } from "openai";
-import { insertSidebarButtons } from "./setup/sidebarButtons";
+import { insertSidebarButtons, type ControlCollection } from "./setup/sidebarButtons";
 import { SchemaTool } from "./tools/schema-tool";
 import { DataEntryTool } from "./tools/data-entry-tool";
 import { GPTClient } from "./gpt/client";
 import { DeveloperConsole } from "./dev/developer-console";
 import { setDeveloperConsole } from "./dev/state";
 import { createDevNamespace, canUseDeveloperTools, type DevNamespace } from "./dev/tools";
+import { ToolOverview } from "./ui/tool-overview";
 import {
   DEFAULT_GENERATION_SEED,
   generateAction,
@@ -78,6 +79,7 @@ declare global {
       applications: {
         schemaTool: SchemaTool,
         dataEntryTool: DataEntryTool,
+        toolOverview: ToolOverview,
       },
       developer: {
         console: DeveloperConsole,
@@ -101,7 +103,8 @@ Hooks.once("init", async () => {
     "schema-tool": `${CONSTANTS.TEMPLATE_PATH}/schema-tool.hbs`,
     "schema-node": `${CONSTANTS.TEMPLATE_PATH}/schema-node.hbs`,
     "data-entry-tool": `${CONSTANTS.TEMPLATE_PATH}/data-entry-tool.hbs`,
-    "developer-console": `${CONSTANTS.TEMPLATE_PATH}/developer-console.hbs`
+    "developer-console": `${CONSTANTS.TEMPLATE_PATH}/developer-console.hbs`,
+    "tool-overview": `${CONSTANTS.TEMPLATE_PATH}/tool-overview.hbs`,
   });
 });
 
@@ -133,6 +136,7 @@ Hooks.once("setup", () => {
     applications: {
       schemaTool: new SchemaTool,
       dataEntryTool: new DataEntryTool,
+      toolOverview: new ToolOverview(),
     },
     developer: {
       console: developerConsole,
@@ -151,6 +155,11 @@ Hooks.once("setup", () => {
 Hooks.once("ready", () => {
   // Only the GM needs an API key to call OpenAI from the browser
   if (!game.user?.isGM) return;
+
+  ui.notifications?.info(
+    `${CONSTANTS.MODULE_NAME} tools live under the Scene Controls toolbar. ` +
+      `Open Handy Dandy Tools or the Tool Guide from Module Settings for quick access.`,
+  );
 
   const key = game.settings.get(CONSTANTS.MODULE_ID, "GPTApiKey") as string;
   if (!key) {
@@ -171,12 +180,15 @@ Hooks.once("ready", () => {
 });
 
 // ---------- SCENE-CONTROL GROUP --------------------------------------------
-Hooks.on("getSceneControlButtons", (controls: SceneControl[]) => {
+Hooks.on("getSceneControlButtons", (controls: ControlCollection) => {
   // GM-only tool-palette
   if (!game.user?.isGM) return;
 
   // Hot-module reloading: guard against double-insertion
-  if (controls.some(c => c.name === "handy-dandy")) return;
+  const alreadyPresent = Array.isArray(controls)
+    ? controls.some(c => c.name === "handy-dandy")
+    : Object.prototype.hasOwnProperty.call(controls, "handy-dandy");
+  if (alreadyPresent) return;
 
   insertSidebarButtons(controls);
 });
