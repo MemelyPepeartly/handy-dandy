@@ -32,7 +32,7 @@ function buildActionSchemaSection(): string {
     "- description: non-empty string containing the full action rules.",
     `- traits: optional array of non-empty strings; defaults to ${traitsDefault}.`,
     `- requirements: optional string; defaults to "${requirementsDefault}".`,
-    `- img: optional string formatted as a URI reference; defaults to ${imgDefault}.`,
+    `- img: optional string containing an image URL or Foundry asset path; defaults to ${imgDefault}.`,
     `- rarity: optional string enum (${rarities}); defaults to "${rarityDefault}".`,
     `- source: optional string; defaults to "${sourceDefault}".`
   ].join("\n");
