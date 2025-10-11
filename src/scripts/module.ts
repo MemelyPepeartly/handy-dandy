@@ -19,7 +19,7 @@ import {
 } from "./generation";
 import type { ActionPromptInput, ActorPromptInput, ItemPromptInput } from "./prompts";
 import type { ActionSchemaData, ActorSchemaData, ItemSchemaData } from "./schemas";
-import { exportSelectedEntities, generateAndImportBatch } from "./flows/batch";
+import { exportSelectedEntities, generateWorkbenchEntry } from "./flows/prompt-workbench";
 import { ensureValid } from "./validation/ensure-valid";
 import { importAction } from "./mappers/import";
 
@@ -87,7 +87,7 @@ declare global {
       dev: DevNamespace,
       flows: {
         exportSelection: typeof exportSelectedEntities;
-        generateBatch: typeof generateAndImportBatch;
+        promptWorkbench: typeof generateWorkbenchEntry;
       };
     };
   }
@@ -144,7 +144,7 @@ Hooks.once("setup", () => {
     dev: devNamespace,
     flows: {
       exportSelection: exportSelectedEntities,
-      generateBatch: generateAndImportBatch,
+      promptWorkbench: generateWorkbenchEntry,
     },
   };
 

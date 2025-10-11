@@ -1,19 +1,7 @@
 import { fromFoundryAction, fromFoundryActor, fromFoundryItem } from "../mappers/export";
 import { importAction } from "../mappers/import";
-import { EnsureValidError } from "../validation/ensure-valid";
-import { showEnsureValidRetryToast } from "../ui/ensure-valid-toast";
-import type {
-  ActionSchemaData,
-  ActorSchemaData,
-  EntityType,
-  CanonicalEntityMap,
-  ItemSchemaData,
-} from "../schemas";
-import type {
-  ActionPromptInput,
-  ActorPromptInput,
-  ItemPromptInput,
-} from "../prompts";
+import type { CanonicalEntityMap, EntityType, SystemId } from "../schemas";
+import type { ActionPromptInput, ActorPromptInput, ItemPromptInput } from "../prompts";
 
 type PromptInputMap = {
   action: ActionPromptInput;
@@ -47,32 +35,33 @@ export interface ExportSelectionResult {
   readonly json: string;
 }
 
-export interface GenerationBatchEntry<T extends EntityType> {
-  readonly type: T;
-  readonly input: PromptInputMap[T];
-  readonly name: string;
-  readonly status: BatchStatus;
-  readonly data?: CanonicalEntityMap[T];
-  readonly documentUuid?: string;
-  readonly error?: Error;
-}
-
-export interface GenerationBatchOptions<T extends EntityType> {
-  readonly type: T;
-  readonly inputs: readonly PromptInputMap[T][];
+export interface ImporterOptions {
   readonly packId?: string;
   readonly folderId?: string;
+}
+
+export interface GenerationDependencyOverrides {
+  readonly generators?: Partial<GeneratorMap>;
+  readonly importers?: Partial<ImporterMap>;
+}
+
+export interface PromptWorkbenchRequest<T extends EntityType> extends ImporterOptions {
+  readonly type: T;
+  readonly systemId: SystemId;
+  readonly entryName: string;
+  readonly referenceText: string;
+  readonly slug?: string;
   readonly seed?: number;
   readonly maxAttempts?: number;
   readonly dependencies?: GenerationDependencyOverrides;
 }
 
-export interface GenerationBatchResult<T extends EntityType> {
+export interface PromptWorkbenchResult<T extends EntityType> {
   readonly type: T;
-  readonly entries: GenerationBatchEntry<T>[];
-  readonly successCount: number;
-  readonly failureCount: number;
-  readonly summary: string;
+  readonly name: string;
+  readonly data: CanonicalEntityMap[T];
+  readonly input: PromptInputMap[T];
+  readonly importer?: (options?: ImporterOptions) => Promise<ClientDocument>;
 }
 
 type GeneratorMap = {
@@ -100,18 +89,8 @@ const DEFAULT_IMPORTERS: Partial<ImporterMap> = {
 };
 
 interface BoundGenerationOptions {
-  seed?: number;
-  maxAttempts?: number;
-}
-
-export interface ImporterOptions {
-  packId?: string;
-  folderId?: string;
-}
-
-export interface GenerationDependencyOverrides {
-  readonly generators?: Partial<GeneratorMap>;
-  readonly importers?: Partial<ImporterMap>;
+  readonly seed?: number;
+  readonly maxAttempts?: number;
 }
 
 export function formatBatchSummary(
@@ -172,98 +151,76 @@ export function exportSelectedEntities(options: ExportSelectionOptions = {}): Ex
   } satisfies ExportSelectionResult;
 }
 
-export async function generateAndImportBatch<T extends EntityType>(
-  options: GenerationBatchOptions<T>,
-): Promise<GenerationBatchResult<T>> {
+export async function generateWorkbenchEntry<T extends EntityType>(
+  request: PromptWorkbenchRequest<T>,
+): Promise<PromptWorkbenchResult<T>> {
   const {
     type,
-    inputs,
-    packId,
-    folderId,
+    systemId,
+    entryName,
+    referenceText,
+    slug,
     seed,
     maxAttempts,
+    packId,
+    folderId,
     dependencies = {},
-  } = options;
+  } = request;
 
   const generator = resolveGenerator(type, dependencies.generators);
-  const importer = resolveImporter(type, dependencies.importers);
-  const batchEntries: GenerationBatchEntry<T>[] = [];
+  const importer = maybeResolveImporter(type, dependencies.importers);
+  const input = buildPromptInput(type, {
+    systemId,
+    entryName,
+    referenceText,
+    slug,
+  });
 
-  for (const input of inputs) {
-    const label = inferInputName(type, input);
-    try {
-      const data = await generator(input, { seed, maxAttempts });
-      const document = await importer(data, { packId, folderId });
-      const entityName = data.name.trim();
-      const resolvedName = entityName.length ? entityName : label;
-      batchEntries.push({
-        type,
-        input,
-        name: resolvedName,
-        status: "success",
-        data,
-        documentUuid: typeof document?.uuid === "string" ? document.uuid : undefined,
-      });
-    } catch (error) {
-      if (error instanceof EnsureValidError) {
-        showEnsureValidRetryToast({
-          type,
-          name: label,
-          error,
-          importer: (json, options) => importer(json as CanonicalEntityMap[T], options),
-          importerOptions: { packId, folderId },
-        });
-      }
+  const data = await generator(input, { seed, maxAttempts });
+  const resolvedName = data.name.trim() || inferInputName(type, input);
 
-      batchEntries.push({
-        type,
-        input,
-        name: label,
-        status: "failure",
-        error: normalizeError(error),
-      });
-    }
-  }
-
-  const successCount = batchEntries.filter((entry) => entry.status === "success").length;
-  const failureCount = batchEntries.length - successCount;
-  const summary = formatBatchSummary(nounForType(type), batchEntries.length, successCount, failureCount);
+  const importerFn = importer
+    ? (options?: ImporterOptions) => importer(data, { packId, folderId, ...options })
+    : undefined;
 
   return {
     type,
-    entries: batchEntries,
-    successCount,
-    failureCount,
-    summary,
-  } satisfies GenerationBatchResult<T>;
+    name: resolvedName,
+    data,
+    input,
+    importer: importerFn,
+  } satisfies PromptWorkbenchResult<T>;
 }
 
-function nounForType(type: EntityType): string {
+function buildPromptInput<T extends EntityType>(
+  type: T,
+  context: { systemId: SystemId; entryName: string; referenceText: string; slug?: string },
+): PromptInputMap[T] {
+  const { systemId, entryName, referenceText, slug } = context;
   switch (type) {
     case "action":
-      return "actions";
+      return {
+        systemId,
+        title: entryName,
+        referenceText,
+        slug,
+      } satisfies ActionPromptInput as PromptInputMap[T];
     case "item":
-      return "items";
+      return {
+        systemId,
+        name: entryName,
+        referenceText,
+        slug,
+      } satisfies ItemPromptInput as PromptInputMap[T];
     case "actor":
-      return "actors";
+      return {
+        systemId,
+        name: entryName,
+        referenceText,
+        slug,
+      } satisfies ActorPromptInput as PromptInputMap[T];
     default:
-      return "entries";
-  }
-}
-
-function normalizeError(error: unknown): Error {
-  if (error instanceof Error) {
-    return error;
-  }
-
-  if (typeof error === "string") {
-    return new Error(error);
-  }
-
-  try {
-    return new Error(JSON.stringify(error));
-  } catch (_jsonError) {
-    return new Error(String(error));
+      throw new Error(`Unsupported entity type: ${type satisfies never}`);
   }
 }
 
@@ -289,20 +246,35 @@ function resolveGenerator<T extends EntityType>(
   return generator as GeneratorMap[T];
 }
 
-function resolveImporter<T extends EntityType>(
+function maybeResolveImporter<T extends EntityType>(
   type: T,
   overrides: GenerationDependencyOverrides["importers"],
-): ImporterMap[T] {
+): ImporterMap[T] | null {
   if (overrides?.[type]) {
     return overrides[type] as ImporterMap[T];
   }
 
   const importer = DEFAULT_IMPORTERS[type];
-  if (!importer) {
-    throw new Error(`No importer configured for ${type} entries.`);
-  }
+  return importer ? (importer as ImporterMap[T]) : null;
+}
 
-  return importer as ImporterMap[T];
+function inferInputName<T extends EntityType>(type: T, input: PromptInputMap[T]): string {
+  switch (type) {
+    case "action": {
+      const actionInput = input as ActionPromptInput;
+      return actionInput.title?.trim() || actionInput.slug?.trim() || "Unnamed";
+    }
+    case "item": {
+      const itemInput = input as ItemPromptInput;
+      return itemInput.name?.trim() || itemInput.slug?.trim() || "Unnamed";
+    }
+    case "actor": {
+      const actorInput = input as ActorPromptInput;
+      return actorInput.name?.trim() || actorInput.slug?.trim() || "Unnamed";
+    }
+    default:
+      return "Unnamed";
+  }
 }
 
 function collectCurrentSelection(): unknown[] {
@@ -341,25 +313,6 @@ function collectCurrentSelection(): unknown[] {
   }
 
   return documents;
-}
-
-function inferInputName<T extends EntityType>(type: T, input: PromptInputMap[T]): string {
-  switch (type) {
-    case "action": {
-      const actionInput = input as ActionPromptInput;
-      return actionInput.title?.trim() || actionInput.slug?.trim() || "Unnamed";
-    }
-    case "item": {
-      const itemInput = input as ItemPromptInput;
-      return itemInput.name?.trim() || itemInput.slug?.trim() || "Unnamed";
-    }
-    case "actor": {
-      const actorInput = input as ActorPromptInput;
-      return actorInput.name?.trim() || actorInput.slug?.trim() || "Unnamed";
-    }
-    default:
-      return "Unnamed";
-  }
 }
 
 function collectDirectorySelection(tab: SidebarDirectory | undefined): unknown[] {
@@ -531,6 +484,22 @@ function isActionItem(doc: { type?: string }): boolean {
 
 function isTokenDocument(doc: { documentName?: string }): boolean {
   return doc.documentName === "Token" || doc.documentName === "TokenDocument";
+}
+
+function normalizeError(error: unknown): Error {
+  if (error instanceof Error) {
+    return error;
+  }
+
+  if (typeof error === "string") {
+    return new Error(error);
+  }
+
+  try {
+    return new Error(JSON.stringify(error));
+  } catch (_jsonError) {
+    return new Error(String(error));
+  }
 }
 
 type SidebarDirectory = { element?: JQuery | HTMLElement | null; collection?: Collection<ClientDocument> };

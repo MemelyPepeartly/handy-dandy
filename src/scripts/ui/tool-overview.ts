@@ -1,5 +1,5 @@
 import { CONSTANTS } from "../constants";
-import { runBatchGenerationFlow, runExportSelectionFlow } from "../flows/batch-ui";
+import { runPromptWorkbenchFlow, runExportSelectionFlow } from "../flows/prompt-workbench-ui";
 
 interface ToolCardData {
   id: string;
@@ -68,14 +68,15 @@ export class ToolOverview extends FormApplication {
           buttonIcon: "fas fa-file-export",
         },
         {
-          id: "batch-generate",
-          title: "Batch Generate & Import",
-          icon: "fas fa-diagram-project",
-          description: "Generate a batch of actions or items with GPT and automatically import the validated results.",
-          location: "Scene Controls → Handy Dandy Tools → Batch Generate & Import",
-          buttonAction: "batch-generate",
-          buttonLabel: "Launch Batch Flow",
-          buttonIcon: "fas fa-diagram-project",
+          id: "prompt-workbench",
+          title: "Prompt Workbench",
+          icon: "fas fa-hat-wizard",
+          description:
+            "Feed a single prompt for an action, item, or creature and receive ready-to-import JSON with download options.",
+          location: "Scene Controls → Handy Dandy Tools → Prompt Workbench",
+          buttonAction: "prompt-workbench",
+          buttonLabel: "Open Prompt Workbench",
+          buttonIcon: "fas fa-hat-wizard",
         },
         {
           id: "developer-console",
@@ -107,8 +108,8 @@ export class ToolOverview extends FormApplication {
         case "export-selection":
           this.#runExportSelection();
           break;
-        case "batch-generate":
-          this.#runBatchGeneration();
+        case "prompt-workbench":
+          this.#runPromptWorkbench();
           break;
         case "open-dev-console":
           this.#openDeveloperConsole();
@@ -146,8 +147,8 @@ export class ToolOverview extends FormApplication {
     void runExportSelectionFlow();
   }
 
-  #runBatchGeneration(): void {
-    void runBatchGenerationFlow();
+  #runPromptWorkbench(): void {
+    void runPromptWorkbenchFlow();
   }
 
   #openDeveloperConsole(): void {
