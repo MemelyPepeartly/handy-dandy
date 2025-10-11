@@ -20,6 +20,7 @@ function buildActorSchemaSection(): string {
     (actorSchema.properties.languages as { default: readonly string[] }).default
   );
   const imgDefault = (actorSchema.properties.img as { default: string }).default;
+  const sourceDefault = (actorSchema.properties.source as { default: string }).default;
   return [
     "Actor schema overview:",
     `- schema_version: integer literal ${schemaVersion}.`,
@@ -31,7 +32,8 @@ function buildActorSchemaSection(): string {
     "- level: integer >= 0.",
     `- traits: optional array of non-empty strings; defaults to ${traitsDefault}.`,
     `- languages: optional array of non-empty strings; defaults to ${languagesDefault}.`,
-    `- img: optional string formatted as a URI reference; defaults to "${imgDefault}".`
+    `- img: optional string formatted as a URI reference; defaults to "${imgDefault}".`,
+    `- source: optional string; defaults to "${sourceDefault}".`
   ].join("\n");
 }
 

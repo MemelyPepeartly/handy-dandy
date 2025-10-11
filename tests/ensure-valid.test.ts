@@ -35,7 +35,7 @@ class StubGPTClient {
 
 test("ensureValid normalises PF2e payloads before validation", async () => {
   const payload = {
-    schema_version: "1",
+    schema_version: "2",
     systemId: "PF2E",
     type: "Action",
     slug: "  test-action  ",
@@ -51,7 +51,7 @@ test("ensureValid normalises PF2e payloads before validation", async () => {
 
   const result = await ensureValid({ type: "action", payload });
 
-  assert.equal(result.schema_version, 1);
+  assert.equal(result.schema_version, 2);
   assert.equal(result.systemId, "pf2e");
   assert.equal(result.type, "action");
   assert.equal(result.slug, "test-action");
@@ -61,13 +61,14 @@ test("ensureValid normalises PF2e payloads before validation", async () => {
   assert.equal(result.requirements, "");
   assert.equal(result.img, "");
   assert.equal(result.rarity, "common");
+  assert.equal(result.source, "");
   assert.equal(Object.hasOwn(result as Record<string, unknown>, "extra"), false);
 });
 
 test("ensureValid uses GPT repair when Ajv validation fails", async () => {
   const stub = new StubGPTClient();
   stub.enqueue({
-    schema_version: 1,
+    schema_version: 2,
     systemId: "pf2e",
     type: "item",
     slug: "test-item",
@@ -78,10 +79,11 @@ test("ensureValid uses GPT repair when Ajv validation fails", async () => {
     price: 15,
     traits: ["magical"],
     description: "A repaired wand.",
+    source: "",
   });
 
   const payload = {
-    schema_version: 1,
+    schema_version: 2,
     systemId: "pf2e",
     type: "item",
     slug: "test-item",
@@ -108,7 +110,7 @@ test("ensureValid uses GPT repair when Ajv validation fails", async () => {
 test("ensureValid throws typed error with diagnostics after exhausting retries", async () => {
   const stub = new StubGPTClient();
   stub.enqueue({
-    schema_version: 1,
+    schema_version: 2,
     systemId: "pf2e",
     type: "item",
     slug: "broken-item",
@@ -116,10 +118,11 @@ test("ensureValid throws typed error with diagnostics after exhausting retries",
     itemType: "wand",
     rarity: "legendary",
     level: 1,
+    source: "",
   });
 
   const payload = {
-    schema_version: 1,
+    schema_version: 2,
     systemId: "pf2e",
     type: "item",
     slug: "broken-item",
@@ -153,7 +156,7 @@ test("ensureValid throws typed error with diagnostics after exhausting retries",
 test("EnsureValidError exposes a repair helper that retries GPT fixes", async () => {
   const stub = new StubGPTClient();
   stub.enqueue({
-    schema_version: 1,
+    schema_version: 2,
     systemId: "pf2e",
     type: "item",
     slug: "retry-item",
@@ -161,10 +164,11 @@ test("EnsureValidError exposes a repair helper that retries GPT fixes", async ()
     itemType: "wand",
     rarity: "legendary",
     level: 1,
+    source: "",
   });
 
   const payload = {
-    schema_version: 1,
+    schema_version: 2,
     systemId: "pf2e",
     type: "item",
     slug: "retry-item",
@@ -188,7 +192,7 @@ test("EnsureValidError exposes a repair helper that retries GPT fixes", async ()
     assert.equal(stub.calls.length, 1);
 
     stub.enqueue({
-      schema_version: 1,
+      schema_version: 2,
       systemId: "pf2e",
       type: "item",
       slug: "retry-item",
@@ -199,6 +203,7 @@ test("EnsureValidError exposes a repair helper that retries GPT fixes", async ()
       price: 50,
       traits: ["magical"],
       description: "A repaired wand.",
+      source: "",
     });
 
     const repaired = await ensureError.repair();

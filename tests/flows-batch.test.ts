@@ -102,7 +102,7 @@ test("generateAndImportBatch aggregates mixed success and failure", async () => 
 
     const slug = input.slug ?? input.title.toLowerCase().replace(/\s+/g, "-");
     return {
-      schema_version: 1,
+      schema_version: 2,
       systemId: input.systemId,
       type: "action",
       slug,
@@ -112,6 +112,7 @@ test("generateAndImportBatch aggregates mixed success and failure", async () => 
       description: "Strike with precision.",
       rarity: "common",
       traits: [],
+      source: "",
     } satisfies ActionSchemaData;
   };
 

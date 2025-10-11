@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "systemId": "pf2e",
   "type": "item",
   "slug": "mirror-shield",
@@ -10,5 +10,6 @@
   "price": 650,
   "traits": ["invested", "magical"],
   "description": "A gleaming shield that reflects hostile magic toward its source.",
-  "img": "icons/items/mirror-shield.webp"
+  "img": "icons/items/mirror-shield.webp",
+  "source": "Pathfinder Secrets of Magic"
 }

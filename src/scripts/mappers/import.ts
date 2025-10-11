@@ -1,4 +1,4 @@
-import type { ActionSchemaData, ActorSchemaData, ItemSchemaData } from "../schemas";
+import type { ActionSchemaData, ActorSchemaData, ItemSchemaData, SystemId } from "../schemas";
 import { validate, formatError } from "../helpers/validation";
 
 const DEFAULT_ACTION_IMAGE = "systems/pf2e/icons/default-icons/action.svg" as const;
@@ -96,6 +96,31 @@ function trimArray(values: readonly string[] | undefined): string[] {
   }
 
   return values.map((value) => value.trim()).filter((value) => value.length > 0);
+}
+
+function resolveActiveSystemId(): string | undefined {
+  const system = (game as Game | undefined)?.system as
+    | { id?: unknown; data?: { id?: unknown } }
+    | undefined;
+  if (!system) {
+    return undefined;
+  }
+
+  if (typeof system.id === "string") {
+    return system.id;
+  }
+
+  const legacyId = (system as { data?: { id?: unknown } }).data?.id;
+  return typeof legacyId === "string" ? legacyId : undefined;
+}
+
+function assertSystemCompatibility(expected: SystemId): void {
+  const active = resolveActiveSystemId();
+  if (active && active !== expected) {
+    throw new Error(
+      `System ID mismatch: payload targets "${expected}" but the active system is "${active}".`,
+    );
+  }
 }
 
 function applyInlineFormatting(text: string): string {
@@ -313,6 +338,7 @@ function prepareActionSource(action: ActionSchemaData): FoundryActionSource {
   const traits = trimArray(action.traits);
   const description = toRichText(action.description);
   const requirements = toRichText(action.requirements);
+  const source = action.source?.trim() ?? "";
 
   return {
     name: action.name,
@@ -325,7 +351,7 @@ function prepareActionSource(action: ActionSchemaData): FoundryActionSource {
       actionType: { value: actionType.value },
       actions: { value: actionType.count },
       requirements: { value: requirements },
-      source: { value: "" },
+      source: { value: source },
       rules: []
     }
   };
@@ -334,6 +360,7 @@ function prepareActionSource(action: ActionSchemaData): FoundryActionSource {
 function prepareItemSource(item: ItemSchemaData): FoundryItemSource {
   const traits = trimArray(item.traits);
   const description = toRichText(item.description);
+  const source = item.source?.trim() ?? "";
 
   return {
     name: item.name,
@@ -345,7 +372,7 @@ function prepareItemSource(item: ItemSchemaData): FoundryItemSource {
       traits: { value: traits, rarity: item.rarity },
       level: { value: item.level },
       price: { value: priceToCoins(item.price) },
-      source: { value: "" },
+      source: { value: source },
       rules: []
     }
   };
@@ -354,6 +381,7 @@ function prepareItemSource(item: ItemSchemaData): FoundryItemSource {
 function prepareActorSource(actor: ActorSchemaData): FoundryActorSource {
   const traits = trimArray(actor.traits);
   const languages = trimArray(actor.languages);
+  const source = actor.source?.trim() ?? "";
 
   return {
     name: actor.name,
@@ -368,7 +396,7 @@ function prepareActorSource(actor: ActorSchemaData): FoundryActorSource {
       },
       details: {
         level: { value: actor.level },
-        source: { value: "" }
+        source: { value: source }
       }
     }
   };
@@ -390,6 +418,7 @@ export async function importAction(
   json: ActionSchemaData,
   options: ImportOptions = {}
 ): Promise<Item> {
+  assertSystemCompatibility(json.systemId);
   ensureValidAction(json);
   const source = prepareActionSource(json);
   const { packId, folderId } = options;

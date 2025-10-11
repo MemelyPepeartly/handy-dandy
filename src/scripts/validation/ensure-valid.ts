@@ -351,6 +351,7 @@ function coerceAction(value: Record<string, unknown>): void {
   assignRequiredString(value, "description");
   assignOptionalString(value, "img", { allowEmpty: true });
   assignEnum(value, "rarity", RARITY_LOOKUP);
+  assignOptionalString(value, "source", { allowEmpty: true });
 }
 
 function coerceItem(value: Record<string, unknown>): void {
@@ -362,6 +363,7 @@ function coerceItem(value: Record<string, unknown>): void {
   assignStringArray(value, "traits");
   assignOptionalString(value, "description");
   assignOptionalString(value, "img", { allowEmpty: true });
+  assignOptionalString(value, "source", { allowEmpty: true });
 }
 
 function coerceActor(value: Record<string, unknown>): void {
@@ -372,6 +374,7 @@ function coerceActor(value: Record<string, unknown>): void {
   assignStringArray(value, "traits");
   assignStringArray(value, "languages");
   assignOptionalString(value, "img", { allowEmpty: true });
+  assignOptionalString(value, "source", { allowEmpty: true });
 }
 
 function coercePackEntry(value: Record<string, unknown>): void {

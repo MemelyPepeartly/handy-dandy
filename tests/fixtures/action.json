@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "systemId": "pf2e",
   "type": "action",
   "slug": "stunning-strike",
@@ -9,5 +9,6 @@
   "requirements": "Wield a melee weapon.",
   "description": "Deliver a crushing blow.\n\n• On a success, r is triggered.\n• On a critical success, the target is knocked prone.",
   "rarity": "uncommon",
-  "img": "icons/actions/stunning-strike.webp"
+  "img": "icons/actions/stunning-strike.webp",
+  "source": "Pathfinder Core Rulebook"
 }

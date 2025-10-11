@@ -89,7 +89,8 @@ beforeEach(() => {
   (globalThis as any).game = {
     packs,
     items,
-    user: { isGM: true }
+    user: { isGM: true },
+    system: { id: "pf2e" }
   } satisfies Partial<Game>;
 
   Object.defineProperty(globalThis, "Item", {
@@ -118,6 +119,7 @@ test("toFoundryActionData converts canonical JSON into PF2e action data", () => 
     /<p>Deliver a crushing blow\.<\/p><ul><li>On a success, <span class="pf2-icon">r<\/span> is triggered\.<\/li><li>On a critical success, the target is knocked prone\.<\/li><\/ul>/,
   );
   assert.equal(data.system.requirements.value, "<p>Wield a melee weapon.<\/p>");
+  assert.equal(data.system.source.value, "Pathfinder Core Rulebook");
 });
 
 test("importAction updates an existing compendium entry with the same slug", async () => {
@@ -170,6 +172,11 @@ test("importAction creates a new world item when no match is found", async () =>
   const result = await importAction(createAction());
   assert.equal(result.name, "Stunning Strike");
   assert.equal(MockItem.created.length, 1);
+});
+
+test("importAction rejects payloads for the wrong system", async () => {
+  (game as Game).system = { id: "sf2e" } as any;
+  await assert.rejects(() => importAction(createAction()), /System ID mismatch/);
 });
 
 test("importAction throws when the JSON payload is invalid", async () => {
