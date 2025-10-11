@@ -21,4 +21,40 @@ export function registerSettings(): void {
     type: String,
     default: ""
   });
+
+  settings.register(CONSTANTS.MODULE_ID, "GPTModel", {
+    name: "GPT Model",
+    hint: "The OpenAI model identifier that should be used for Handy-Dandy prompts.",
+    scope: "client",
+    config: true,
+    type: String,
+    default: "gpt-4.1-mini"
+  });
+
+  settings.register(CONSTANTS.MODULE_ID, "GPTTemperature", {
+    name: "GPT Temperature",
+    hint: "Sampling temperature for OpenAI responses (0-2).",
+    scope: "client",
+    config: true,
+    type: Number,
+    default: 0.2
+  });
+
+  settings.register(CONSTANTS.MODULE_ID, "GPTTopP", {
+    name: "GPT Top P",
+    hint: "Nucleus sampling probability mass for OpenAI responses (0-1).",
+    scope: "client",
+    config: true,
+    type: Number,
+    default: 1
+  });
+
+  settings.register(CONSTANTS.MODULE_ID, "GPTSeed", {
+    name: "GPT Seed",
+    hint: "Optional deterministic seed for OpenAI responses (leave blank for random).",
+    scope: "client",
+    config: true,
+    type: Number,
+    default: null
+  });
 }

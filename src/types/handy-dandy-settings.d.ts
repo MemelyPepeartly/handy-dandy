@@ -8,6 +8,10 @@ declare module "fvtt-types/configuration" {
      */
     "handy-dandy.GPTApiKey": string;
     "handy-dandy.GPTOrganization": string;
+    "handy-dandy.GPTModel": string;
+    "handy-dandy.GPTTemperature": number;
+    "handy-dandy.GPTTopP": number;
+    "handy-dandy.GPTSeed": number | null;
   }
 }
 

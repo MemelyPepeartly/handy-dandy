@@ -5,12 +5,14 @@ import { OpenAI } from "openai";
 import { insertSidebarButtons } from "./setup/sidebarButtons";
 import { SchemaTool } from "./tools/schema-tool";
 import { DataEntryTool } from "./tools/data-entry-tool";
+import { GPTClient } from "./gpt/client";
 
 // ---------- module namespace ----------
 declare global {
   interface Game {
     handyDandy?: {
       openai: OpenAI | null,
+      gptClient: GPTClient | null,
       applications: {
         schemaTool: SchemaTool,
         dataEntryTool: DataEntryTool
@@ -37,7 +39,9 @@ Hooks.once("init", async () => {
 Hooks.once("setup", () => {
   // Provide a place other modules/macros can grab the SDK from
   game.handyDandy = {
-    openai: null, applications: {
+    openai: null,
+    gptClient: null,
+    applications: {
       schemaTool: new SchemaTool,
       dataEntryTool: new DataEntryTool
     }
@@ -56,10 +60,13 @@ Hooks.once("ready", () => {
   }
 
   // Store on the namespace for easy access later
-  game.handyDandy!.openai = new OpenAI({
+  const openai = new OpenAI({
     apiKey: key,
     dangerouslyAllowBrowser: true
   });
+
+  game.handyDandy!.openai = openai;
+  game.handyDandy!.gptClient = GPTClient.fromSettings(openai);
 
   console.log(`${CONSTANTS.MODULE_NAME} | OpenAI SDK initialised`);
 });
