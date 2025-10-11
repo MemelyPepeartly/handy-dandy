@@ -214,7 +214,7 @@ function sanitizeSystemId(value: string): SystemId | null {
 
 async function showWorkbenchResult(result: PromptWorkbenchResult<EntityType>): Promise<void> {
   const json = JSON.stringify(result.data, null, 2);
-  const escaped = foundry.utils.escapeHTML(json);
+  const escaped = escapeJsonForTextarea(json);
   const importerAvailable = typeof result.importer === "function";
 
   const content = `
@@ -235,6 +235,17 @@ async function showWorkbenchResult(result: PromptWorkbenchResult<EntityType>): P
 
     dialog.render(true);
   });
+}
+
+function escapeJsonForTextarea(json: string): string {
+  const utils = foundry.utils as { escapeHTML?: (value: string) => string };
+  if (typeof utils.escapeHTML === "function") {
+    return utils.escapeHTML(json);
+  }
+
+  const div = document.createElement("div");
+  div.textContent = json;
+  return div.innerHTML;
 }
 
 function buildResultButtons(
