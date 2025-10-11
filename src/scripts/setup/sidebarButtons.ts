@@ -7,10 +7,29 @@ export function insertSidebarButtons(controls: SceneControl[]): void {
     name: "handy-dandy",
     title: "Handy Dandy Tools",
     icon: "fas fa-screwdriver-wrench",
-    layer: "controls", // Any existing layer is fine
+    layer: "interface",
     visible: true,
-    activeTool: "schema-tool", // Mandatory in v12 :contentReference[oaicite:0]{index=0}
+    activeTool: "tool-guide",
     tools: <SceneControlTool[]>[
+      {
+        name: "tool-guide",
+        title: "Tool Guide",
+        icon: "fas fa-compass",
+        toggle: true,
+        onClick: toggled => {
+          if (!game.handyDandy) {
+            ui.notifications?.error("Handy Dandy module is not initialized.");
+            return;
+          }
+
+          const toolOverview = game.handyDandy.applications.toolOverview;
+          if (toggled) {
+            toolOverview.render(true);
+          } else {
+            toolOverview.close();
+          }
+        }
+      },
       {
         name: "schema-tool",
         title: "Schema Tool",
