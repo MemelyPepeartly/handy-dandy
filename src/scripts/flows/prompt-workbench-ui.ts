@@ -51,13 +51,19 @@ export async function runPromptWorkbenchFlow(): Promise<void> {
     return;
   }
 
+  let waitingDialog: Dialog | null = null;
   try {
+    waitingDialog = showGeneratingDialog(request);
     const result = await generateWorkbenchEntry(request);
+    waitingDialog.close({ force: true });
+    waitingDialog = null;
     await showWorkbenchResult(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     ui.notifications?.error(`${CONSTANTS.MODULE_NAME} | Prompt workbench failed: ${message}`);
     console.error(`${CONSTANTS.MODULE_NAME} | Prompt workbench failed`, error);
+  } finally {
+    waitingDialog?.close({ force: true });
   }
 }
 
@@ -212,6 +218,29 @@ function sanitizeSystemId(value: string): SystemId | null {
   return SYSTEM_IDS.includes(normalised as SystemId) ? (normalised as SystemId) : null;
 }
 
+function showGeneratingDialog(request: PromptWorkbenchRequest<EntityType>): Dialog {
+  const entryName = request.entryName.trim() || "entry";
+  const safeEntryName = escapeHtml(entryName);
+  const content = `
+    <div class="handy-dandy-workbench-loading">
+      <p><i class="fas fa-spinner fa-spin"></i> Generating ${safeEntryName}...</p>
+      <p class="notes">This can take a few moments. Feel free to grab a beverage while you wait.</p>
+    </div>
+  `;
+
+  const dialog = new Dialog({
+    title: `${CONSTANTS.MODULE_NAME} | Working`,
+    content,
+    buttons: {},
+    close: () => {
+      /* no-op while loading */
+    },
+  }, { jQuery: true });
+
+  dialog.render(true);
+  return dialog;
+}
+
 async function showWorkbenchResult(result: PromptWorkbenchResult<EntityType>): Promise<void> {
   const json = JSON.stringify(result.data, null, 2);
   const escaped = escapeJsonForTextarea(json);
@@ -238,14 +267,7 @@ async function showWorkbenchResult(result: PromptWorkbenchResult<EntityType>): P
 }
 
 function escapeJsonForTextarea(json: string): string {
-  const utils = foundry.utils as { escapeHTML?: (value: string) => string };
-  if (typeof utils.escapeHTML === "function") {
-    return utils.escapeHTML(json);
-  }
-
-  const div = document.createElement("div");
-  div.textContent = json;
-  return div.innerHTML;
+  return escapeHtml(json);
 }
 
 function buildResultButtons(
@@ -258,7 +280,7 @@ function buildResultButtons(
 
   const buttons: Record<string, Dialog.Button> = {
     copy: {
-      icon: "fas fa-copy",
+      icon: '<i class="fas fa-copy"></i>',
       label: "Copy JSON",
       callback: async () => {
         try {
@@ -271,21 +293,21 @@ function buildResultButtons(
       },
     },
     download: {
-      icon: "fas fa-download",
+      icon: '<i class="fas fa-download"></i>',
       label: "Download JSON",
       callback: () => {
         downloadJson(json, filename);
       },
     },
     close: {
-      icon: "fas fa-check",
+      icon: '<i class="fas fa-check"></i>',
       label: "Close",
     },
   };
 
   if (importerAvailable && result.importer) {
     buttons.import = {
-      icon: "fas fa-cloud-upload-alt",
+      icon: '<i class="fas fa-cloud-upload-alt"></i>',
       label: "Import to World",
       callback: async () => {
         try {
@@ -320,5 +342,16 @@ function downloadJson(json: string, filename: string): void {
   link.download = filename;
   link.click();
   URL.revokeObjectURL(url);
+}
+
+function escapeHtml(value: string): string {
+  const utils = foundry.utils as { escapeHTML?: (input: string) => string };
+  if (typeof utils.escapeHTML === "function") {
+    return utils.escapeHTML(value);
+  }
+
+  const div = document.createElement("div");
+  div.textContent = value;
+  return div.innerHTML;
 }
 
