@@ -5,7 +5,9 @@ type LegacyTool = SceneControls.Tool & {
   onChange?: (...args: unknown[]) => void;
 };
 
+type HybridToolArray = LegacyTool[] & Record<string, LegacyTool>;
 type ToolCollection = LegacyTool[] | Record<string, LegacyTool>;
+type HybridControlArray = SceneControls.Control[] & Record<string, ControlWithToolCollection>;
 export type ControlCollection = SceneControls.Control[] | Record<string, ControlWithToolCollection>;
 
 type ControlWithToolCollection = Omit<SceneControls.Control, "tools"> & {
@@ -34,7 +36,7 @@ function compatibilityAddControl(collection: ControlCollection, control: Control
     // Newer Foundry releases expect string lookups on the collection as well as
     // array iteration. Assign the control by name to preserve backwards
     // compatibility with either access pattern.
-    (collection as Record<string, ControlWithToolCollection>)[control.name] = control;
+    (collection as HybridControlArray)[control.name] = control;
   } else {
     collection[control.name] = control;
   }
@@ -45,7 +47,7 @@ function compatibilityAddTool(collection: ToolCollection, tool: LegacyTool): voi
     collection.push(tool);
     // Provide property-style access on the array for Foundry versions which
     // look up tools via their string name instead of iterating the array.
-    (collection as Record<string, LegacyTool>)[tool.name] = tool;
+    (collection as HybridToolArray)[tool.name] = tool;
   } else {
     collection[tool.name] = tool;
   }
