@@ -35,6 +35,8 @@ export type ImportOptions = {
   folderId?: string;
 };
 
+type ItemCompendium = CompendiumCollection<CompendiumCollection.Metadata & { type: "Item" }>;
+
 type FoundryActionSource = {
   name: string;
   type: "action";
@@ -90,7 +92,7 @@ function ensureValidAction(data: ActionSchemaData): void {
   throw new Error(`Action JSON failed validation:\n${messages.join("\n")}`);
 }
 
-function trimArray(values: readonly string[] | undefined): string[] {
+function trimArray(values: readonly string[] | null | undefined): string[] {
   if (!values?.length) {
     return [];
   }
@@ -153,7 +155,7 @@ function buildList(items: string[]): string {
   return `<ul>${entries}</ul>`;
 }
 
-function toRichText(text: string | undefined): string {
+function toRichText(text: string | null | undefined): string {
   const value = text?.trim();
   if (!value) {
     return "";
@@ -207,9 +209,9 @@ function toRichText(text: string | undefined): string {
   return blocks.join("");
 }
 
-function priceToCoins(price: number | undefined): Record<string, number> {
+function priceToCoins(price: number | null | undefined): Record<string, number> {
   if (!price || price <= 0) {
-    return { pp: 0, gp: 0, sp: 0, cp: 0 }; 
+    return { pp: 0, gp: 0, sp: 0, cp: 0 };
   }
 
   const copperTotal = Math.round(price * 100);
@@ -267,12 +269,12 @@ function extractIndexEntries(index: unknown): PackIndexEntry[] {
   return result;
 }
 
-async function findPackDocument(pack: CompendiumCollection<Item>, slug: string): Promise<Item | undefined> {
+async function findPackDocument(pack: ItemCompendium, slug: string): Promise<Item | undefined> {
   const indexEntries = extractIndexEntries(pack.index);
   let entry = indexEntries.find((item) => matchesSlug(item, slug));
 
   if (!entry && typeof pack.getIndex === "function") {
-    const index = await pack.getIndex({ fields: ["slug", "system.slug"] });
+    const index = await pack.getIndex({ fields: ["slug", "system.slug"] as any });
     const candidates = extractIndexEntries(index);
     entry = candidates.find((item) => matchesSlug(item, slug));
   }
@@ -286,7 +288,7 @@ async function findPackDocument(pack: CompendiumCollection<Item>, slug: string):
     return undefined;
   }
 
-  const existing = await pack.getDocument(id);
+  const existing = (await pack.getDocument(id)) as Item | null | undefined;
   return existing ?? undefined;
 }
 
@@ -428,7 +430,7 @@ export async function importAction(
   }
 
   if (packId) {
-    const pack = game.packs?.get(packId) as CompendiumCollection<Item> | undefined;
+    const pack = game.packs?.get(packId) as ItemCompendium | undefined;
     if (!pack) {
       throw new Error(`Pack with id "${packId}" was not found.`);
     }
@@ -440,11 +442,11 @@ export async function importAction(
         updateData.folder = folderId;
       }
 
-      await existing.update(updateData);
+      await existing.update(updateData as any);
       return existing;
     }
 
-    const imported = await pack.importDocument(source, { keepId: true });
+    const imported = (await pack.importDocument(source as any, { keepId: true } as any)) as Item | null | undefined;
     if (!imported) {
       throw new Error(`Failed to import action "${json.name}" into pack ${pack.collection}`);
     }
@@ -459,11 +461,11 @@ export async function importAction(
       updateData.folder = folderId;
     }
 
-    await existing.update(updateData);
+    await existing.update(updateData as any);
     return existing;
   }
 
-  const created = await Item.create(source, { keepId: true });
+  const created = await Item.create(source as any, { keepId: true } as any);
   if (!created) {
     throw new Error(`Failed to create action "${json.name}" in the world.`);
   }

@@ -96,14 +96,18 @@ async function promptBatchGeneration(): Promise<GenerationBatchOptions<EntityTyp
     </form>
   `;
 
-  const response = await Dialog.prompt<{
-    entityType: string;
-    payload: string;
-    packId: string;
-    folderId: string;
-    seed: string;
-    maxAttempts: string;
-  } | null>({
+  const response = await Dialog.prompt<
+    {
+      entityType: string;
+      payload: string;
+      packId: string;
+      folderId: string;
+      seed: string;
+      maxAttempts: string;
+    } | null,
+    undefined,
+    { jQuery: true }
+  >({
     title: `${CONSTANTS.MODULE_NAME} | Batch Generate`,
     content,
     label: "Run Batch",

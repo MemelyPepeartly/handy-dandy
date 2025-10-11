@@ -6,6 +6,7 @@ import type {
   ActionSchemaData,
   ActorSchemaData,
   EntityType,
+  CanonicalEntityMap,
   ItemSchemaData,
 } from "../schemas";
 import type {
@@ -13,12 +14,6 @@ import type {
   ActorPromptInput,
   ItemPromptInput,
 } from "../prompts";
-
-type CanonicalEntityMap = {
-  action: ActionSchemaData;
-  item: ItemSchemaData;
-  actor: ActorSchemaData;
-};
 
 type PromptInputMap = {
   action: ActionPromptInput;
@@ -80,17 +75,29 @@ export interface GenerationBatchResult<T extends EntityType> {
   readonly summary: string;
 }
 
-interface GeneratorMap {
-  action: (input: ActionPromptInput, options?: BoundGenerationOptions) => Promise<ActionSchemaData>;
-  item: (input: ItemPromptInput, options?: BoundGenerationOptions) => Promise<ItemSchemaData>;
-  actor: (input: ActorPromptInput, options?: BoundGenerationOptions) => Promise<ActorSchemaData>;
-}
+type GeneratorMap = {
+  [K in EntityType]: (
+    input: PromptInputMap[K],
+    options?: BoundGenerationOptions,
+  ) => Promise<CanonicalEntityMap[K]>;
+};
 
-interface ImporterMap {
-  action: (json: ActionSchemaData, options?: ImporterOptions) => Promise<ClientDocument>;
-  item: (json: ItemSchemaData, options?: ImporterOptions) => Promise<ClientDocument>;
-  actor: (json: ActorSchemaData, options?: ImporterOptions) => Promise<ClientDocument>;
-}
+type ImporterMap = {
+  [K in EntityType]: (
+    json: CanonicalEntityMap[K],
+    options?: ImporterOptions,
+  ) => Promise<ClientDocument>;
+};
+
+const GENERATION_METHOD_MAP: Record<EntityType, keyof NonNullable<Game["handyDandy"]>["generation"]> = {
+  action: "generateAction",
+  item: "generateItem",
+  actor: "generateActor",
+};
+
+const DEFAULT_IMPORTERS: Partial<ImporterMap> = {
+  action: async (json, options) => importAction(json, options),
+};
 
 interface BoundGenerationOptions {
   seed?: number;
@@ -183,18 +190,18 @@ export async function generateAndImportBatch<T extends EntityType>(
   const batchEntries: GenerationBatchEntry<T>[] = [];
 
   for (const input of inputs) {
-    const label = inferInputName(type, input as PromptInputMap[T]);
+    const label = inferInputName(type, input);
     try {
-      const data = await generator(input as PromptInputMap[T], { seed, maxAttempts });
-      const document = await importer(data as CanonicalEntityMap[T], { packId, folderId });
+      const data = await generator(input, { seed, maxAttempts });
+      const document = await importer(data, { packId, folderId });
+      const entityName = data.name.trim();
+      const resolvedName = entityName.length ? entityName : label;
       batchEntries.push({
         type,
-        input: input as PromptInputMap[T],
-        name: typeof (data as { name?: string }).name === "string" && (data as { name?: string }).name?.trim()
-          ? (data as { name: string }).name
-          : label,
+        input,
+        name: resolvedName,
         status: "success",
-        data: data as CanonicalEntityMap[T],
+        data,
         documentUuid: typeof document?.uuid === "string" ? document.uuid : undefined,
       });
     } catch (error) {
@@ -210,7 +217,7 @@ export async function generateAndImportBatch<T extends EntityType>(
 
       batchEntries.push({
         type,
-        input: input as PromptInputMap[T],
+        input,
         name: label,
         status: "failure",
         error: normalizeError(error),
@@ -273,7 +280,8 @@ function resolveGenerator<T extends EntityType>(
     throw new Error("Handy Dandy generation helpers are unavailable.");
   }
 
-  const generator = generation[`generate${capitalize(type)}` as const];
+  const method = GENERATION_METHOD_MAP[type];
+  const generator = generation[method];
   if (!generator) {
     throw new Error(`No generator available for ${type} entries.`);
   }
@@ -289,16 +297,12 @@ function resolveImporter<T extends EntityType>(
     return overrides[type] as ImporterMap[T];
   }
 
-  switch (type) {
-    case "action":
-      return importAction as unknown as ImporterMap[T];
-    default:
-      throw new Error(`No importer configured for ${type} entries.`);
+  const importer = DEFAULT_IMPORTERS[type];
+  if (!importer) {
+    throw new Error(`No importer configured for ${type} entries.`);
   }
-}
 
-function capitalize(value: string): string {
-  return value.charAt(0).toUpperCase() + value.slice(1);
+  return importer as ImporterMap[T];
 }
 
 function collectCurrentSelection(): unknown[] {

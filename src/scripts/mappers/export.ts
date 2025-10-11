@@ -529,10 +529,11 @@ export function fromFoundryActor(doc: FoundryActor): ActorSchemaData {
   const rarityValue = doc.system?.traits?.rarity;
 
   const languagesSources: unknown[] = [];
+  const languagesSource = doc.system?.traits?.languages;
   const traitLanguages =
-    doc.system?.traits?.languages && "value" in (doc.system?.traits?.languages ?? {})
-      ? (doc.system?.traits?.languages as { value?: unknown }).value
-      : doc.system?.traits?.languages;
+    typeof languagesSource === "object" && languagesSource !== null && "value" in languagesSource
+      ? (languagesSource as { value?: unknown }).value
+      : languagesSource;
   if (traitLanguages !== undefined) {
     languagesSources.push(traitLanguages);
   }

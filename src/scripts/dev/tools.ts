@@ -81,10 +81,13 @@ const MODULE_PREFIX = `${CONSTANTS.MODULE_NAME} |` as const;
 const toBoolean = (value: unknown): boolean | null =>
   typeof value === "boolean" ? value : null;
 
-const safeGetBooleanSetting = (
+const safeGetBooleanSetting = <
+  N extends ClientSettings.Namespace,
+  K extends ClientSettings.KeyFor<N>,
+>(
   settings: Game["settings"] | undefined,
-  namespace: string,
-  key: string,
+  namespace: N,
+  key: K,
 ): boolean | null => {
   if (!settings || typeof settings.get !== "function") {
     return null;
@@ -215,8 +218,8 @@ export function canUseDeveloperTools(): boolean {
   }
 
   const developerSetting =
-    safeGetBooleanSetting(gameInstance.settings, "core", "developerMode") ??
-    safeGetBooleanSetting(gameInstance.settings, "core", "devMode");
+    safeGetBooleanSetting(gameInstance.settings, "core" as any, "developerMode" as any) ??
+    safeGetBooleanSetting(gameInstance.settings, "core" as any, "devMode" as any);
   if (developerSetting) {
     return true;
   }

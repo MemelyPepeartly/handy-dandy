@@ -12,6 +12,7 @@ import {
   type ActorSchemaData,
   type ItemSchemaData,
   type PackEntrySchemaData,
+  type SchemaDataFor,
   type SchemaMap,
   type ValidatorKey,
 } from "../schemas";
@@ -20,13 +21,7 @@ import type { JsonSchemaDefinition, GPTClient } from "../gpt/client";
 import { getDeveloperConsole } from "../dev/state";
 import type { ValidationLogPayload } from "../dev/developer-console";
 
-export type SchemaDataFor<K extends ValidatorKey> = K extends "action"
-  ? ActionSchemaData
-  : K extends "item"
-    ? ItemSchemaData
-    : K extends "actor"
-      ? ActorSchemaData
-      : PackEntrySchemaData;
+export type { SchemaDataFor, ValidatorKey } from "../schemas";
 
 export interface EnsureValidDiagnostics<K extends ValidatorKey> {
   attempt: number;
