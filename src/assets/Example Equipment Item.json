@@ -1,0 +1,94 @@
+{
+  "name": "Test equipment",
+  "type": "equipment",
+  "effects": [],
+  "system": {
+    "description": {
+      "gm": "",
+      "value": "<p>description goes here</p>"
+    },
+    "rules": [],
+    "slug": null,
+    "_migration": {
+      "version": 0.943,
+      "lastMigration": null
+    },
+    "traits": {
+      "otherTags": [],
+      "value": [],
+      "rarity": "common"
+    },
+    "publication": {
+      "title": "/mlptg/ The Bannermanes",
+      "authors": "Memely",
+      "license": "OGL",
+      "remaster": false
+    },
+    "level": {
+      "value": 0
+    },
+    "quantity": 1,
+    "baseItem": null,
+    "bulk": {
+      "value": 0.1
+    },
+    "hp": {
+      "value": 0,
+      "max": 0
+    },
+    "hardness": 0,
+    "price": {
+      "value": {}
+    },
+    "equipped": {
+      "carryType": "worn",
+      "invested": null
+    },
+    "containerId": null,
+    "size": "med",
+    "material": {
+      "type": null,
+      "grade": null
+    },
+    "identification": {
+      "status": "identified",
+      "unidentified": {
+        "name": "Unusual Object",
+        "img": "systems/pf2e/icons/unidentified_item_icons/adventuring_gear.webp",
+        "data": {
+          "description": {
+            "value": ""
+          }
+        }
+      },
+      "misidentified": {}
+    },
+    "usage": {
+      "value": "held-in-one-hand"
+    },
+    "subitems": []
+  },
+  "img": "systems/pf2e/icons/default-icons/equipment.svg",
+  "folder": null,
+  "flags": {},
+  "_stats": {
+    "compendiumSource": null,
+    "duplicateSource": null,
+    "exportSource": {
+      "worldId": "bannermanes-pf2",
+      "uuid": "Item.5B3fBY011FzqT49U",
+      "coreVersion": "13.348",
+      "systemId": "pf2e",
+      "systemVersion": "7.5.2"
+    },
+    "coreVersion": "13.348",
+    "systemId": "pf2e",
+    "systemVersion": "7.5.2",
+    "createdTime": 1759526361393,
+    "modifiedTime": 1759526381917,
+    "lastModifiedBy": "tstGJ3x0JRVfhi4Q"
+  },
+  "ownership": {
+    "default": 0
+  }
+}

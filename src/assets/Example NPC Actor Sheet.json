@@ -1,0 +1,1562 @@
+{
+  "name": "Example Monster",
+  "type": "npc",
+  "img": "systems/pf2e/icons/default-icons/npc.svg",
+  "system": {
+    "attributes": {
+      "hp": {
+        "value": 255,
+        "temp": 0,
+        "max": 255,
+        "details": ""
+      },
+      "ac": {
+        "value": 35,
+        "details": ""
+      },
+      "allSaves": {
+        "value": ""
+      },
+      "speed": {
+        "value": 25,
+        "otherSpeeds": [],
+        "details": ""
+      },
+      "immunities": [
+        {
+          "type": "acid",
+          "exceptions": []
+        }
+      ],
+      "weaknesses": [
+        {
+          "type": "cold",
+          "value": 5,
+          "exceptions": []
+        }
+      ],
+      "resistances": [
+        {
+          "type": "fire",
+          "value": 5,
+          "exceptions": [],
+          "doubleVs": []
+        }
+      ]
+    },
+    "initiative": {
+      "statistic": "perception"
+    },
+    "details": {
+      "languages": {
+        "value": [
+          "common",
+          "fey"
+        ],
+        "details": ""
+      },
+      "level": {
+        "value": 14
+      },
+      "blurb": "",
+      "publicNotes": "<p>Description goes here</p>",
+      "privateNotes": "<p>Potential voice lines go here</p>",
+      "publication": {
+        "title": "/mlptg/ The Bannermanes",
+        "authors": "Memely",
+        "license": "OGL",
+        "remaster": false
+      }
+    },
+    "resources": {},
+    "_migration": {
+      "version": 0.943,
+      "previous": {
+        "schema": 0.942,
+        "foundry": "13.348",
+        "system": "7.5.2"
+      }
+    },
+    "abilities": {
+      "str": {
+        "mod": 5
+      },
+      "dex": {
+        "mod": 5
+      },
+      "con": {
+        "mod": 5
+      },
+      "int": {
+        "mod": 5
+      },
+      "wis": {
+        "mod": 5
+      },
+      "cha": {
+        "mod": 5
+      }
+    },
+    "perception": {
+      "details": "Darkvision",
+      "mod": 28,
+      "senses": [],
+      "vision": true
+    },
+    "saves": {
+      "fortitude": {
+        "value": 25,
+        "saveDetail": ""
+      },
+      "reflex": {
+        "value": 28,
+        "saveDetail": ""
+      },
+      "will": {
+        "value": 25,
+        "saveDetail": ""
+      }
+    },
+    "skills": {
+      "intimidation": {
+        "base": 25
+      }
+    },
+    "traits": {
+      "value": [
+        "fey"
+      ],
+      "rarity": "common",
+      "size": {
+        "value": "med"
+      }
+    }
+  },
+  "prototypeToken": {
+    "name": "Example Monster Token Name",
+    "displayName": 20,
+    "actorLink": false,
+    "width": 1,
+    "height": 1,
+    "texture": {
+      "src": "systems/pf2e/icons/default-icons/npc.svg",
+      "anchorX": 0.5,
+      "anchorY": 0.5,
+      "offsetX": 0,
+      "offsetY": 0,
+      "fit": "contain",
+      "scaleX": 1,
+      "scaleY": 1,
+      "rotation": 0,
+      "tint": "#ffffff",
+      "alphaThreshold": 0.75
+    },
+    "lockRotation": true,
+    "rotation": 0,
+    "alpha": 1,
+    "disposition": -1,
+    "displayBars": 20,
+    "bar1": {
+      "attribute": "attributes.hp"
+    },
+    "bar2": {
+      "attribute": null
+    },
+    "light": {
+      "negative": false,
+      "priority": 0,
+      "alpha": 0.5,
+      "angle": 360,
+      "bright": 0,
+      "color": null,
+      "coloration": 1,
+      "dim": 0,
+      "attenuation": 0.5,
+      "luminosity": 0.5,
+      "saturation": 0,
+      "contrast": 0,
+      "shadows": 0,
+      "animation": {
+        "type": null,
+        "speed": 5,
+        "intensity": 5,
+        "reverse": false
+      },
+      "darkness": {
+        "min": 0,
+        "max": 1
+      }
+    },
+    "sight": {
+      "enabled": false,
+      "range": 0,
+      "angle": 360,
+      "visionMode": "basic",
+      "color": null,
+      "attenuation": 0.1,
+      "brightness": 0,
+      "saturation": 0,
+      "contrast": 0
+    },
+    "detectionModes": [],
+    "occludable": {
+      "radius": 0
+    },
+    "ring": {
+      "enabled": false,
+      "colors": {
+        "ring": null,
+        "background": null
+      },
+      "effects": 0,
+      "subject": {
+        "scale": 1,
+        "texture": null
+      }
+    },
+    "turnMarker": {
+      "mode": 1,
+      "animation": null,
+      "src": null,
+      "disposition": false
+    },
+    "movementAction": null,
+    "flags": {
+      "healthEstimate": {
+        "dontMarkDead": false,
+        "hideHealthEstimate": false,
+        "hideName": false
+      }
+    },
+    "randomImg": false,
+    "appendNumber": false,
+    "prependAdjective": false
+  },
+  "items": [
+    {
+      "img": "icons/weapons/guns/gun-pistol-flintlock-metal.webp",
+      "name": "Flintlock Pistol",
+      "system": {
+        "description": {
+          "gm": "",
+          "value": "<p>Though less accurate and powerful than a flintlock musket, the flintlock pistol is a preferred weapon of privateers thanks to its more compact size and affordability. Pirate captains often wear a brace of such pistols in a bandolier so they can draw and fire without stopping to reload.</p>"
+        },
+        "rules": [],
+        "slug": "flintlock-pistol",
+        "_migration": {
+          "version": 0.943,
+          "lastMigration": null,
+          "previous": {
+            "schema": 0.942,
+            "foundry": "13.348",
+            "system": "7.5.2"
+          }
+        },
+        "traits": {
+          "otherTags": [],
+          "value": [
+            "concussive",
+            "fatal-d8"
+          ],
+          "rarity": "uncommon"
+        },
+        "publication": {
+          "title": "Pathfinder Guns & Gears",
+          "authors": "",
+          "license": "ORC",
+          "remaster": true
+        },
+        "level": {
+          "value": 0
+        },
+        "quantity": 1,
+        "baseItem": "flintlock-pistol",
+        "bulk": {
+          "value": 1
+        },
+        "hp": {
+          "value": 0,
+          "max": 0
+        },
+        "hardness": 0,
+        "price": {
+          "value": {
+            "gp": 4
+          }
+        },
+        "equipped": {
+          "carryType": "worn",
+          "invested": null,
+          "handsHeld": 0
+        },
+        "containerId": null,
+        "size": "med",
+        "material": {
+          "type": null,
+          "grade": null
+        },
+        "identification": {
+          "status": "identified",
+          "unidentified": {
+            "name": "Unusual Flintlock Pistol",
+            "img": "systems/pf2e/icons/unidentified_item_icons/weapon.webp",
+            "data": {
+              "description": {
+                "value": ""
+              }
+            }
+          },
+          "misidentified": {}
+        },
+        "usage": {
+          "value": "held-in-one-hand"
+        },
+        "category": "simple",
+        "group": "firearm",
+        "bonus": {
+          "value": 0
+        },
+        "damage": {
+          "dice": 1,
+          "die": "d4",
+          "damageType": "piercing",
+          "persistent": null
+        },
+        "splashDamage": {
+          "value": 0
+        },
+        "range": 40,
+        "expend": 1,
+        "reload": {
+          "value": "1"
+        },
+        "grade": null,
+        "runes": {
+          "potency": 2,
+          "striking": 2,
+          "property": []
+        },
+        "specific": null,
+        "subitems": [],
+        "bonusDamage": {
+          "value": 0
+        }
+      },
+      "type": "weapon",
+      "_stats": {
+        "compendiumSource": "Compendium.pf2e.equipment-srd.Item.N3nNqO5Nw2DIFhrv",
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.347",
+        "systemId": "pf2e",
+        "systemVersion": "7.3.1",
+        "createdTime": 1755902147786,
+        "modifiedTime": 1755902272233,
+        "lastModifiedBy": "tstGJ3x0JRVfhi4Q"
+      },
+      "effects": [],
+      "folder": null,
+      "sort": 0,
+      "flags": {},
+      "_id": "iStnEepvwl29B2X5",
+      "ownership": {
+        "default": 0
+      }
+    },
+    {
+      "img": "icons/equipment/chest/shirt-collared-pink.webp",
+      "name": "Explorer's Clothing",
+      "system": {
+        "description": {
+          "gm": "",
+          "value": "<p>Adventurers who don't wear armor travel in durable clothing. Though it's not armor and uses your unarmored defense proficiency, it still has a Dex Cap and can grant an item bonus to AC if etched with potency runes.</p>"
+        },
+        "rules": [],
+        "slug": "explorers-clothing",
+        "_migration": {
+          "version": 0.943,
+          "lastMigration": null,
+          "previous": {
+            "schema": 0.942,
+            "foundry": "13.348",
+            "system": "7.5.2"
+          }
+        },
+        "traits": {
+          "otherTags": [],
+          "value": [
+            "comfort"
+          ],
+          "rarity": "common"
+        },
+        "publication": {
+          "title": "Pathfinder Player Core",
+          "authors": "",
+          "license": "ORC",
+          "remaster": true
+        },
+        "level": {
+          "value": 0
+        },
+        "quantity": 1,
+        "baseItem": "explorers-clothing",
+        "bulk": {
+          "value": 0.1
+        },
+        "hp": {
+          "value": 0,
+          "max": 0
+        },
+        "hardness": 0,
+        "price": {
+          "value": {
+            "sp": 1
+          }
+        },
+        "equipped": {
+          "carryType": "worn",
+          "invested": null
+        },
+        "containerId": null,
+        "size": "med",
+        "material": {
+          "type": null,
+          "grade": null
+        },
+        "identification": {
+          "status": "identified",
+          "unidentified": {
+            "name": "",
+            "img": "",
+            "data": {
+              "description": {
+                "value": ""
+              }
+            }
+          },
+          "misidentified": {}
+        },
+        "category": "unarmored",
+        "group": "cloth",
+        "acBonus": 0,
+        "strength": null,
+        "dexCap": 5,
+        "checkPenalty": 0,
+        "speedPenalty": 0,
+        "grade": null,
+        "runes": {
+          "potency": 0,
+          "resilient": 0,
+          "property": []
+        },
+        "subitems": []
+      },
+      "type": "armor",
+      "_stats": {
+        "compendiumSource": "Compendium.pf2e.equipment-srd.Item.dDIPA1WE9ESF67EB",
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.347",
+        "systemId": "pf2e",
+        "systemVersion": "7.3.1",
+        "createdTime": 1755902157613,
+        "modifiedTime": 1755902157613,
+        "lastModifiedBy": "tstGJ3x0JRVfhi4Q"
+      },
+      "effects": [],
+      "folder": null,
+      "sort": 0,
+      "flags": {},
+      "_id": "35vMEusOQ8q1eRoC",
+      "ownership": {
+        "default": 0
+      }
+    },
+    {
+      "img": "icons/skills/ranged/cannon-barrel-firing-yellow.webp",
+      "name": "Alchemist's Flamethrower",
+      "system": {
+        "description": {
+          "gm": "",
+          "value": "<p>This long cylinder is topped by a pair of brass sockets and a collection of polished pipes and tubes. A total of two vials of alchemist's fire must be loaded into the sockets at the base of the weapon and the tubes cleaned and primed. Properly loading the flamethrower in this way takes 1 minute. When the trigger on a loaded flamethrower is pulled, the alchemist's fire is siphoned into the rifle and shot out of the muzzle in a line of fire. The damage dealt by a flamethrower is determined by the strength of the weakest alchemist's fire loaded into the flamethrower.</p><hr /><p><strong>Activate</strong> <span class=\"action-glyph\">2</span> (fire, manipulate)</p>\n<p><strong>Requirements</strong> The flamethrower is loaded</p>\n<p><strong>Effect</strong> You pull the trigger, expending both loaded alchemist's fires to shoot a line of fire. Creatures in the area take fire damage based on the weakest alchemist's fire loaded into the flamethrower, as noted below. Creatures that critically fail the basic Reflex save additionally take the listed persistent fire damage.</p><ul><li><strong>Lesser Alchemist's Fire</strong>: The flamethrower deals @Damage[1d8[fire]|options:area-damage] (@Check[reflex|dc:15|basic|options:area-effect]) in a @Template[line|distance:30]. @Damage[1[persistent,fire]] damage.</li><li><strong>Moderate Alchemist's Fire</strong>: The flamethrower deals @Damage[2d8[fire]|options:area-damage] (@Check[reflex|dc:17|basic|options:area-effect]) in a @Template[line|distance:60]. @Damage[2[persistent,fire]] damage.</li><li><strong>Greater Alchemist's Fire</strong>: The flamethrower deals @Damage[6d8[fire]|options:area-damage] (@Check[reflex|dc:28|basic|options:area-effect]) in a @Template[line|distance:90]. @Damage[3[persistent,fire]] damage.</li><li><strong>Major Alchemist's Fire</strong>: The flamethrower deals @Damage[10d8[fire]|options:area-damage] (@Check[reflex|dc:37|basic|options:area-effect]) in a @Template[line|distance:120]. @Damage[4[persistent,fire]] damage.</li></ul>"
+        },
+        "rules": [],
+        "slug": "alchemists-flamethrower",
+        "_migration": {
+          "version": 0.943,
+          "lastMigration": null,
+          "previous": {
+            "schema": 0.942,
+            "foundry": "13.348",
+            "system": "7.5.2"
+          }
+        },
+        "traits": {
+          "otherTags": [],
+          "value": [
+            "alchemical",
+            "fire"
+          ],
+          "rarity": "rare"
+        },
+        "publication": {
+          "title": "Pathfinder Treasure Vault (Remastered)",
+          "authors": "",
+          "license": "ORC",
+          "remaster": true
+        },
+        "level": {
+          "value": 2
+        },
+        "quantity": 1,
+        "baseItem": null,
+        "bulk": {
+          "value": 1
+        },
+        "hp": {
+          "value": 0,
+          "max": 0
+        },
+        "hardness": 0,
+        "price": {
+          "value": {
+            "gp": 35
+          }
+        },
+        "equipped": {
+          "carryType": "worn",
+          "invested": null
+        },
+        "containerId": null,
+        "size": "med",
+        "material": {
+          "type": null,
+          "grade": null
+        },
+        "identification": {
+          "status": "identified",
+          "unidentified": {
+            "name": "",
+            "img": "",
+            "data": {
+              "description": {
+                "value": ""
+              }
+            }
+          },
+          "misidentified": {}
+        },
+        "usage": {
+          "value": "held-in-two-hands"
+        },
+        "subitems": []
+      },
+      "type": "equipment",
+      "_stats": {
+        "compendiumSource": "Compendium.pf2e.equipment-srd.Item.gdaLHiWRhB1l2Xr3",
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.347",
+        "systemId": "pf2e",
+        "systemVersion": "7.3.1",
+        "createdTime": 1755902192849,
+        "modifiedTime": 1755902192849,
+        "lastModifiedBy": "tstGJ3x0JRVfhi4Q"
+      },
+      "effects": [],
+      "folder": null,
+      "sort": 0,
+      "flags": {},
+      "_id": "m1xm5aSmKaXK7zya",
+      "ownership": {
+        "default": 0
+      }
+    },
+    {
+      "img": "systems/pf2e/icons/equipment/worn-items/other-worn-items/alchemist-goggles.webp",
+      "name": "Alchemist Goggles",
+      "system": {
+        "description": {
+          "gm": "",
+          "value": "<p>These brass goggles are engraved with flame patterns and have thick, heavy lenses.</p>\n<p>While worn, they give you a +1 item bonus to Crafting checks to @UUID[Compendium.pf2e.actionspf2e.Item.rmwa3OyhTZ2i2AHl]{Craft} alchemical items. When making Strikes with alchemical bombs, you ignore lesser cover.</p>\n<p>If your Strike with an alchemical bomb fails (but doesn't critically fail), you gain a +1 item bonus to the splash damage the target of the Strike takes.</p>"
+        },
+        "rules": [
+          {
+            "key": "FlatModifier",
+            "predicate": [
+              "item:trait:alchemical",
+              "action:craft"
+            ],
+            "selector": "crafting",
+            "type": "item",
+            "value": 1
+          },
+          {
+            "key": "EphemeralEffect",
+            "predicate": [
+              "target:cover-level:lesser"
+            ],
+            "selectors": "alchemical-bomb-base-attack-roll",
+            "uuid": "Compendium.pf2e.equipment-effects.Item.SZWxyXOTZtGvZbN7"
+          },
+          {
+            "key": "RollOption",
+            "label": "PF2E.SpecificRule.Equipment.AlchemistGoggles.RollOptionLabel",
+            "option": "alchemist-goggles-failure",
+            "toggleable": true
+          },
+          {
+            "damageCategory": "splash",
+            "key": "FlatModifier",
+            "predicate": [
+              "alchemist-goggles-failure"
+            ],
+            "selector": "alchemical-bomb-base-damage",
+            "type": "item",
+            "value": 1
+          }
+        ],
+        "slug": "alchemist-goggles",
+        "_migration": {
+          "version": 0.943,
+          "lastMigration": null,
+          "previous": {
+            "schema": 0.942,
+            "foundry": "13.348",
+            "system": "7.5.2"
+          }
+        },
+        "traits": {
+          "otherTags": [],
+          "value": [
+            "invested",
+            "magical"
+          ],
+          "rarity": "common"
+        },
+        "publication": {
+          "title": "Pathfinder Player Core 2",
+          "authors": "",
+          "license": "ORC",
+          "remaster": true
+        },
+        "level": {
+          "value": 4
+        },
+        "quantity": 1,
+        "baseItem": null,
+        "bulk": {
+          "value": 0
+        },
+        "hp": {
+          "value": 0,
+          "max": 0
+        },
+        "hardness": 0,
+        "price": {
+          "value": {
+            "gp": 100
+          }
+        },
+        "equipped": {
+          "carryType": "worn",
+          "invested": null
+        },
+        "containerId": null,
+        "size": "med",
+        "material": {
+          "type": null,
+          "grade": null
+        },
+        "identification": {
+          "status": "identified",
+          "unidentified": {
+            "name": "",
+            "img": "",
+            "data": {
+              "description": {
+                "value": ""
+              }
+            }
+          },
+          "misidentified": {}
+        },
+        "usage": {
+          "value": "worneyepiece"
+        },
+        "subitems": []
+      },
+      "type": "equipment",
+      "_stats": {
+        "compendiumSource": "Compendium.pf2e.equipment-srd.Item.7JVgLiNTAs4clEW8",
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.347",
+        "systemId": "pf2e",
+        "systemVersion": "7.3.1",
+        "createdTime": 1755902203268,
+        "modifiedTime": 1755902203268,
+        "lastModifiedBy": "tstGJ3x0JRVfhi4Q"
+      },
+      "effects": [],
+      "folder": null,
+      "sort": 0,
+      "flags": {},
+      "_id": "NhgcMVqU5NBbIiVH",
+      "ownership": {
+        "default": 0
+      }
+    },
+    {
+      "img": "icons/weapons/ammunition/shot-round-lead.webp",
+      "name": "Rounds (Flintlock Pistol)",
+      "system": {
+        "description": {
+          "gm": "",
+          "value": "<p>Firearms require ammunition consisting of a projectile and black powder. A round of ammo can vary in its composition but is typically either a prepackaged paper cartridge, including wadding, bullet, and black powder, or loose shot packed in manually. Some weapons, like hand cannons and blunderbusses, can fire other materials, but their ammunition has the same Price due to the cost of the black powder. Because making rounds of firearm ammunition requires creating black powder, you need the @UUID[Compendium.pf2e.feats-srd.Item.is3Oz9wt11lNq62K]{Alchemical Crafting} skill feat to make them. Firearm rounds are a valid option for magical ammunition, just like arrows or bolts. Crafting magical firearm ammunition requires you to be able to craft both alchemical and magical items.</p>"
+        },
+        "rules": [],
+        "slug": "rounds-flintlock-pistol",
+        "_migration": {
+          "version": 0.943,
+          "lastMigration": null,
+          "previous": {
+            "schema": 0.942,
+            "foundry": "13.348",
+            "system": "7.5.2"
+          }
+        },
+        "traits": {
+          "otherTags": [],
+          "value": [
+            "alchemical"
+          ],
+          "rarity": "common"
+        },
+        "publication": {
+          "title": "Pathfinder Guns & Gears",
+          "authors": "",
+          "license": "ORC",
+          "remaster": true
+        },
+        "level": {
+          "value": 0
+        },
+        "quantity": 10,
+        "baseItem": null,
+        "bulk": {
+          "value": 0.1
+        },
+        "hp": {
+          "value": 0,
+          "max": 0
+        },
+        "hardness": 0,
+        "price": {
+          "value": {
+            "sp": 1
+          },
+          "per": 10
+        },
+        "equipped": {
+          "carryType": "worn"
+        },
+        "containerId": null,
+        "size": "med",
+        "material": {
+          "type": null,
+          "grade": null
+        },
+        "identification": {
+          "status": "identified",
+          "unidentified": {
+            "name": "",
+            "img": "",
+            "data": {
+              "description": {
+                "value": ""
+              }
+            }
+          },
+          "misidentified": {}
+        },
+        "category": "ammo",
+        "uses": {
+          "value": 1,
+          "max": 1,
+          "autoDestroy": true
+        },
+        "damage": null,
+        "usage": {
+          "value": "held-in-one-hand"
+        },
+        "stackGroup": "rounds10",
+        "spell": null
+      },
+      "type": "consumable",
+      "_stats": {
+        "compendiumSource": "Compendium.pf2e.equipment-srd.Item.3QGZS6l7NrX4auyR",
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.347",
+        "systemId": "pf2e",
+        "systemVersion": "7.3.1",
+        "createdTime": 1755902229533,
+        "modifiedTime": 1755902229533,
+        "lastModifiedBy": "tstGJ3x0JRVfhi4Q"
+      },
+      "effects": [],
+      "folder": null,
+      "sort": 0,
+      "flags": {},
+      "_id": "8UWhTXsjyXwcuh86",
+      "ownership": {
+        "default": 0
+      }
+    },
+    {
+      "img": "systems/pf2e/icons/equipment/treasure/gems/moderate-semiprecious-stones/carnelian.webp",
+      "name": "Carnelian",
+      "system": {
+        "description": {
+          "gm": "",
+          "value": ""
+        },
+        "rules": [],
+        "slug": "carnelian",
+        "_migration": {
+          "version": 0.943,
+          "lastMigration": null,
+          "previous": {
+            "schema": 0.942,
+            "foundry": "13.348",
+            "system": "7.5.2"
+          }
+        },
+        "traits": {
+          "otherTags": [],
+          "value": [],
+          "rarity": "common"
+        },
+        "publication": {
+          "title": "Pathfinder Gamemastery Guide",
+          "authors": "",
+          "license": "OGL",
+          "remaster": false
+        },
+        "level": {
+          "value": 0
+        },
+        "quantity": 1,
+        "baseItem": null,
+        "bulk": {
+          "value": 0
+        },
+        "hp": {
+          "value": 0,
+          "max": 0
+        },
+        "hardness": 0,
+        "price": {
+          "value": {
+            "sp": 25
+          }
+        },
+        "equipped": {
+          "carryType": "worn"
+        },
+        "containerId": null,
+        "size": "med",
+        "material": {
+          "type": null,
+          "grade": null
+        },
+        "identification": {
+          "status": "identified",
+          "unidentified": {
+            "name": "",
+            "img": "",
+            "data": {
+              "description": {
+                "value": ""
+              }
+            }
+          },
+          "misidentified": {}
+        },
+        "stackGroup": "gems"
+      },
+      "type": "treasure",
+      "_stats": {
+        "compendiumSource": "Compendium.pf2e.equipment-srd.Item.P2MIJxEQiIWJmV8n",
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.347",
+        "systemId": "pf2e",
+        "systemVersion": "7.3.1",
+        "createdTime": 1755902242258,
+        "modifiedTime": 1755902242258,
+        "lastModifiedBy": "tstGJ3x0JRVfhi4Q"
+      },
+      "effects": [],
+      "folder": null,
+      "sort": 0,
+      "flags": {},
+      "_id": "v4h8pHQT5PFetZ0n",
+      "ownership": {
+        "default": 0
+      }
+    },
+    {
+      "_id": "KjWoIKCUJAAXzAMT",
+      "name": "Example Ranged Attack",
+      "type": "melee",
+      "system": {
+        "slug": "flintlock-pistol",
+        "bonus": {
+          "value": 28
+        },
+        "damageRolls": {
+          "UNVABjhD8uzpECxO": {
+            "damage": "4d4+9",
+            "damageType": "piercing",
+            "category": null
+          }
+        },
+        "traits": {
+          "value": [
+            "concussive",
+            "fatal-d8",
+            "magical",
+            "range-increment-40",
+            "reload-1"
+          ],
+          "otherTags": []
+        },
+        "rules": [],
+        "description": {
+          "value": "<p>Attack description</p>",
+          "gm": ""
+        },
+        "publication": {
+          "title": "",
+          "authors": "",
+          "license": "OGL",
+          "remaster": false
+        },
+        "_migration": {
+          "version": 0.943,
+          "previous": {
+            "schema": 0.942,
+            "foundry": "13.348",
+            "system": "7.5.2"
+          }
+        },
+        "attackEffects": {
+          "value": []
+        }
+      },
+      "flags": {
+        "pf2e": {
+          "linkedWeapon": "iStnEepvwl29B2X5"
+        }
+      },
+      "img": "systems/pf2e/icons/default-icons/melee.svg",
+      "effects": [],
+      "folder": null,
+      "sort": 0,
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.348",
+        "systemId": "pf2e",
+        "systemVersion": "7.5.2",
+        "createdTime": 1755902274953,
+        "modifiedTime": 1760148936029,
+        "lastModifiedBy": "tstGJ3x0JRVfhi4Q"
+      },
+      "ownership": {
+        "default": 0
+      }
+    },
+    {
+      "type": "action",
+      "name": "One Action action",
+      "system": {
+        "actionType": {
+          "value": "action"
+        },
+        "description": {
+          "value": "<p>action description</p>",
+          "gm": ""
+        },
+        "publication": {
+          "title": "",
+          "authors": "",
+          "license": "OGL",
+          "remaster": false
+        },
+        "rules": [],
+        "slug": null,
+        "traits": {
+          "otherTags": [],
+          "value": []
+        },
+        "_migration": {
+          "version": 0.943,
+          "previous": {
+            "schema": 0.942,
+            "foundry": "13.348",
+            "system": "7.5.2"
+          }
+        },
+        "actions": {
+          "value": 1
+        },
+        "category": "interaction",
+        "deathNote": false
+      },
+      "effects": [],
+      "_id": "KkoAVvTHzuEAUGwe",
+      "img": "systems/pf2e/icons/default-icons/action.svg",
+      "folder": null,
+      "sort": 0,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.348",
+        "systemId": "pf2e",
+        "systemVersion": "7.5.2",
+        "createdTime": 1755902478226,
+        "modifiedTime": 1760148831569,
+        "lastModifiedBy": "tstGJ3x0JRVfhi4Q"
+      },
+      "ownership": {
+        "default": 0
+      }
+    },
+    {
+      "type": "action",
+      "name": "Two action action",
+      "system": {
+        "actionType": {
+          "value": "action"
+        },
+        "description": {
+          "value": "<p>Action description</p>",
+          "gm": ""
+        },
+        "publication": {
+          "title": "",
+          "authors": "",
+          "license": "OGL",
+          "remaster": false
+        },
+        "rules": [],
+        "slug": null,
+        "traits": {
+          "otherTags": [],
+          "value": []
+        },
+        "_migration": {
+          "version": 0.943,
+          "previous": {
+            "schema": null,
+            "foundry": "13.348",
+            "system": "7.5.2"
+          }
+        },
+        "actions": {
+          "value": 2
+        },
+        "category": "defensive",
+        "deathNote": false
+      },
+      "effects": [],
+      "_id": "1YhXTsTWvhLq4i3j",
+      "img": "systems/pf2e/icons/default-icons/action.svg",
+      "folder": null,
+      "sort": 0,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.348",
+        "systemId": "pf2e",
+        "systemVersion": "7.5.2",
+        "createdTime": 1760148782154,
+        "modifiedTime": 1760148835141,
+        "lastModifiedBy": "tstGJ3x0JRVfhi4Q"
+      },
+      "ownership": {
+        "default": 0
+      }
+    },
+    {
+      "type": "action",
+      "name": "Three Action action",
+      "system": {
+        "actionType": {
+          "value": "action"
+        },
+        "description": {
+          "value": "<p>three action action</p>",
+          "gm": ""
+        },
+        "publication": {
+          "title": "",
+          "authors": "",
+          "license": "OGL",
+          "remaster": false
+        },
+        "rules": [],
+        "slug": null,
+        "traits": {
+          "otherTags": [],
+          "value": []
+        },
+        "_migration": {
+          "version": 0.943,
+          "previous": {
+            "schema": null,
+            "foundry": "13.348",
+            "system": "7.5.2"
+          }
+        },
+        "actions": {
+          "value": 3
+        },
+        "category": "offensive",
+        "deathNote": false
+      },
+      "effects": [],
+      "_id": "EAaZD11dOMppEWFA",
+      "img": "systems/pf2e/icons/default-icons/action.svg",
+      "folder": null,
+      "sort": 0,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.348",
+        "systemId": "pf2e",
+        "systemVersion": "7.5.2",
+        "createdTime": 1760148807709,
+        "modifiedTime": 1760148840805,
+        "lastModifiedBy": "tstGJ3x0JRVfhi4Q"
+      },
+      "ownership": {
+        "default": 0
+      }
+    },
+    {
+      "type": "action",
+      "name": "Reaction",
+      "system": {
+        "actionType": {
+          "value": "reaction"
+        },
+        "description": {
+          "value": "<p>action description</p>",
+          "gm": ""
+        },
+        "publication": {
+          "title": "",
+          "authors": "",
+          "license": "OGL",
+          "remaster": false
+        },
+        "rules": [],
+        "slug": null,
+        "traits": {
+          "otherTags": [],
+          "value": []
+        },
+        "_migration": {
+          "version": 0.943,
+          "previous": {
+            "schema": null,
+            "foundry": "13.348",
+            "system": "7.5.2"
+          }
+        },
+        "actions": {
+          "value": null
+        },
+        "category": "familiar",
+        "deathNote": false
+      },
+      "effects": [],
+      "_id": "6OCZQX1UsvmmsHeN",
+      "img": "systems/pf2e/icons/default-icons/action.svg",
+      "folder": null,
+      "sort": 0,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.348",
+        "systemId": "pf2e",
+        "systemVersion": "7.5.2",
+        "createdTime": 1760148843445,
+        "modifiedTime": 1760148901180,
+        "lastModifiedBy": "tstGJ3x0JRVfhi4Q"
+      },
+      "ownership": {
+        "default": 0
+      }
+    },
+    {
+      "type": "action",
+      "name": "Free Action",
+      "system": {
+        "actionType": {
+          "value": "free"
+        },
+        "description": {
+          "value": "<p>action description</p>",
+          "gm": ""
+        },
+        "publication": {
+          "title": "",
+          "authors": "",
+          "license": "OGL",
+          "remaster": false
+        },
+        "rules": [],
+        "slug": null,
+        "traits": {
+          "otherTags": [],
+          "value": []
+        },
+        "_migration": {
+          "version": 0.943,
+          "previous": {
+            "schema": null,
+            "foundry": "13.348",
+            "system": "7.5.2"
+          }
+        },
+        "actions": {
+          "value": null
+        },
+        "category": null,
+        "deathNote": false
+      },
+      "effects": [],
+      "_id": "sbCLucWGU0a0O3dy",
+      "img": "systems/pf2e/icons/default-icons/action.svg",
+      "folder": null,
+      "sort": 0,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.348",
+        "systemId": "pf2e",
+        "systemVersion": "7.5.2",
+        "createdTime": 1760148860685,
+        "modifiedTime": 1760148896588,
+        "lastModifiedBy": "tstGJ3x0JRVfhi4Q"
+      },
+      "ownership": {
+        "default": 0
+      }
+    },
+    {
+      "type": "action",
+      "name": "Passive Action",
+      "system": {
+        "actionType": {
+          "value": "passive"
+        },
+        "description": {
+          "value": "",
+          "gm": ""
+        },
+        "publication": {
+          "title": "",
+          "authors": "",
+          "license": "OGL",
+          "remaster": false
+        },
+        "rules": [],
+        "slug": null,
+        "traits": {
+          "otherTags": [],
+          "value": []
+        },
+        "_migration": {
+          "version": 0.943,
+          "previous": {
+            "schema": null,
+            "foundry": "13.348",
+            "system": "7.5.2"
+          }
+        },
+        "actions": {
+          "value": null
+        },
+        "category": null,
+        "deathNote": false
+      },
+      "effects": [],
+      "_id": "n2cXHVuwsnaIcz9c",
+      "img": "systems/pf2e/icons/default-icons/action.svg",
+      "folder": null,
+      "sort": 0,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.348",
+        "systemId": "pf2e",
+        "systemVersion": "7.5.2",
+        "createdTime": 1760148873467,
+        "modifiedTime": 1760148883848,
+        "lastModifiedBy": "tstGJ3x0JRVfhi4Q"
+      },
+      "ownership": {
+        "default": 0
+      }
+    },
+    {
+      "type": "melee",
+      "name": "Example attack with effects",
+      "effects": [],
+      "system": {
+        "_migration": {
+          "version": 0.943,
+          "previous": null
+        },
+        "description": {
+          "value": "<p>Attack description</p>",
+          "gm": ""
+        },
+        "publication": {
+          "title": "",
+          "authors": "",
+          "license": "OGL",
+          "remaster": false
+        },
+        "rules": [],
+        "slug": null,
+        "traits": {
+          "otherTags": [],
+          "value": []
+        },
+        "damageRolls": {
+          "U2Kd065KooURiQCM": {
+            "damage": "1d4",
+            "damageType": "bludgeoning",
+            "category": "persistent"
+          },
+          "3YF9aegwfUyVg0C8": {
+            "damage": "1d4",
+            "damageType": "electricity",
+            "category": "precision"
+          },
+          "rI2uYk72ZTUlT2b1": {
+            "damage": "1d4",
+            "damageType": "poison",
+            "category": "splash"
+          }
+        },
+        "bonus": {
+          "value": 20
+        },
+        "attackEffects": {
+          "value": [
+            "constrict",
+            "grab",
+            "greater-constrict",
+            "improved-grab",
+            "improved-knockdown",
+            "improved-push",
+            "knockdown",
+            "trip"
+          ]
+        }
+      },
+      "_id": "iaLH23bqfo3SUuqp",
+      "img": "systems/pf2e/icons/default-icons/melee.svg",
+      "folder": null,
+      "sort": 0,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.348",
+        "systemId": "pf2e",
+        "systemVersion": "7.5.2",
+        "createdTime": 1760148945490,
+        "modifiedTime": 1760149003963,
+        "lastModifiedBy": "tstGJ3x0JRVfhi4Q"
+      },
+      "ownership": {
+        "default": 0
+      }
+    },
+    {
+      "name": "Arcane Innate Spells",
+      "type": "spellcastingEntry",
+      "system": {
+        "description": {
+          "gm": "",
+          "value": ""
+        },
+        "rules": [],
+        "slug": null,
+        "_migration": {
+          "version": 0.943,
+          "lastMigration": null
+        },
+        "traits": {
+          "otherTags": []
+        },
+        "publication": {
+          "title": "",
+          "authors": "",
+          "license": "OGL",
+          "remaster": false
+        },
+        "ability": {
+          "value": "cha"
+        },
+        "spelldc": {
+          "value": 10,
+          "dc": 10
+        },
+        "tradition": {
+          "value": "arcane"
+        },
+        "prepared": {
+          "value": "innate"
+        },
+        "showSlotlessLevels": {
+          "value": true
+        },
+        "proficiency": {
+          "value": 1
+        },
+        "slots": {
+          "slot0": {
+            "prepared": [],
+            "value": 0,
+            "max": 0
+          },
+          "slot1": {
+            "prepared": [],
+            "value": 0,
+            "max": 0
+          },
+          "slot2": {
+            "prepared": [],
+            "value": 0,
+            "max": 0
+          },
+          "slot3": {
+            "prepared": [],
+            "value": 0,
+            "max": 0
+          },
+          "slot4": {
+            "prepared": [],
+            "value": 0,
+            "max": 0
+          },
+          "slot5": {
+            "prepared": [],
+            "value": 0,
+            "max": 0
+          },
+          "slot6": {
+            "prepared": [],
+            "value": 0,
+            "max": 0
+          },
+          "slot7": {
+            "prepared": [],
+            "value": 0,
+            "max": 0
+          },
+          "slot8": {
+            "prepared": [],
+            "value": 0,
+            "max": 0
+          },
+          "slot9": {
+            "prepared": [],
+            "value": 0,
+            "max": 0
+          },
+          "slot10": {
+            "prepared": [],
+            "value": 0,
+            "max": 0
+          },
+          "slot11": {
+            "prepared": [],
+            "value": 0,
+            "max": 0
+          }
+        },
+        "autoHeightenLevel": {
+          "value": null
+        }
+      },
+      "_id": "Zq2fa86jeXVGgvGU",
+      "img": "systems/pf2e/icons/default-icons/spellcastingEntry.svg",
+      "effects": [],
+      "folder": null,
+      "sort": 0,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.348",
+        "systemId": "pf2e",
+        "systemVersion": "7.5.2",
+        "createdTime": 1760149088170,
+        "modifiedTime": 1760149095424,
+        "lastModifiedBy": "tstGJ3x0JRVfhi4Q"
+      },
+      "ownership": {
+        "default": 0
+      }
+    }
+  ],
+  "effects": [],
+  "folder": null,
+  "flags": {},
+  "_stats": {
+    "compendiumSource": null,
+    "duplicateSource": null,
+    "exportSource": {
+      "worldId": "bannermanes-pf2",
+      "uuid": "Actor.cV2HDsqTn5QyqHVw",
+      "coreVersion": "13.348",
+      "systemId": "pf2e",
+      "systemVersion": "7.5.2"
+    },
+    "coreVersion": "13.348",
+    "systemId": "pf2e",
+    "systemVersion": "7.5.2",
+    "createdTime": 1755902057246,
+    "modifiedTime": 1760149199120,
+    "lastModifiedBy": "tstGJ3x0JRVfhi4Q"
+  },
+  "ownership": {
+    "default": 0
+  }
+}
