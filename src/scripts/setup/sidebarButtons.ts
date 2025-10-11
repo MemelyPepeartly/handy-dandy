@@ -12,6 +12,19 @@ export function insertSidebarButtons(controls: SceneControl[]): void {
     activeTool: "schema-tool", // Mandatory in v12 :contentReference[oaicite:0]{index=0}
     tools: <SceneControlTool[]>[
       {
+        name: "tool-guide",
+        title: "Tool Guide",
+        icon: "fas fa-compass",
+        button: true,
+        onClick: () => {
+          if (!game.handyDandy) {
+            ui.notifications?.error("Handy Dandy module is not initialized.");
+            return;
+          }
+          game.handyDandy.applications.toolOverview.render(true);
+        }
+      },
+      {
         name: "schema-tool",
         title: "Schema Tool",
         icon: "fas fa-magic",
