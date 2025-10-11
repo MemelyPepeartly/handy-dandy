@@ -6,6 +6,7 @@ import {
   generateActor,
   generateItem,
 } from "../src/scripts/generation";
+import { toFoundryActorData } from "../src/scripts/mappers/import";
 import type { JsonSchemaDefinition } from "../src/scripts/gpt/client";
 import type {
   ActionSchemaData,
@@ -118,12 +119,28 @@ test("generateActor respects custom seeds for deterministic behaviour", async ()
   const first = await generateActor(baseActorInput, { gptClient: client, seed: 7 });
   const second = await generateActor(baseActorInput, { gptClient: client, seed: 7 });
 
-  const expected = cloneFixture(actorFixture) as ActorSchemaData;
-  expected.recallKnowledge = null;
-  expected.spellcasting = [];
+  const canonical = cloneFixture(actorFixture) as ActorSchemaData;
+  canonical.recallKnowledge = null;
+  canonical.spellcasting = [];
+  const foundry = toFoundryActorData(canonical);
+  const expected = {
+    schema_version: canonical.schema_version,
+    systemId: canonical.systemId,
+    slug: canonical.slug,
+    name: foundry.name,
+    type: foundry.type,
+    img: foundry.img,
+    system: foundry.system,
+    prototypeToken: foundry.prototypeToken,
+    items: foundry.items,
+    effects: foundry.effects,
+    folder: foundry.folder ?? null,
+    flags: foundry.flags ?? {},
+  };
 
-  assert.deepStrictEqual(first, expected, "tests/fixtures/actor.json should be returned for actor generation");
-  assert.deepStrictEqual(second, expected, "tests/fixtures/actor.json should be returned for actor generation");
+  assert.deepStrictEqual(first, expected, "tests/fixtures/actor.json should produce a Foundry-ready actor");
+  assert.deepStrictEqual(second, expected, "tests/fixtures/actor.json should produce a Foundry-ready actor");
+  assert.ok(!("actorType" in first), "generated actors should not expose actorType");
   assert.equal(client.calls.length, 2);
   assert.ok(client.calls.every((call) => call.seed === 7));
 });

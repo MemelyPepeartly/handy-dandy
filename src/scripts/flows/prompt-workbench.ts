@@ -1,6 +1,6 @@
 import { fromFoundryAction, fromFoundryActor, fromFoundryItem } from "../mappers/export";
 import { importAction } from "../mappers/import";
-import type { CanonicalEntityMap, EntityType, SystemId } from "../schemas";
+import type { CanonicalEntityMap, EntityType, GeneratedEntityMap, SystemId } from "../schemas";
 import type { ActionPromptInput, ActorPromptInput, ItemPromptInput } from "../prompts";
 
 type PromptInputMap = {
@@ -59,7 +59,7 @@ export interface PromptWorkbenchRequest<T extends EntityType> extends ImporterOp
 export interface PromptWorkbenchResult<T extends EntityType> {
   readonly type: T;
   readonly name: string;
-  readonly data: CanonicalEntityMap[T];
+  readonly data: GeneratedEntityMap[T];
   readonly input: PromptInputMap[T];
   readonly importer?: (options?: ImporterOptions) => Promise<ClientDocument>;
 }
@@ -68,7 +68,7 @@ type GeneratorMap = {
   [K in EntityType]: (
     input: PromptInputMap[K],
     options?: BoundGenerationOptions,
-  ) => Promise<CanonicalEntityMap[K]>;
+  ) => Promise<GeneratedEntityMap[K]>;
 };
 
 type ImporterMap = {
@@ -180,7 +180,8 @@ export async function generateWorkbenchEntry<T extends EntityType>(
   const resolvedName = data.name.trim() || inferInputName(type, input);
 
   const importerFn = importer
-    ? (options?: ImporterOptions) => importer(data, { packId, folderId, ...options })
+    ? (options?: ImporterOptions) =>
+        importer(data as unknown as CanonicalEntityMap[T], { packId, folderId, ...options })
     : undefined;
 
   return {

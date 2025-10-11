@@ -18,7 +18,11 @@ import {
   type GenerateOptions,
 } from "./generation";
 import type { ActionPromptInput, ActorPromptInput, ItemPromptInput } from "./prompts";
-import type { ActionSchemaData, ActorSchemaData, ItemSchemaData } from "./schemas";
+import type {
+  ActionSchemaData,
+  ActorGenerationResult,
+  ItemSchemaData,
+} from "./schemas";
 import { exportSelectedEntities, generateWorkbenchEntry } from "./flows/prompt-workbench";
 import { ensureValid } from "./validation/ensure-valid";
 import { importAction } from "./mappers/import";
@@ -45,7 +49,7 @@ type BoundGenerateItem = (
 type BoundGenerateActor = (
   input: ActorPromptInput,
   options?: BoundGenerationOptions,
-) => Promise<ActorSchemaData>;
+) => Promise<ActorGenerationResult>;
 
 function bindGenerator<TInput, TResult>(
   fn: GeneratorFunction<TInput, TResult>,
