@@ -22,13 +22,14 @@ test("createEnsureValidRetryHandler invokes repair and importer", async () => {
       repair: async () => {
         repairCalls += 1;
         return {
-          schema_version: 1,
+          schema_version: 2,
           systemId: "pf2e",
           type: "item",
           slug: "retry",
           name: "Retry",
           itemType: "wand",
           rarity: "common",
+          source: "",
         } as any;
       },
     },

@@ -41,8 +41,10 @@ export type Rarity = (typeof RARITIES)[number];
 export const ENTITY_TYPES = ["action", "item", "actor"] as const;
 export type EntityType = (typeof ENTITY_TYPES)[number];
 
+export const LATEST_SCHEMA_VERSION = 2 as const;
+
 type BaseEntity<TType extends EntityType> = {
-  schema_version: 1;
+  schema_version: typeof LATEST_SCHEMA_VERSION;
   systemId: SystemId;
   type: TType;
   slug: string;
@@ -56,6 +58,7 @@ export interface ActionSchemaData extends BaseEntity<"action"> {
   description: string;
   img?: string;
   rarity?: Rarity;
+  source?: string;
 }
 
 export interface ItemSchemaData extends BaseEntity<"item"> {
@@ -66,6 +69,7 @@ export interface ItemSchemaData extends BaseEntity<"item"> {
   traits?: string[];
   description?: string;
   img?: string;
+  source?: string;
 }
 
 export interface ActorSchemaData extends BaseEntity<"actor"> {
@@ -75,10 +79,11 @@ export interface ActorSchemaData extends BaseEntity<"actor"> {
   traits?: string[];
   languages?: string[];
   img?: string;
+  source?: string;
 }
 
 export interface PackEntrySchemaData {
-  schema_version: 1;
+  schema_version: typeof LATEST_SCHEMA_VERSION;
   systemId: SystemId;
   id: string;
   entityType: EntityType;
@@ -90,7 +95,11 @@ export interface PackEntrySchemaData {
 }
 
 const baseMeta = {
-  schema_version: { type: "integer", enum: [1], default: 1 as const },
+  schema_version: {
+    type: "integer",
+    enum: [LATEST_SCHEMA_VERSION],
+    default: LATEST_SCHEMA_VERSION,
+  },
   systemId: { type: "string", enum: SYSTEM_IDS, default: "pf2e" as const },
   slug: { type: "string", minLength: 1 },
   name: { type: "string", minLength: 1 }
@@ -113,7 +122,8 @@ export const actionSchema = {
     requirements: { type: "string", default: "" },
     description: { type: "string", minLength: 1 },
     img: { type: "string", format: "uri-reference", default: "" },
-    rarity: { type: "string", enum: RARITIES, default: "common" as const }
+    rarity: { type: "string", enum: RARITIES, default: "common" as const },
+    source: { type: "string", default: "" }
   }
 } satisfies JSONSchemaType<ActionSchemaData>;
 
@@ -135,7 +145,8 @@ export const itemSchema = {
       default: [] as const
     },
     description: { type: "string", default: "" },
-    img: { type: "string", format: "uri-reference", default: "" }
+    img: { type: "string", format: "uri-reference", default: "" },
+    source: { type: "string", default: "" }
   }
 } satisfies JSONSchemaType<ItemSchemaData>;
 
@@ -160,7 +171,8 @@ export const actorSchema = {
       items: { type: "string", minLength: 1 },
       default: [] as const
     },
-    img: { type: "string", format: "uri-reference", default: "" }
+    img: { type: "string", format: "uri-reference", default: "" },
+    source: { type: "string", default: "" }
   }
 } satisfies JSONSchemaType<ActorSchemaData>;
 

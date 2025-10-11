@@ -7,9 +7,15 @@ import type {
   ItemCategory,
   Rarity
 } from "../schemas";
-import { ACTION_EXECUTIONS, ACTOR_CATEGORIES, ITEM_CATEGORIES, RARITIES } from "../schemas";
+import {
+  ACTION_EXECUTIONS,
+  ACTOR_CATEGORIES,
+  ITEM_CATEGORIES,
+  LATEST_SCHEMA_VERSION,
+  RARITIES
+} from "../schemas";
 
-const DEFAULT_SCHEMA_VERSION = 1 as const;
+const DEFAULT_SCHEMA_VERSION = LATEST_SCHEMA_VERSION;
 const DEFAULT_SYSTEM_ID = "pf2e" as const;
 
 const ACTION_TYPE_MAP: Record<string, ActionExecution> = {
@@ -87,6 +93,27 @@ function normalizeImg(img: unknown): string | undefined {
   }
 
   return trimmed;
+}
+
+function normalizeSource(value: unknown): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed || undefined;
+  }
+
+  if (typeof value === "object") {
+    const candidate = (value as { value?: unknown }).value;
+    if (typeof candidate === "string") {
+      const trimmed = candidate.trim();
+      return trimmed || undefined;
+    }
+  }
+
+  return undefined;
 }
 
 function decodeHtmlEntities(value: string): string {
@@ -333,6 +360,7 @@ export type FoundryAction = FoundryBaseDocument & {
     actionType?: { value?: string | null } | string | null;
     actions?: { value?: number | string | null } | number | string | null;
     requirements?: { value?: string | null } | string | null;
+    source?: { value?: string | null } | string | null;
   } & Record<string, unknown>;
 };
 
@@ -348,6 +376,7 @@ export type FoundryItem = FoundryBaseDocument & {
     description?: { value?: string | null } | string | null;
     level?: { value?: number | string | null } | number | string | null;
     price?: { value?: unknown } | unknown;
+    source?: { value?: string | null } | string | null;
   } & Record<string, unknown>;
 };
 
@@ -364,6 +393,7 @@ export type FoundryActor = FoundryBaseDocument & {
     details?: {
       level?: { value?: number | string | null } | number | string | null;
       languages?: { value?: unknown } | unknown;
+      source?: { value?: string | null } | string | null;
     } & Record<string, unknown>;
   } & Record<string, unknown>;
 };
@@ -394,6 +424,7 @@ export function fromFoundryAction(doc: FoundryAction): ActionSchemaData {
   const requirements = normalizeHtml(rawRequirements) || "";
 
   const rarity = normalizeRarity(doc.system?.traits?.rarity);
+  const source = normalizeSource(doc.system?.source);
 
   const result: ActionSchemaData = {
     schema_version: DEFAULT_SCHEMA_VERSION,
@@ -414,6 +445,10 @@ export function fromFoundryAction(doc: FoundryAction): ActionSchemaData {
 
   if (traits?.length) {
     result.traits = traits;
+  }
+
+  if (source) {
+    result.source = source;
   }
 
   return result;
@@ -440,6 +475,7 @@ export function fromFoundryItem(doc: FoundryItem): ItemSchemaData {
   const rarityValue = doc.system?.traits?.rarity ??
     (typeof doc.system?.rarity === "string" ? doc.system.rarity : doc.system?.rarity?.value);
   const priceValue = doc.system?.price;
+  const source = normalizeSource(doc.system?.source);
 
   const result: ItemSchemaData = {
     schema_version: DEFAULT_SCHEMA_VERSION,
@@ -459,6 +495,10 @@ export function fromFoundryItem(doc: FoundryItem): ItemSchemaData {
 
   if (traits?.length) {
     result.traits = traits;
+  }
+
+  if (source) {
+    result.source = source;
   }
 
   if (description) {
@@ -524,6 +564,8 @@ export function fromFoundryActor(doc: FoundryActor): ActorSchemaData {
     languages.push(language);
   }
 
+  const source = normalizeSource(doc.system?.details?.source ?? doc.system?.source);
+
   const result: ActorSchemaData = {
     schema_version: DEFAULT_SCHEMA_VERSION,
     systemId: DEFAULT_SYSTEM_ID,
@@ -541,6 +583,10 @@ export function fromFoundryActor(doc: FoundryActor): ActorSchemaData {
 
   if (languages?.length) {
     result.languages = languages;
+  }
+
+  if (source) {
+    result.source = source;
   }
 
   const img = normalizeImg(doc.img);

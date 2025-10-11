@@ -19,6 +19,7 @@ function buildItemSchemaSection(): string {
   );
   const descriptionDefault = (itemSchema.properties.description as { default: string }).default;
   const imgDefault = (itemSchema.properties.img as { default: string }).default;
+  const sourceDefault = (itemSchema.properties.source as { default: string }).default;
   return [
     "Item schema overview:",
     `- schema_version: integer literal ${schemaVersion}.`,
@@ -31,7 +32,8 @@ function buildItemSchemaSection(): string {
     `- price: optional number >= 0; defaults to ${priceDefault}.`,
     `- traits: optional array of non-empty strings; defaults to ${traitsDefault}.`,
     `- description: optional string; defaults to "${descriptionDefault}".`,
-    `- img: optional string formatted as a URI reference; defaults to "${imgDefault}".`
+    `- img: optional string formatted as a URI reference; defaults to "${imgDefault}".`,
+    `- source: optional string; defaults to "${sourceDefault}".`
   ].join("\n");
 }
 

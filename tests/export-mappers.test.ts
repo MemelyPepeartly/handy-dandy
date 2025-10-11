@@ -53,12 +53,13 @@ test("fromFoundryAction produces a valid schema-compliant action", () => {
       description: { value: "<p><strong>Strike</strong> twice.</p>" },
       traits: { value: ["attack ", " fighter"], rarity: "common" },
       actionType: { value: "one" },
-      requirements: { value: "Wield a melee weapon. " }
+      requirements: { value: "Wield a melee weapon. " },
+      source: { value: "Advanced Player's Guide" }
     }
   };
 
   const action = fromFoundryAction(mockAction);
-  assert.equal(action.schema_version, 1);
+  assert.equal(action.schema_version, 2);
   assert.equal(action.systemId, "pf2e");
   assert.equal(action.slug, "power-attack");
   assert.equal(action.actionType, "one-action");
@@ -66,6 +67,7 @@ test("fromFoundryAction produces a valid schema-compliant action", () => {
   assert.equal(action.requirements, "Wield a melee weapon.");
   assert.equal(action.description, "Strike twice.");
   assert.equal(action.rarity, "common");
+  assert.equal(action.source, "Advanced Player's Guide");
   assert.ok(!("img" in action), "placeholder icon should be removed");
 
   const validation = validate("action", action);
@@ -81,12 +83,13 @@ test("fromFoundryItem normalises PF2e specific fields", () => {
       description: { value: "<p>Shiny <em>blade</em>.</p>" },
       level: { value: 2 },
       traits: { value: ["magical", " versatile-s "], rarity: "uncommon" },
-      price: { value: { gp: 12, sp: 5 } }
+      price: { value: { gp: 12, sp: 5 } },
+      source: { value: "Guns & Gears" }
     }
   };
 
   const item = fromFoundryItem(mockItem);
-  assert.equal(item.schema_version, 1);
+  assert.equal(item.schema_version, 2);
   assert.equal(item.systemId, "pf2e");
   assert.equal(item.slug, "resonant-blade");
   assert.equal(item.itemType, "weapon");
@@ -95,6 +98,7 @@ test("fromFoundryItem normalises PF2e specific fields", () => {
   assert.equal(item.price, 12.5);
   assert.deepEqual(item.traits, ["magical", "versatile-s"]);
   assert.equal(item.description, "Shiny blade.");
+  assert.equal(item.source, "Guns & Gears");
   assert.ok(!("img" in item));
 
   const validation = validate("item", item);
@@ -110,7 +114,8 @@ test("fromFoundryActor converts actor documents", () => {
       slug: "goblin-warrior",
       details: {
         level: { value: 3 },
-        languages: { value: "Goblin, Common" }
+        languages: { value: "Goblin, Common" },
+        source: { value: "Bestiary" }
       },
       traits: {
         rarity: "common",
@@ -121,7 +126,7 @@ test("fromFoundryActor converts actor documents", () => {
   };
 
   const actor = fromFoundryActor(mockActor);
-  assert.equal(actor.schema_version, 1);
+  assert.equal(actor.schema_version, 2);
   assert.equal(actor.systemId, "pf2e");
   assert.equal(actor.slug, "goblin-warrior");
   assert.equal(actor.actorType, "npc");
@@ -129,6 +134,7 @@ test("fromFoundryActor converts actor documents", () => {
   assert.equal(actor.level, 3);
   assert.deepEqual(actor.traits, ["goblin", "humanoid"]);
   assert.deepEqual(actor.languages, ["Goblin", "Goblin Sign", "Common"]);
+  assert.equal(actor.source, "Bestiary");
   assert.ok(!("img" in actor));
 
   const validation = validate("actor", actor);

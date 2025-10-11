@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "systemId": "pf2e",
   "type": "actor",
   "slug": "cautious-scout",
@@ -9,5 +9,6 @@
   "level": 3,
   "traits": ["human", "scout"],
   "languages": ["Common", "Mwangi"],
-  "img": "icons/actors/cautious-scout.webp"
+  "img": "icons/actors/cautious-scout.webp",
+  "source": "Pathfinder Bestiary"
 }
