@@ -56,6 +56,19 @@ export function insertSidebarButtons(controls: SceneControl[]): void {
         onClick: () => {
           void runBatchGenerationFlow();
         }
+      },
+      {
+        name: "developer-console",
+        title: "Developer Console",
+        icon: "fas fa-terminal",
+        button: true,
+        onClick: () => {
+          if (!game.handyDandy) {
+            ui.notifications?.error("Handy Dandy module is not initialized.");
+            return;
+          }
+          game.handyDandy.developer.console.render(true);
+        }
       }
     ]
   };

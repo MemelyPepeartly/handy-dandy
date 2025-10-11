@@ -6,6 +6,8 @@ import { insertSidebarButtons } from "./setup/sidebarButtons";
 import { SchemaTool } from "./tools/schema-tool";
 import { DataEntryTool } from "./tools/data-entry-tool";
 import { GPTClient } from "./gpt/client";
+import { DeveloperConsole } from "./dev/developer-console";
+import { setDeveloperConsole } from "./dev/state";
 import {
   DEFAULT_GENERATION_SEED,
   generateAction,
@@ -74,6 +76,9 @@ declare global {
         schemaTool: SchemaTool,
         dataEntryTool: DataEntryTool,
       },
+      developer: {
+        console: DeveloperConsole,
+      },
       flows: {
         exportSelection: typeof exportSelectedEntities;
         generateBatch: typeof generateAndImportBatch;
@@ -91,7 +96,8 @@ Hooks.once("init", async () => {
   await loadTemplates({
     "schema-tool": `${CONSTANTS.TEMPLATE_PATH}/schema-tool.hbs`,
     "schema-node": `${CONSTANTS.TEMPLATE_PATH}/schema-node.hbs`,
-    "data-entry-tool": `${CONSTANTS.TEMPLATE_PATH}/data-entry-tool.hbs`
+    "data-entry-tool": `${CONSTANTS.TEMPLATE_PATH}/data-entry-tool.hbs`,
+    "developer-console": `${CONSTANTS.TEMPLATE_PATH}/developer-console.hbs`
   });
 });
 
@@ -111,11 +117,16 @@ Hooks.once("setup", () => {
       schemaTool: new SchemaTool,
       dataEntryTool: new DataEntryTool,
     },
+    developer: {
+      console: new DeveloperConsole(),
+    },
     flows: {
       exportSelection: exportSelectedEntities,
       generateBatch: generateAndImportBatch,
     },
   };
+
+  setDeveloperConsole(game.handyDandy!.developer.console);
 });
 
 // ---------- READY -----------------------------------------------------------

@@ -17,6 +17,8 @@ import {
 } from "../schemas";
 import { formatError } from "../helpers/validation";
 import type { JsonSchemaDefinition, GPTClient } from "../gpt/client";
+import { getDeveloperConsole } from "../dev/state";
+import type { ValidationLogPayload } from "../dev/developer-console";
 
 export type SchemaDataFor<K extends ValidatorKey> = K extends "action"
   ? ActionSchemaData
@@ -52,22 +54,38 @@ export interface EnsureValidOptions<K extends ValidatorKey> {
   schema?: JsonSchemaDefinition;
 }
 
+export interface EnsureValidRepairOptions<K extends ValidatorKey> {
+  payload?: unknown;
+  maxAttempts?: number;
+  gptClient?: Pick<GPTClient, "generateWithSchema">;
+  promptBuilder?: (context: EnsureValidPromptContext<K>) => string;
+  schema?: JsonSchemaDefinition;
+}
+
 export class EnsureValidError<K extends ValidatorKey> extends Error {
   public readonly diagnostics: EnsureValidDiagnostics<K>[];
   public readonly originalPayload: unknown;
   public readonly lastPayload: unknown;
+  public readonly type: K;
+  public readonly repair: (overrides?: EnsureValidRepairOptions<K>) => Promise<SchemaDataFor<K>>;
 
   constructor(
     message: string,
     diagnostics: EnsureValidDiagnostics<K>[],
     originalPayload: unknown,
     lastPayload: unknown,
+    context: {
+      type: K;
+      repair: (overrides?: EnsureValidRepairOptions<K>) => Promise<SchemaDataFor<K>>;
+    },
   ) {
     super(message);
     this.name = "EnsureValidError";
     this.diagnostics = diagnostics;
     this.originalPayload = originalPayload;
     this.lastPayload = lastPayload;
+    this.type = context.type;
+    this.repair = context.repair;
   }
 }
 
@@ -148,12 +166,58 @@ export async function ensureValid<K extends ValidatorKey>(
     );
   }
 
+  const developerConsole = getDeveloperConsole();
+  if (developerConsole) {
+    const payload: ValidationLogPayload = {
+      type,
+      attempts: diagnostics.length,
+    };
+
+    if (developerConsole.shouldDumpInvalidJson()) {
+      payload.invalidJson = stringifyForConsole(lastNormalized ?? originalPayload);
+    }
+
+    if (developerConsole.shouldDumpAjvErrors()) {
+      const lastErrors = diagnostics.at(-1)?.errors ?? [];
+      payload.errors = lastErrors.map((error) => formatError(error));
+    }
+
+    developerConsole.recordValidationFailure(payload);
+  }
+
   throw new EnsureValidError(
     `Failed to validate ${type} payload after ${maxAttempts} attempts`,
     diagnostics,
     originalPayload,
     lastNormalized,
+    {
+      type,
+      repair: async (overrides: EnsureValidRepairOptions<K> = {}) => {
+        const payloadSource = Object.hasOwn(overrides, "payload")
+          ? overrides.payload
+          : lastNormalized ?? originalPayload;
+
+        const retryPayload = clone(payloadSource);
+
+        return ensureValid({
+          type,
+          payload: retryPayload,
+          maxAttempts: overrides.maxAttempts ?? maxAttempts,
+          gptClient: overrides.gptClient ?? gptClient,
+          promptBuilder: overrides.promptBuilder ?? promptBuilder,
+          schema: overrides.schema ?? schemaDefinition,
+        });
+      },
+    },
   );
+}
+
+function stringifyForConsole(value: unknown): string {
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch (error) {
+    return `<<unable to serialise: ${(error as Error).message}>>`;
+  }
 }
 
 function buildDefaultPrompt<K extends ValidatorKey>(

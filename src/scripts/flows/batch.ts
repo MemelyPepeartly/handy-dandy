@@ -1,5 +1,7 @@
 import { fromFoundryAction, fromFoundryActor, fromFoundryItem } from "../mappers/export";
 import { importAction } from "../mappers/import";
+import { EnsureValidError } from "../validation/ensure-valid";
+import { showEnsureValidRetryToast } from "../ui/ensure-valid-toast";
 import type {
   ActionSchemaData,
   ActorSchemaData,
@@ -95,7 +97,7 @@ interface BoundGenerationOptions {
   maxAttempts?: number;
 }
 
-interface ImporterOptions {
+export interface ImporterOptions {
   packId?: string;
   folderId?: string;
 }
@@ -196,6 +198,16 @@ export async function generateAndImportBatch<T extends EntityType>(
         documentUuid: typeof document?.uuid === "string" ? document.uuid : undefined,
       });
     } catch (error) {
+      if (error instanceof EnsureValidError) {
+        showEnsureValidRetryToast({
+          type,
+          name: label,
+          error,
+          importer: (json, options) => importer(json as CanonicalEntityMap[T], options),
+          importerOptions: { packId, folderId },
+        });
+      }
+
       batchEntries.push({
         type,
         input: input as PromptInputMap[T],
