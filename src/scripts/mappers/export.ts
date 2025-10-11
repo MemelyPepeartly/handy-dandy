@@ -387,10 +387,11 @@ export function fromFoundryAction(doc: FoundryAction): ActionSchemaData {
       ? doc.system?.actions
       : doc.system?.actions?.value);
 
-  const requirements =
+  const rawRequirements =
     (typeof doc.system?.requirements === "string"
       ? doc.system?.requirements
       : doc.system?.requirements?.value) ?? "";
+  const requirements = normalizeHtml(rawRequirements) || "";
 
   const rarity = normalizeRarity(doc.system?.traits?.rarity);
 
@@ -401,7 +402,7 @@ export function fromFoundryAction(doc: FoundryAction): ActionSchemaData {
     slug,
     name: doc.name,
     actionType: resolveActionType(actionTypeRaw),
-    requirements: normalizeString(requirements) ?? "",
+    requirements,
     description,
     rarity
   };

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { beforeEach, test } from "node:test";
 import { importAction, toFoundryActionData } from "../src/scripts/mappers/import";
 import type { ActionSchemaData } from "../src/scripts/schemas";
+import { cloneFixture, loadFixture } from "./helpers/fixtures";
 
 class MockItem {
   public static nextId = 1;
@@ -76,19 +77,8 @@ class MockCollection<T extends { id: string }> extends Map<string, T> {
   }
 }
 
-const baseAction: ActionSchemaData = {
-  schema_version: 1,
-  systemId: "pf2e",
-  type: "action",
-  slug: "stunning-strike",
-  name: "Stunning Strike",
-  actionType: "two-actions",
-  traits: ["fighter", "press"],
-  requirements: "Wield a melee weapon",
-  description: "Deliver a crushing blow.\n\n• On a success, [reaction] is triggered.",
-  img: "icons/actions/stunning-strike.webp",
-  rarity: "uncommon"
-};
+const actionFixture = loadFixture<ActionSchemaData>("action.json");
+const createAction = (): ActionSchemaData => cloneFixture(actionFixture);
 
 beforeEach(() => {
   MockItem.nextId = 1;
@@ -109,7 +99,12 @@ beforeEach(() => {
 });
 
 test("toFoundryActionData converts canonical JSON into PF2e action data", () => {
-  const data = toFoundryActionData(baseAction);
+  const action = createAction();
+  const glyphAction = {
+    ...action,
+    description: action.description.replace("r is triggered", "[reaction] is triggered"),
+  } satisfies ActionSchemaData;
+  const data = toFoundryActionData(glyphAction);
 
   assert.equal(data.name, "Stunning Strike");
   assert.equal(data.type, "action");
@@ -118,8 +113,11 @@ test("toFoundryActionData converts canonical JSON into PF2e action data", () => 
   assert.deepEqual(data.system.traits.value, ["fighter", "press"]);
   assert.equal(data.system.actionType.value, "two");
   assert.equal(data.system.actions.value, 2);
-  assert.match(data.system.description.value, /<p>Deliver a crushing blow\.<\/p><ul><li>On a success, <span class="pf2-icon">r<\/span> is triggered.<\/li><\/ul>/);
-  assert.equal(data.system.requirements.value, "<p>Wield a melee weapon<\/p>");
+  assert.match(
+    data.system.description.value,
+    /<p>Deliver a crushing blow\.<\/p><ul><li>On a success, <span class="pf2-icon">r<\/span> is triggered\.<\/li><li>On a critical success, the target is knocked prone\.<\/li><\/ul>/,
+  );
+  assert.equal(data.system.requirements.value, "<p>Wield a melee weapon.<\/p>");
 });
 
 test("importAction updates an existing compendium entry with the same slug", async () => {
@@ -133,18 +131,18 @@ test("importAction updates an existing compendium entry with the same slug", asy
   pack.addDocument(existing);
   (game.packs as Map<string, MockPack>).set("pf2e.actions", pack);
 
-  const result = await importAction(baseAction, { packId: "pf2e.actions", folderId: "folder-123" });
+  const result = await importAction(createAction(), { packId: "pf2e.actions", folderId: "folder-123" });
 
   assert.strictEqual(result, existing);
   assert.equal(existing.folder, "folder-123");
-  assert.equal(existing.system.description.value, toFoundryActionData(baseAction).system.description.value);
+  assert.equal(existing.system.description.value, toFoundryActionData(createAction()).system.description.value);
 });
 
 test("importAction creates a new compendium entry when none exists", async () => {
   const pack = new MockPack("pf2e.actions");
   (game.packs as Map<string, MockPack>).set("pf2e.actions", pack);
 
-  const result = await importAction(baseAction, { packId: "pf2e.actions" });
+  const result = await importAction(createAction(), { packId: "pf2e.actions" });
 
   assert.equal(result.name, "Stunning Strike");
   assert.equal(pack.index.length, 1);
@@ -161,7 +159,7 @@ test("importAction updates a world item when one with the slug is present", asyn
 
   (game.items as MockCollection<MockItem>).set(existing.id, existing);
 
-  const result = await importAction(baseAction, { folderId: "folder-999" });
+  const result = await importAction(createAction(), { folderId: "folder-999" });
 
   assert.strictEqual(result, existing);
   assert.equal(existing.folder, "folder-999");
@@ -169,7 +167,7 @@ test("importAction updates a world item when one with the slug is present", asyn
 });
 
 test("importAction creates a new world item when no match is found", async () => {
-  const result = await importAction(baseAction);
+  const result = await importAction(createAction());
   assert.equal(result.name, "Stunning Strike");
   assert.equal(MockItem.created.length, 1);
 });
@@ -178,7 +176,7 @@ test("importAction throws when the JSON payload is invalid", async () => {
   await assert.rejects(
     () =>
       importAction({
-        ...baseAction,
+        ...createAction(),
         description: ""
       }),
     /Action JSON failed validation/

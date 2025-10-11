@@ -1,7 +1,47 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { fromFoundryAction, fromFoundryActor, fromFoundryItem } from "../src/scripts/mappers/export";
+import { toFoundryActionData, toFoundryActorData, toFoundryItemData } from "../src/scripts/mappers/import";
 import { validate } from "../src/scripts/helpers/validation";
+import type { ActionSchemaData, ActorSchemaData, ItemSchemaData } from "../src/scripts/schemas";
+import { cloneFixture, loadFixture } from "./helpers/fixtures";
+
+const actionFixture = loadFixture<ActionSchemaData>("action.json");
+const itemFixture = loadFixture<ItemSchemaData>("item.json");
+const actorFixture = loadFixture<ActorSchemaData>("actor.json");
+
+test("action fixture survives a Foundry round-trip", () => {
+  const foundry = toFoundryActionData(cloneFixture(actionFixture));
+  const canonical = fromFoundryAction(foundry);
+
+  assert.deepStrictEqual(
+    canonical,
+    actionFixture,
+    "tests/fixtures/action.json should round-trip through Foundry mappers",
+  );
+});
+
+test("item fixture survives a Foundry round-trip", () => {
+  const foundry = toFoundryItemData(cloneFixture(itemFixture));
+  const canonical = fromFoundryItem(foundry);
+
+  assert.deepStrictEqual(
+    canonical,
+    itemFixture,
+    "tests/fixtures/item.json should round-trip through Foundry mappers",
+  );
+});
+
+test("actor fixture survives a Foundry round-trip", () => {
+  const foundry = toFoundryActorData(cloneFixture(actorFixture));
+  const canonical = fromFoundryActor(foundry);
+
+  assert.deepStrictEqual(
+    canonical,
+    actorFixture,
+    "tests/fixtures/actor.json should round-trip through Foundry mappers",
+  );
+});
 
 test("fromFoundryAction produces a valid schema-compliant action", () => {
   const mockAction = {
