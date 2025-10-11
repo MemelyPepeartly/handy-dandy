@@ -5,6 +5,8 @@ const DEFAULT_ACTION_IMAGE = "systems/pf2e/icons/default-icons/action.svg" as co
 const DEFAULT_ITEM_IMAGE = "systems/pf2e/icons/default-icons/item.svg" as const;
 const DEFAULT_ACTOR_IMAGE = "systems/pf2e/icons/default-icons/monster.svg" as const;
 const DEFAULT_STRIKE_IMAGE = "systems/pf2e/icons/default-icons/melee.svg" as const;
+const DEFAULT_SPELL_IMAGE = "systems/pf2e/icons/default-icons/spell.svg" as const;
+const DEFAULT_SPELLCASTING_IMAGE = "systems/pf2e/icons/default-icons/spellcastingEntry.svg" as const;
 
 type ActorSpellcastingEntry = NonNullable<ActorSchemaData["spellcasting"]>[number];
 
@@ -40,6 +42,17 @@ function generateId(): string {
   for (let index = 0; index < 16; index += 1) {
     const random = Math.floor(Math.random() * alphabet.length);
     id += alphabet[random];
+  }
+  return id;
+}
+
+const generatedIdCache = new Map<string, string>();
+
+function generateStableId(key: string): string {
+  let id = generatedIdCache.get(key);
+  if (!id) {
+    id = generateId();
+    generatedIdCache.set(key, id);
   }
   return id;
 }
@@ -136,7 +149,83 @@ type FoundryActorActionSource = {
   flags: Record<string, unknown>;
 };
 
-type FoundryActorItemSource = FoundryActorStrikeSource | FoundryActorActionSource;
+type FoundryActorSpellcastingEntrySource = {
+  _id: string;
+  name: string;
+  type: "spellcastingEntry";
+  img: string;
+  system: {
+    description: { value: string; gm: string };
+    rules: unknown[];
+    slug: string | null;
+    _migration: { version: number; lastMigration: number | null };
+    traits: { otherTags: string[] };
+    publication: { title: string; authors: string; license: string; remaster: boolean };
+    ability: { value: string };
+    spelldc: { value: number; dc: number };
+    tradition: { value: string };
+    prepared: { value: string };
+    showSlotlessLevels: { value: boolean };
+    proficiency: { value: number };
+    slots: Record<string, { prepared: unknown[]; value: number; max: number }>;
+    autoHeightenLevel: { value: number | null };
+  };
+  effects: unknown[];
+  folder: null;
+  sort: number;
+  flags: Record<string, unknown>;
+};
+
+type FoundryActorSpellSource = {
+  _id: string;
+  name: string;
+  type: "spell";
+  img: string;
+  system: {
+    description: { value: string; gm: string };
+    rules: unknown[];
+    slug: string | null;
+    _migration: { version: number; lastMigration: number | null };
+    traits: {
+      otherTags: string[];
+      value: string[];
+      rarity: string;
+      traditions: string[];
+    };
+    publication: { title: string; authors: string; license: string; remaster: boolean };
+    level: { value: number };
+    requirements: string;
+    target: { value: string };
+    range: { value: string };
+    area: { value: number | null; type: string | null };
+    time: { value: string };
+    duration: { value: string; sustained: boolean };
+    damage: Record<string, unknown>;
+    defense: {
+      passive: { statistic: string };
+      save: { statistic: string; basic: boolean };
+    };
+    cost: { value: string };
+    location: { value: string };
+    counteraction: boolean;
+    heightening: {
+      type: string | null;
+      interval: number | null;
+      damage: Record<string, unknown>;
+      area: number | null;
+    };
+  };
+  effects: unknown[];
+  folder: null;
+  sort: number;
+  flags: Record<string, unknown>;
+};
+
+type FoundryActorItemSource =
+  | FoundryActorStrikeSource
+  | FoundryActorActionSource
+  | FoundryActorSpellcastingEntrySource
+  | FoundryActorSpellSource;
 
 type FoundryActorSource = {
   name: string;
@@ -505,15 +594,14 @@ function prepareActorSource(actor: ActorSchemaData): FoundryActorSource {
   const privateNotes = toRichText(actor.recallKnowledge);
   const alignment = sanitizeText(actor.alignment);
 
-  const strikes = actor.strikes.map((strike) => createStrikeItem(actor, strike));
-  const actions = actor.actions.map((action) => createActionItem(action));
-  const spellcastingActions = actor.spellcasting
-    ?.map((entry) => createSpellcastingAction(entry))
-    .filter((entry): entry is FoundryActorActionSource => entry !== null);
+  const strikes = actor.strikes.map((strike, index) => createStrikeItem(actor, strike, index));
+  const actions = actor.actions.map((action, index) => createActionItem(actor, action, index));
+  const spellcastingItems =
+    actor.spellcasting?.flatMap((entry, index) => createSpellcastingItems(actor, entry, index)) ?? [];
 
   const items: FoundryActorItemSource[] = [...strikes, ...actions];
-  if (spellcastingActions?.length) {
-    items.push(...spellcastingActions);
+  if (spellcastingItems.length) {
+    items.push(...spellcastingItems);
   }
 
   return {
@@ -639,10 +727,15 @@ const ACTION_COST_SYSTEM_MAP: Record<ActorSchemaData["actions"][number]["actionC
   passive: { type: "passive", value: null },
 };
 
-function createStrikeItem(actor: ActorSchemaData, strike: ActorSchemaData["strikes"][number]): FoundryActorStrikeSource {
+function createStrikeItem(
+  actor: ActorSchemaData,
+  strike: ActorSchemaData["strikes"][number],
+  index: number,
+): FoundryActorStrikeSource {
   const damageRolls: FoundryActorStrikeSource["system"]["damageRolls"] = {};
-  for (const damage of strike.damage) {
-    const id = generateId();
+  const actorKey = actor.slug || actor.name;
+  for (const [damageIndex, damage] of strike.damage.entries()) {
+    const id = generateStableId(`strike-damage:${actorKey}:${index}:${damageIndex}`);
     damageRolls[id] = {
       damage: damage.formula,
       damageType: damage.damageType ? damage.damageType.toLowerCase() : null,
@@ -653,7 +746,7 @@ function createStrikeItem(actor: ActorSchemaData, strike: ActorSchemaData["strik
   const slug = toSlug(strike.name) || toSlug(generateId());
 
   return {
-    _id: generateId(),
+    _id: generateStableId(`strike:${actorKey}:${index}`),
     name: strike.name,
     type: "melee",
     img: DEFAULT_STRIKE_IMAGE,
@@ -677,7 +770,11 @@ function createStrikeItem(actor: ActorSchemaData, strike: ActorSchemaData["strik
   };
 }
 
-function createActionItem(action: ActorSchemaData["actions"][number]): FoundryActorActionSource {
+function createActionItem(
+  actor: ActorSchemaData,
+  action: ActorSchemaData["actions"][number],
+  index: number,
+): FoundryActorActionSource {
   const { type, value } = ACTION_COST_SYSTEM_MAP[action.actionCost];
   const details: string[] = [];
   if (action.requirements) {
@@ -693,7 +790,7 @@ function createActionItem(action: ActorSchemaData["actions"][number]): FoundryAc
   const description = toRichText(details.join("\n"));
 
   return {
-    _id: generateId(),
+    _id: generateStableId(`action:${actor.slug || actor.name}:${index}`),
     name: action.name,
     type: "action",
     img: DEFAULT_ACTION_IMAGE,
@@ -719,7 +816,11 @@ function createActionItem(action: ActorSchemaData["actions"][number]): FoundryAc
   };
 }
 
-function createSpellcastingAction(entry: ActorSpellcastingEntry): FoundryActorActionSource | null {
+function createSpellcastingItems(
+  actor: ActorSchemaData,
+  entry: ActorSpellcastingEntry,
+  index: number,
+): FoundryActorItemSource[] {
   const lines: string[] = [];
   if (entry.notes) {
     lines.push(entry.notes);
@@ -744,28 +845,107 @@ function createSpellcastingAction(entry: ActorSpellcastingEntry): FoundryActorAc
     }
   }
   if (!lines.length) {
-    return null;
+    lines.push(`${entry.name} spellcasting`);
   }
 
   const description = toRichText(lines.join("\n"));
-  const traits = [entry.tradition.toLowerCase(), "spellcasting"];
+  const tradition = entry.tradition.toLowerCase();
+  const actorKey = actor.slug || actor.name;
+  const entryId = generateStableId(`spellcasting-entry:${actorKey}:${index}`);
+
+  const spellcastingEntry: FoundryActorSpellcastingEntrySource = {
+    _id: entryId,
+    name: `${entry.name} Spellcasting`,
+    type: "spellcastingEntry",
+    img: DEFAULT_SPELLCASTING_IMAGE,
+    system: {
+      description: { value: description, gm: "" },
+      rules: [],
+      slug: null,
+      _migration: { version: 0.946, lastMigration: null },
+      traits: { otherTags: [] },
+      publication: { title: "", authors: "", license: "OGL", remaster: false },
+      ability: { value: mapTraditionToAbility(tradition) },
+      spelldc: { value: entry.saveDC ?? 10, dc: entry.saveDC ?? 10 },
+      tradition: { value: tradition },
+      prepared: { value: entry.castingType },
+      showSlotlessLevels: { value: entry.castingType !== "prepared" && entry.castingType !== "spontaneous" },
+      proficiency: { value: 1 },
+      slots: buildEmptySpellSlots(),
+      autoHeightenLevel: { value: null },
+    },
+    effects: [],
+    folder: null,
+    sort: 0,
+    flags: {},
+  };
+
+  const spells = entry.spells.map((spell, spellIndex) =>
+    createSpellItem(actorKey, index, spell, spellIndex, tradition, entryId),
+  );
+
+  return [spellcastingEntry, ...spells];
+}
+
+function buildEmptySpellSlots(): Record<string, { prepared: unknown[]; value: number; max: number }> {
+  const slots: Record<string, { prepared: unknown[]; value: number; max: number }> = {};
+  for (let level = 0; level <= 11; level += 1) {
+    slots[`slot${level}`] = { prepared: [], value: 0, max: 0 };
+  }
+  return slots;
+}
+
+function mapTraditionToAbility(tradition: string): string {
+  const abilityMap: Record<string, string> = {
+    arcane: "int",
+    divine: "wis",
+    occult: "cha",
+    primal: "wis",
+  };
+  return abilityMap[tradition] ?? "cha";
+}
+
+function createSpellItem(
+  actorKey: string,
+  entryIndex: number,
+  spell: ActorSpellcastingEntry["spells"][number],
+  spellIndex: number,
+  defaultTradition: string,
+  entryId: string,
+): FoundryActorSpellSource {
+  const description = toRichText(spell.description ?? "");
+  const tradition = (spell.tradition ?? defaultTradition).toLowerCase();
 
   return {
-    _id: generateId(),
-    name: `${entry.name} Spellcasting`,
-    type: "action",
-    img: DEFAULT_ACTION_IMAGE,
+    _id: generateStableId(`spell:${actorKey}:${entryIndex}:${spellIndex}`),
+    name: spell.name,
+    type: "spell",
+    img: DEFAULT_SPELL_IMAGE,
     system: {
-      actionType: { value: "passive" },
-      actions: { value: null },
-      category: "spell", 
-      traits: { value: traits, otherTags: [] },
       description: { value: description, gm: "" },
-      requirements: { value: "" },
-      trigger: { value: "" },
-      frequency: { value: "" },
       rules: [],
+      slug: null,
+      _migration: { version: 0.946, lastMigration: null },
+      traits: {
+        otherTags: [],
+        value: [],
+        rarity: "common",
+        traditions: tradition ? [tradition] : [],
+      },
       publication: { title: "", authors: "", license: "OGL", remaster: false },
+      level: { value: spell.level },
+      requirements: "",
+      target: { value: "" },
+      range: { value: "" },
+      area: { value: null, type: null },
+      time: { value: "" },
+      duration: { value: "", sustained: false },
+      damage: {},
+      defense: { passive: { statistic: "" }, save: { statistic: "", basic: false } },
+      cost: { value: "" },
+      location: { value: entryId },
+      counteraction: false,
+      heightening: { type: null, interval: null, damage: {}, area: null },
     },
     effects: [],
     folder: null,
