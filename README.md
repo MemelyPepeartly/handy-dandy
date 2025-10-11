@@ -59,6 +59,25 @@ These settings are used to initialise the OpenAI SDK when the game is ready.
 3. The OpenAI client is available to other macros as `game.handyDandy.openai` if
    configured.
 
+## Developer Helpers
+
+GMs and users with developer mode enabled gain access to a dedicated
+`game.handyDandy.dev` namespace with helper methods for local testing:
+
+- `generateAction(input, options?)` – runs the full generation pipeline using
+  the active GPT client and logs the prompt input and resulting payload to the
+  browser console.
+- `validate(type, payload, options?)` – validates or repairs a payload via the
+  standard Ensure Valid flow. The helper logs the payload and validation
+  summary, and honours options such as `maxAttempts` or `useGPT` when you need
+  to disable automatic repairs.
+- `importAction(json, options?)` – performs the same sanity checks and import
+  routine used by the UI, reporting results in the console.
+
+All helpers write structured output to the developer console using collapsed
+console groups. Access is restricted to the GM or when a developer module/flag
+is active; otherwise the helpers emit a warning and throw an error.
+
 ## Compatibility
 
 The module targets Foundry **V12** and is tested with the **pf2e** system.  The

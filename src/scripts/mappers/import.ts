@@ -30,7 +30,7 @@ interface PackIndexEntry {
   system?: { slug?: string | null };
 }
 
-type ImportOptions = {
+export type ImportOptions = {
   packId?: string;
   folderId?: string;
 };
