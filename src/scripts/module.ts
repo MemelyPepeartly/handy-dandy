@@ -6,6 +6,57 @@ import { insertSidebarButtons } from "./setup/sidebarButtons";
 import { SchemaTool } from "./tools/schema-tool";
 import { DataEntryTool } from "./tools/data-entry-tool";
 import { GPTClient } from "./gpt/client";
+import {
+  DEFAULT_GENERATION_SEED,
+  generateAction,
+  generateActor,
+  generateItem,
+  type GenerateOptions,
+} from "./generation";
+import type { ActionPromptInput, ActorPromptInput, ItemPromptInput } from "./prompts";
+import type { ActionSchemaData, ActorSchemaData, ItemSchemaData } from "./schemas";
+
+type GeneratorFunction<TInput, TResult> = (
+  input: TInput,
+  options: GenerateOptions,
+) => Promise<TResult>;
+
+interface BoundGenerationOptions {
+  seed?: number;
+  maxAttempts?: number;
+  gptClient?: Pick<GPTClient, "generateWithSchema">;
+}
+
+type BoundGenerateAction = (
+  input: ActionPromptInput,
+  options?: BoundGenerationOptions,
+) => Promise<ActionSchemaData>;
+type BoundGenerateItem = (
+  input: ItemPromptInput,
+  options?: BoundGenerationOptions,
+) => Promise<ItemSchemaData>;
+type BoundGenerateActor = (
+  input: ActorPromptInput,
+  options?: BoundGenerationOptions,
+) => Promise<ActorSchemaData>;
+
+function bindGenerator<TInput, TResult>(
+  fn: GeneratorFunction<TInput, TResult>,
+): (input: TInput, options?: BoundGenerationOptions) => Promise<TResult> {
+  return async (input: TInput, options: BoundGenerationOptions = {}) => {
+    const { gptClient: explicitClient, seed, maxAttempts } = options;
+    const gptClient = explicitClient ?? game.handyDandy?.gptClient;
+    if (!gptClient) {
+      throw new Error(`${CONSTANTS.MODULE_NAME} | GPT client has not been initialised`);
+    }
+
+    return fn(input, {
+      gptClient,
+      seed: seed ?? DEFAULT_GENERATION_SEED,
+      maxAttempts,
+    });
+  };
+}
 
 // ---------- module namespace ----------
 declare global {
@@ -13,6 +64,11 @@ declare global {
     handyDandy?: {
       openai: OpenAI | null,
       gptClient: GPTClient | null,
+      generation: {
+        generateAction: BoundGenerateAction,
+        generateItem: BoundGenerateItem,
+        generateActor: BoundGenerateActor,
+      },
       applications: {
         schemaTool: SchemaTool,
         dataEntryTool: DataEntryTool
@@ -41,6 +97,11 @@ Hooks.once("setup", () => {
   game.handyDandy = {
     openai: null,
     gptClient: null,
+    generation: {
+      generateAction: bindGenerator(generateAction),
+      generateItem: bindGenerator(generateItem),
+      generateActor: bindGenerator(generateActor),
+    },
     applications: {
       schemaTool: new SchemaTool,
       dataEntryTool: new DataEntryTool

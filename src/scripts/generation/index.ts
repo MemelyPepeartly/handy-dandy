@@ -1,0 +1,110 @@
+import {
+  buildActionPrompt,
+  buildActorPrompt,
+  buildItemPrompt,
+  type ActionPromptInput,
+  type ActorPromptInput,
+  type ItemPromptInput,
+} from "../prompts";
+import { ensureValid } from "../validation/ensure-valid";
+import {
+  actionSchema,
+  actorSchema,
+  itemSchema,
+  type ActionSchemaData,
+  type ActorSchemaData,
+  type ItemSchemaData,
+} from "../schemas";
+import type {
+  GenerateWithSchemaOptions,
+  GPTClient,
+  JsonSchemaDefinition,
+} from "../gpt/client";
+
+export interface GenerateOptions extends GenerateWithSchemaOptions {
+  gptClient: Pick<GPTClient, "generateWithSchema">;
+  maxAttempts?: number;
+}
+
+export const DEFAULT_GENERATION_SEED = 1337;
+
+const ACTION_SCHEMA_DEFINITION: JsonSchemaDefinition = {
+  name: String(actionSchema.$id ?? "Action"),
+  schema: actionSchema as unknown as Record<string, unknown>,
+  description: "Schema for action entries",
+};
+
+const ITEM_SCHEMA_DEFINITION: JsonSchemaDefinition = {
+  name: String(itemSchema.$id ?? "Item"),
+  schema: itemSchema as unknown as Record<string, unknown>,
+  description: "Schema for item entries",
+};
+
+const ACTOR_SCHEMA_DEFINITION: JsonSchemaDefinition = {
+  name: String(actorSchema.$id ?? "Actor"),
+  schema: actorSchema as unknown as Record<string, unknown>,
+  description: "Schema for actor entries",
+};
+
+export async function generateAction(
+  input: ActionPromptInput,
+  options: GenerateOptions,
+): Promise<ActionSchemaData> {
+  const { gptClient, maxAttempts, seed = DEFAULT_GENERATION_SEED } = options;
+  const prompt = buildActionPrompt(input);
+  const draft = await gptClient.generateWithSchema<ActionSchemaData>(
+    prompt,
+    ACTION_SCHEMA_DEFINITION,
+    { seed },
+  );
+
+  return ensureValid({
+    type: "action",
+    payload: draft,
+    gptClient,
+    maxAttempts,
+    schema: ACTION_SCHEMA_DEFINITION,
+  });
+}
+
+export async function generateItem(
+  input: ItemPromptInput,
+  options: GenerateOptions,
+): Promise<ItemSchemaData> {
+  const { gptClient, maxAttempts, seed = DEFAULT_GENERATION_SEED } = options;
+  const prompt = buildItemPrompt(input);
+  const draft = await gptClient.generateWithSchema<ItemSchemaData>(
+    prompt,
+    ITEM_SCHEMA_DEFINITION,
+    { seed },
+  );
+
+  return ensureValid({
+    type: "item",
+    payload: draft,
+    gptClient,
+    maxAttempts,
+    schema: ITEM_SCHEMA_DEFINITION,
+  });
+}
+
+export async function generateActor(
+  input: ActorPromptInput,
+  options: GenerateOptions,
+): Promise<ActorSchemaData> {
+  const { gptClient, maxAttempts, seed = DEFAULT_GENERATION_SEED } = options;
+  const prompt = buildActorPrompt(input);
+  const draft = await gptClient.generateWithSchema<ActorSchemaData>(
+    prompt,
+    ACTOR_SCHEMA_DEFINITION,
+    { seed },
+  );
+
+  return ensureValid({
+    type: "actor",
+    payload: draft,
+    gptClient,
+    maxAttempts,
+    schema: ACTOR_SCHEMA_DEFINITION,
+  });
+}
