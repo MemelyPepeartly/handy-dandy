@@ -1,11 +1,17 @@
 import { CONSTANTS } from "../constants";
 import { runBatchGenerationFlow, runExportSelectionFlow } from "../flows/batch-ui";
 
-type ToolCollection = SceneControls.Tool[] | Record<string, SceneControls.Tool>;
+type LegacyTool = SceneControls.Tool & {
+  onChange?: (...args: unknown[]) => void;
+};
+
+type ToolCollection = LegacyTool[] | Record<string, LegacyTool>;
 export type ControlCollection = SceneControls.Control[] | Record<string, ControlWithToolCollection>;
 
 type ControlWithToolCollection = Omit<SceneControls.Control, "tools"> & {
   tools: ToolCollection;
+  onChange?: (activeTool: string) => void;
+  onToolChange?: (activeTool: string) => void;
 };
 
 function useArrayTools(): boolean {
@@ -21,7 +27,7 @@ function compatibilityAddControl(collection: ControlCollection, control: Control
   }
 }
 
-function compatibilityAddTool(collection: ToolCollection, tool: SceneControls.Tool): void {
+function compatibilityAddTool(collection: ToolCollection, tool: LegacyTool): void {
   if (Array.isArray(collection)) {
     collection.push(tool);
   } else {
@@ -41,6 +47,10 @@ function requireNamespace(): NonNullable<Game["handyDandy"]> {
 export function insertSidebarButtons(controls: ControlCollection): void {
   const tools: ToolCollection = useArrayTools() ? [] : {};
 
+  const noop = (): void => {
+    /* noop for legacy Foundry compatibility */
+  };
+
   const handyGroup: ControlWithToolCollection = {
     name: "handy-dandy",
     title: "Handy Dandy Tools",
@@ -48,6 +58,8 @@ export function insertSidebarButtons(controls: ControlCollection): void {
     layer: "interface",
     visible: true,
     activeTool: "tool-guide",
+    onChange: noop,
+    onToolChange: noop,
     tools,
   };
 
@@ -58,6 +70,15 @@ export function insertSidebarButtons(controls: ControlCollection): void {
     toggle: true,
     active: true,
     onClick: toggled => {
+      const handyDandy = requireNamespace();
+      const toolOverview = handyDandy.applications.toolOverview;
+      if (toggled) {
+        toolOverview.render(true);
+      } else {
+        toolOverview.close();
+      }
+    },
+    onChange: toggled => {
       const handyDandy = requireNamespace();
       const toolOverview = handyDandy.applications.toolOverview;
       if (toggled) {
@@ -77,6 +98,7 @@ export function insertSidebarButtons(controls: ControlCollection): void {
       console.debug(`${CONSTANTS.MODULE_NAME} | Opening Schema Tool`);
       requireNamespace().applications.schemaTool.render(true);
     },
+    onChange: noop,
   });
 
   compatibilityAddTool(handyGroup.tools, {
@@ -88,6 +110,7 @@ export function insertSidebarButtons(controls: ControlCollection): void {
       console.debug(`${CONSTANTS.MODULE_NAME} | Opening Data Entry Tool`);
       requireNamespace().applications.dataEntryTool.render(true);
     },
+    onChange: noop,
   });
 
   compatibilityAddTool(handyGroup.tools, {
@@ -98,6 +121,7 @@ export function insertSidebarButtons(controls: ControlCollection): void {
     onClick: () => {
       void runExportSelectionFlow();
     },
+    onChange: noop,
   });
 
   compatibilityAddTool(handyGroup.tools, {
@@ -108,6 +132,7 @@ export function insertSidebarButtons(controls: ControlCollection): void {
     onClick: () => {
       void runBatchGenerationFlow();
     },
+    onChange: noop,
   });
 
   compatibilityAddTool(handyGroup.tools, {
@@ -118,6 +143,7 @@ export function insertSidebarButtons(controls: ControlCollection): void {
     onClick: () => {
       requireNamespace().developer.console.render(true);
     },
+    onChange: noop,
   });
 
   compatibilityAddControl(controls, handyGroup);
