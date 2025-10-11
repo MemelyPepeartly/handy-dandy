@@ -1,7 +1,7 @@
 import { CONSTANTS } from "../constants";
 import type { EntityType, SchemaDataFor } from "../schemas";
 import type { EnsureValidError } from "../validation/ensure-valid";
-import type { ImporterOptions } from "../flows/batch";
+import type { ImporterOptions } from "../flows/prompt-workbench";
 
 interface EnsureValidRetryToastOptions<T extends EntityType> {
   type: T;
