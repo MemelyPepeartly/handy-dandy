@@ -148,40 +148,45 @@ type FoundryActorSource = {
       value: string[];
       rarity: string;
       size: { value: string };
-      languages: { value: string[] };
       otherTags: string[];
     };
     details: {
       level: { value: number };
-      alignment: { value: string | null };
+      alignment: { value: string };
       publicNotes: string;
       privateNotes: string;
       blurb: string;
-      source: { value: string };
       languages: { value: string[]; details: string };
+      source: { value: string };
+      publication: { title: string; authors: string; license: string; remaster: boolean };
     };
     initiative: { statistic: string };
     attributes: {
-      hp: { value: number; max: number; temp: number; details: string | null };
-      ac: { value: number; details: string | null };
+      hp: { value: number; max: number; temp: number; details: string };
+      ac: { value: number; details: string };
       speed: {
         value: number;
-        details: string | null;
-        otherSpeeds: { type: string; value: number; details: string | null }[];
+        details: string;
+        otherSpeeds: { type: string; value: number; details: string }[];
       };
-      immunities: { type: string; exceptions: string[]; notes?: string | null }[];
-      weaknesses: { type: string; value: number; exceptions: string[]; notes?: string | null }[];
-      resistances: { type: string; value: number; exceptions: string[]; doubleVs: string[]; notes?: string | null }[];
+      immunities: { type: string; exceptions: string[]; notes: string }[];
+      weaknesses: { type: string; value: number; exceptions: string[]; notes: string }[];
+      resistances: { type: string; value: number; exceptions: string[]; doubleVs: string[]; notes: string }[];
       allSaves: { value: string };
     };
-    perception: { mod: number; details: string | null; senses: string[]; vision: boolean };
+    resources: Record<string, unknown>;
+    _migration: {
+      version: number;
+      previous: { schema: number; foundry: string; system: string };
+    };
+    perception: { mod: number; details: string; senses: string[]; vision: boolean };
     saves: {
-      fortitude: { value: number; saveDetail: string | null };
-      reflex: { value: number; saveDetail: string | null };
-      will: { value: number; saveDetail: string | null };
+      fortitude: { value: number; saveDetail: string };
+      reflex: { value: number; saveDetail: string };
+      will: { value: number; saveDetail: string };
     };
     abilities: Record<string, { mod: number }>;
-    skills: Record<string, { value: number; base: number; details: string | null }>;
+    skills: Record<string, { value: number; base: number; details: string }>;
   };
   prototypeToken: Record<string, unknown>;
   items: FoundryActorItemSource[];
@@ -206,6 +211,10 @@ function trimArray(values: readonly string[] | null | undefined): string[] {
   }
 
   return values.map((value) => value.trim()).filter((value) => value.length > 0);
+}
+
+function sanitizeText(value: string | null | undefined): string {
+  return value?.trim() ?? "";
 }
 
 function resolveActiveSystemId(): string | undefined {
@@ -491,9 +500,10 @@ function prepareItemSource(item: ItemSchemaData): FoundryItemSource {
 function prepareActorSource(actor: ActorSchemaData): FoundryActorSource {
   const traits = trimArray(actor.traits).map((value) => value.toLowerCase());
   const languages = trimArray(actor.languages).map((value) => value.toLowerCase());
-  const source = actor.source.trim();
+  const source = sanitizeText(actor.source);
   const description = toRichText(actor.description);
   const privateNotes = toRichText(actor.recallKnowledge);
+  const alignment = sanitizeText(actor.alignment);
 
   const strikes = actor.strikes.map((strike) => createStrikeItem(actor, strike));
   const actions = actor.actions.map((action) => createActionItem(action));
@@ -508,7 +518,7 @@ function prepareActorSource(actor: ActorSchemaData): FoundryActorSource {
 
   return {
     name: actor.name,
-    type: actor.actorType,
+    type: actor.actorType === "npc" ? "npc" : actor.actorType,
     img: actor.img?.trim() || DEFAULT_ACTOR_IMAGE,
     system: {
       slug: actor.slug,
@@ -516,17 +526,17 @@ function prepareActorSource(actor: ActorSchemaData): FoundryActorSource {
         value: traits,
         rarity: actor.rarity,
         size: { value: actor.size },
-        languages: { value: languages },
         otherTags: [],
       },
       details: {
         level: { value: actor.level },
-        alignment: { value: actor.alignment?.trim() || null },
+        alignment: { value: alignment },
         publicNotes: description,
         privateNotes,
         blurb: "",
-        source: { value: source },
         languages: { value: languages, details: "" },
+        source: { value: source },
+        publication: { title: source, authors: "", license: "OGL", remaster: false },
       },
       initiative: { statistic: "perception" },
       attributes: {
@@ -534,59 +544,64 @@ function prepareActorSource(actor: ActorSchemaData): FoundryActorSource {
           value: actor.attributes.hp.value,
           max: actor.attributes.hp.max,
           temp: actor.attributes.hp.temp ?? 0,
-          details: actor.attributes.hp.details ?? null,
+          details: sanitizeText(actor.attributes.hp.details),
         },
         ac: {
           value: actor.attributes.ac.value,
-          details: actor.attributes.ac.details ?? null,
+          details: sanitizeText(actor.attributes.ac.details),
         },
         speed: {
           value: actor.attributes.speed.value,
-          details: actor.attributes.speed.details ?? null,
+          details: sanitizeText(actor.attributes.speed.details),
           otherSpeeds: (actor.attributes.speed.other ?? []).map((entry) => ({
             type: entry.type,
             value: entry.value,
-            details: entry.details ?? null,
+            details: sanitizeText(entry.details),
           })),
         },
         immunities: (actor.attributes.immunities ?? []).map((entry) => ({
           type: entry.type,
           exceptions: trimArray(entry.exceptions).map((value) => value.toLowerCase()),
-          notes: entry.details ?? null,
+          notes: sanitizeText(entry.details),
         })),
         weaknesses: (actor.attributes.weaknesses ?? []).map((entry) => ({
           type: entry.type,
           value: entry.value,
           exceptions: trimArray(entry.exceptions).map((value) => value.toLowerCase()),
-          notes: entry.details ?? null,
+          notes: sanitizeText(entry.details),
         })),
         resistances: (actor.attributes.resistances ?? []).map((entry) => ({
           type: entry.type,
           value: entry.value,
           exceptions: trimArray(entry.exceptions).map((value) => value.toLowerCase()),
           doubleVs: trimArray(entry.doubleVs).map((value) => value.toLowerCase()),
-          notes: entry.details ?? null,
+          notes: sanitizeText(entry.details),
         })),
         allSaves: { value: "" },
       },
+      resources: {},
+      _migration: {
+        version: 0.943,
+        previous: { schema: 0.942, foundry: "13.348", system: "7.5.2" },
+      },
       perception: {
         mod: actor.attributes.perception.value,
-        details: actor.attributes.perception.details ?? null,
+        details: sanitizeText(actor.attributes.perception.details),
         senses: (actor.attributes.perception.senses ?? []).map((sense) => sense.toLowerCase()),
         vision: true,
       },
       saves: {
         fortitude: {
           value: actor.attributes.saves.fortitude.value,
-          saveDetail: actor.attributes.saves.fortitude.details ?? null,
+          saveDetail: sanitizeText(actor.attributes.saves.fortitude.details),
         },
         reflex: {
           value: actor.attributes.saves.reflex.value,
-          saveDetail: actor.attributes.saves.reflex.details ?? null,
+          saveDetail: sanitizeText(actor.attributes.saves.reflex.details),
         },
         will: {
           value: actor.attributes.saves.will.value,
-          saveDetail: actor.attributes.saves.will.details ?? null,
+          saveDetail: sanitizeText(actor.attributes.saves.will.details),
         },
       },
       abilities: {
@@ -767,43 +782,98 @@ function buildSkillMap(
     result[skill.slug] = {
       value: skill.modifier,
       base: skill.modifier,
-      details: skill.details ?? null,
+      details: sanitizeText(skill.details),
     };
   }
   return result;
 }
 
+const TOKEN_SIZE_MAP: Record<ActorSchemaData["size"], number> = {
+  tiny: 1,
+  sm: 1,
+  med: 1,
+  lg: 2,
+  huge: 3,
+  grg: 4,
+};
+
 function buildPrototypeToken(actor: ActorSchemaData): Record<string, unknown> {
   const img = actor.img?.trim() || DEFAULT_ACTOR_IMAGE;
+  const tokenSize = TOKEN_SIZE_MAP[actor.size] ?? 1;
   return {
     name: actor.name,
     displayName: 20,
-    actorLink: true,
-    width: 1,
-    height: 1,
+    actorLink: false,
+    width: tokenSize,
+    height: tokenSize,
     texture: {
       src: img,
+      anchorX: 0.5,
+      anchorY: 0.5,
+      offsetX: 0,
+      offsetY: 0,
+      fit: "contain",
       scaleX: 1,
       scaleY: 1,
       rotation: 0,
-      offsetX: 0,
-      offsetY: 0,
+      tint: "#ffffff",
+      alphaThreshold: 0.75,
     },
+    lockRotation: true,
+    rotation: 0,
+    alpha: 1,
+    disposition: -1,
+    displayBars: 20,
     bar1: { attribute: "attributes.hp" },
     bar2: { attribute: null },
-    disposition: -1,
     light: {
+      negative: false,
+      priority: 0,
       alpha: 0.5,
+      angle: 360,
       bright: 0,
-      dim: 0,
       color: null,
+      coloration: 1,
+      dim: 0,
+      attenuation: 0.5,
+      luminosity: 0.5,
+      saturation: 0,
+      contrast: 0,
+      shadows: 0,
+      animation: { type: null, speed: 5, intensity: 5, reverse: false },
+      darkness: { min: 0, max: 1 },
     },
     sight: {
       enabled: false,
       range: 0,
       angle: 360,
       visionMode: "basic",
+      color: null,
+      attenuation: 0.1,
+      brightness: 0,
+      saturation: 0,
+      contrast: 0,
     },
+    detectionModes: [],
+    occludable: { radius: 0 },
+    ring: {
+      enabled: false,
+      colors: { ring: null, background: null },
+      effects: 0,
+      subject: { scale: 1, texture: null },
+    },
+    turnMarker: { mode: 1, animation: null, src: null, disposition: false },
+    movementAction: null,
+    flags: {
+      healthEstimate: {
+        dontMarkDead: false,
+        hideHealthEstimate: false,
+        hideName: false,
+      },
+    },
+    randomImg: false,
+    appendNumber: false,
+    prependAdjective: false,
   };
 }
 

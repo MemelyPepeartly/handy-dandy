@@ -241,6 +241,21 @@ export interface ActorSchemaData extends BaseEntity<"actor"> {
   source: string;
 }
 
+export interface ActorGenerationResult {
+  schema_version: typeof LATEST_SCHEMA_VERSION;
+  systemId: SystemId;
+  slug: string;
+  name: string;
+  type: ActorCategory;
+  img: string;
+  system: Record<string, unknown>;
+  prototypeToken: Record<string, unknown>;
+  items: Record<string, unknown>[];
+  effects: unknown[];
+  folder: string | null;
+  flags: Record<string, unknown>;
+}
+
 export interface PackEntrySchemaData {
   schema_version: typeof LATEST_SCHEMA_VERSION;
   systemId: SystemId;
@@ -716,6 +731,12 @@ export type CanonicalEntityMap = {
   action: ActionSchemaData;
   item: ItemSchemaData;
   actor: ActorSchemaData;
+};
+
+export type GeneratedEntityMap = {
+  action: ActionSchemaData;
+  item: ItemSchemaData;
+  actor: ActorGenerationResult;
 };
 
 export type SchemaDataFor<K extends ValidatorKey> = K extends "action"

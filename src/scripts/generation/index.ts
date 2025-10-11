@@ -7,11 +7,13 @@ import {
   type ItemPromptInput,
 } from "../prompts";
 import { ensureValid } from "../validation/ensure-valid";
+import { toFoundryActorData } from "../mappers/import";
 import {
   actionSchema,
   actorSchema,
   itemSchema,
   type ActionSchemaData,
+  type ActorGenerationResult,
   type ActorSchemaData,
   type ItemSchemaData,
 } from "../schemas";
@@ -91,7 +93,7 @@ export async function generateItem(
 export async function generateActor(
   input: ActorPromptInput,
   options: GenerateOptions,
-): Promise<ActorSchemaData> {
+): Promise<ActorGenerationResult> {
   const { gptClient, maxAttempts, seed = DEFAULT_GENERATION_SEED } = options;
   const prompt = buildActorPrompt(input);
   const draft = await gptClient.generateWithSchema<ActorSchemaData>(
@@ -100,11 +102,28 @@ export async function generateActor(
     { seed },
   );
 
-  return ensureValid({
+  const canonical = await ensureValid({
     type: "actor",
     payload: draft,
     gptClient,
     maxAttempts,
     schema: ACTOR_SCHEMA_DEFINITION,
   });
+
+  const foundry = toFoundryActorData(canonical);
+
+  return {
+    schema_version: canonical.schema_version,
+    systemId: canonical.systemId,
+    slug: canonical.slug,
+    name: foundry.name,
+    type: foundry.type as ActorGenerationResult["type"],
+    img: foundry.img,
+    system: foundry.system,
+    prototypeToken: foundry.prototypeToken,
+    items: foundry.items,
+    effects: foundry.effects,
+    folder: (foundry.folder ?? null) as ActorGenerationResult["folder"],
+    flags: (foundry.flags ?? {}) as ActorGenerationResult["flags"],
+  } satisfies ActorGenerationResult;
 }
