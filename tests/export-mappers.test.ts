@@ -135,7 +135,7 @@ test("fromFoundryActor converts actor documents", () => {
   assert.deepEqual(actor.traits, ["goblin", "humanoid"]);
   assert.deepEqual(actor.languages, ["Goblin", "Goblin Sign", "Common"]);
   assert.equal(actor.source, "Bestiary");
-  assert.ok(!("img" in actor));
+  assert.equal(actor.img, null);
 
   const validation = validate("actor", actor);
   assert.deepEqual(validation, { ok: true });
