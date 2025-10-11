@@ -149,3 +149,61 @@ test("ensureValid throws typed error with diagnostics after exhausting retries",
     assert.ok(firstAttempt.errors.some((err: ErrorObject) => err.instancePath === "/rarity"));
   }
 });
+
+test("EnsureValidError exposes a repair helper that retries GPT fixes", async () => {
+  const stub = new StubGPTClient();
+  stub.enqueue({
+    schema_version: 1,
+    systemId: "pf2e",
+    type: "item",
+    slug: "retry-item",
+    name: "Retry Item",
+    itemType: "wand",
+    rarity: "legendary",
+    level: 1,
+  });
+
+  const payload = {
+    schema_version: 1,
+    systemId: "pf2e",
+    type: "item",
+    slug: "retry-item",
+    name: "Retry Item",
+    itemType: "wand",
+    rarity: "legendary",
+    level: 1,
+  };
+
+  try {
+    await ensureValid({
+      type: "item",
+      payload,
+      gptClient: stub as unknown as GPTClient,
+      maxAttempts: 2,
+    });
+    assert.fail("Expected ensureValid to throw");
+  } catch (error) {
+    assert.ok(error instanceof EnsureValidError);
+    const ensureError = error as EnsureValidError<"item">;
+    assert.equal(stub.calls.length, 1);
+
+    stub.enqueue({
+      schema_version: 1,
+      systemId: "pf2e",
+      type: "item",
+      slug: "retry-item",
+      name: "Retry Item",
+      itemType: "wand",
+      rarity: "common",
+      level: 1,
+      price: 50,
+      traits: ["magical"],
+      description: "A repaired wand.",
+    });
+
+    const repaired = await ensureError.repair();
+    assert.equal(stub.calls.length, 2);
+    assert.equal(repaired.rarity, "common");
+    assert.equal(repaired.price, 50);
+  }
+});

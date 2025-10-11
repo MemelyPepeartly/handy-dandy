@@ -1,0 +1,87 @@
+.developer-console__form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  height: 100%;
+}
+
+.developer-console__settings {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.developer-console__settings label {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin: 0;
+}
+
+.developer-console__settings button {
+  margin-left: auto;
+}
+
+.developer-console__section {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  padding: 0.5rem;
+  flex: 1 1 auto;
+  overflow: auto;
+}
+
+.developer-console__section h3 {
+  margin-top: 0;
+}
+
+.developer-console__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.developer-console__table th,
+.developer-console__table td {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0.25rem 0.5rem;
+  vertical-align: top;
+}
+
+.developer-console__table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.developer-console__validation-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.developer-console__validation-entry {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  padding: 0.5rem;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.developer-console__validation-entry header {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+
+.developer-console__validation-entry details {
+  margin-top: 0.5rem;
+}
+
+.developer-console__validation-entry pre {
+  max-height: 200px;
+  overflow: auto;
+}
+
+.developer-console__empty {
+  font-style: italic;
+  opacity: 0.75;
+}

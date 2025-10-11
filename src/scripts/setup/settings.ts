@@ -57,4 +57,22 @@ export function registerSettings(): void {
     type: Number,
     default: null
   });
+
+  settings.register(CONSTANTS.MODULE_ID, "developerDumpInvalidJson", {
+    name: "Developer: Dump Invalid JSON",
+    hint: "When enabled, failed Ensure Valid attempts will record the last invalid JSON in the developer console.",
+    scope: "client",
+    config: true,
+    type: Boolean,
+    default: false,
+  });
+
+  settings.register(CONSTANTS.MODULE_ID, "developerDumpAjvErrors", {
+    name: "Developer: Dump Ajv Errors",
+    hint: "When enabled, failed Ensure Valid attempts will record Ajv error messages in the developer console.",
+    scope: "client",
+    config: true,
+    type: Boolean,
+    default: false,
+  });
 }

@@ -1,5 +1,7 @@
 import type { OpenAI } from "openai";
 import { CONSTANTS } from "../constants";
+import { getDeveloperConsole } from "../dev/state";
+import type { GPTUsageMetrics } from "../dev/developer-console";
 
 export interface JsonSchemaDefinition {
   name: string;
@@ -44,6 +46,29 @@ export interface GenerateWithSchemaOptions {
   seed?: number;
 }
 
+const performanceNow = typeof performance !== "undefined" && typeof performance.now === "function"
+  ? () => performance.now()
+  : () => Date.now();
+
+async function hashPrompt(prompt: string): Promise<string> {
+  if (typeof crypto !== "undefined" && crypto.subtle) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(prompt);
+    const digest = await crypto.subtle.digest("SHA-256", data);
+    return Array.from(new Uint8Array(digest))
+      .map((byte) => byte.toString(16).padStart(2, "0"))
+      .join("");
+  }
+
+  const { createHash } = await import("node:crypto");
+  return createHash("sha256").update(prompt).digest("hex");
+}
+
+interface GPTGenerationAttempt<T> {
+  result: T;
+  response: unknown;
+}
+
 export class GPTClient {
   #openai: OpenAI;
   #config: GPTClientConfig;
@@ -62,11 +87,25 @@ export class GPTClient {
     schema: JsonSchemaDefinition,
     options?: GenerateWithSchemaOptions,
   ): Promise<T> {
+    const promptHash = await hashPrompt(prompt);
     try {
-      return await this.#generateStructured<T>(prompt, schema, options);
+      return await this.#runWithLogging<T>(
+        "structured",
+        promptHash,
+        schema,
+        async () => this.#generateStructured<T>(prompt, schema, options),
+      );
     } catch (error) {
-      if (!this.#shouldFallback(error)) throw error;
-      return await this.#generateWithTool<T>(prompt, schema, options);
+      if (!this.#shouldFallback(error)) {
+        throw error;
+      }
+
+      return await this.#runWithLogging<T>(
+        "tool",
+        promptHash,
+        schema,
+        async () => this.#generateWithTool<T>(prompt, schema, options),
+      );
     }
   }
 
@@ -74,7 +113,7 @@ export class GPTClient {
     prompt: string,
     schema: JsonSchemaDefinition,
     options?: GenerateWithSchemaOptions,
-  ): Promise<T> {
+  ): Promise<GPTGenerationAttempt<T>> {
     const seed = options?.seed ?? this.#config.seed;
     const response = await this.#openai.responses.create({
       model: this.#config.model,
@@ -92,14 +131,17 @@ export class GPTClient {
       },
     });
 
-    return this.#extractJson<T>(response, schema);
+    return {
+      response,
+      result: this.#extractJson<T>(response, schema),
+    } satisfies GPTGenerationAttempt<T>;
   }
 
   async #generateWithTool<T>(
     prompt: string,
     schema: JsonSchemaDefinition,
     options?: GenerateWithSchemaOptions,
-  ): Promise<T> {
+  ): Promise<GPTGenerationAttempt<T>> {
     const seed = options?.seed ?? this.#config.seed;
     const response = await this.#openai.responses.create({
       model: this.#config.model,
@@ -127,7 +169,10 @@ export class GPTClient {
       tool_choice: { type: "function", function: { name: schema.name } },
     });
 
-    return this.#extractJson<T>(response, schema);
+    return {
+      response,
+      result: this.#extractJson<T>(response, schema),
+    } satisfies GPTGenerationAttempt<T>;
   }
 
   #shouldFallback(error: unknown): boolean {
@@ -143,6 +188,100 @@ export class GPTClient {
       return true;
     }
     return false;
+  }
+
+  async #runWithLogging<T>(
+    method: "structured" | "tool",
+    promptHash: string,
+    schema: JsonSchemaDefinition,
+    executor: () => Promise<GPTGenerationAttempt<T>>,
+  ): Promise<T> {
+    const startWallClock = Date.now();
+    const start = performanceNow();
+
+    try {
+      const attempt = await executor();
+      this.#recordInteraction({
+        method,
+        promptHash,
+        schemaName: schema.name,
+        durationMs: performanceNow() - start,
+        startedAt: startWallClock,
+        success: true,
+        usage: this.#extractUsage(attempt.response),
+      });
+      return attempt.result;
+    } catch (error) {
+      this.#recordInteraction({
+        method,
+        promptHash,
+        schemaName: schema.name,
+        durationMs: performanceNow() - start,
+        startedAt: startWallClock,
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  }
+
+  #recordInteraction(payload: {
+    method: "structured" | "tool";
+    promptHash: string;
+    schemaName: string;
+    durationMs: number;
+    startedAt: number;
+    success: boolean;
+    usage?: GPTUsageMetrics;
+    error?: string;
+  }): void {
+    const consoleApp = getDeveloperConsole();
+    if (!consoleApp) {
+      return;
+    }
+
+    consoleApp.recordGPTInteraction({
+      promptHash: payload.promptHash,
+      schemaName: payload.schemaName,
+      model: this.#config.model,
+      method: payload.method,
+      durationMs: payload.durationMs,
+      startedAt: payload.startedAt,
+      success: payload.success,
+      usage: payload.usage,
+      error: payload.error,
+    });
+  }
+
+  #extractUsage(response: unknown): GPTUsageMetrics | undefined {
+    if (!response || typeof response !== "object") {
+      return undefined;
+    }
+
+    const usage = (response as { usage?: unknown }).usage;
+    if (!usage || typeof usage !== "object") {
+      return undefined;
+    }
+
+    const metrics: GPTUsageMetrics = {};
+    const candidate = usage as Record<string, unknown>;
+
+    const input = candidate.input_tokens ?? candidate.prompt_tokens ?? candidate.total_input_tokens;
+    if (typeof input === "number") {
+      metrics.inputTokens = input;
+    }
+
+    const output = candidate.output_tokens ?? candidate.completion_tokens ?? candidate.total_output_tokens;
+    if (typeof output === "number") {
+      metrics.outputTokens = output;
+    }
+
+    const total = candidate.total_tokens ?? candidate.totalTokenCount ?? candidate.combined_tokens;
+    if (typeof total === "number") {
+      metrics.totalTokens = total;
+    }
+
+    return Object.keys(metrics).length ? metrics : undefined;
   }
 
   #extractJson<T>(response: unknown, schema: JsonSchemaDefinition): T {
