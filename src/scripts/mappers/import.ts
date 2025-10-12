@@ -8,6 +8,65 @@ const DEFAULT_STRIKE_IMAGE = "systems/pf2e/icons/default-icons/melee.svg" as con
 const DEFAULT_SPELL_IMAGE = "systems/pf2e/icons/default-icons/spell.svg" as const;
 const DEFAULT_SPELLCASTING_IMAGE = "systems/pf2e/icons/default-icons/spellcastingEntry.svg" as const;
 
+type Pf2eFrequencyInterval = "round" | "turn" | "PT1M" | "PT10M" | "PT1H" | "day";
+
+const PF2E_FREQUENCY_INTERVALS = new Set<Pf2eFrequencyInterval>([
+  "round",
+  "turn",
+  "PT1M",
+  "PT10M",
+  "PT1H",
+  "day",
+]);
+
+function normalizeTraitKey(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function getPf2eActionTraits(): Set<string> {
+  const config = (globalThis as { CONFIG?: unknown }).CONFIG;
+  const pf2eConfig = (config as { PF2E?: unknown })?.PF2E;
+  const traitSource = (pf2eConfig as { actionTraits?: unknown })?.actionTraits;
+
+  const traits = new Set<string>();
+
+  const collect = (value: unknown): void => {
+    if (!value) return;
+    if (Array.isArray(value)) {
+      for (const entry of value) {
+        if (typeof entry === "string") {
+          const normalized = normalizeTraitKey(entry);
+          if (normalized) traits.add(normalized);
+        }
+      }
+      return;
+    }
+    if (value instanceof Map) {
+      for (const key of value.keys()) {
+        if (typeof key === "string") {
+          const normalized = normalizeTraitKey(key);
+          if (normalized) traits.add(normalized);
+        }
+      }
+      return;
+    }
+    if (typeof value === "object") {
+      for (const key of Object.keys(value as Record<string, unknown>)) {
+        const normalized = normalizeTraitKey(key);
+        if (normalized) traits.add(normalized);
+      }
+    }
+  };
+
+  collect(traitSource);
+
+  return traits;
+}
+
 type ActorSpellcastingEntry = NonNullable<ActorSchemaData["spellcasting"]>[number];
 
 const ACTION_TYPE_MAP: Record<ActionSchemaData["actionType"], { value: string; count: number | null }> = {
@@ -139,7 +198,7 @@ type FoundryActorActionSource = {
     description: { value: string; gm: string };
     requirements: { value: string };
     trigger: { value: string };
-    frequency: { value: string };
+    frequency: FoundryFrequencySource | null;
     rules: unknown[];
     publication: { title: string; authors: string; license: string; remaster: boolean };
   };
@@ -147,6 +206,12 @@ type FoundryActorActionSource = {
   folder: null;
   sort: number;
   flags: Record<string, unknown>;
+};
+
+type FoundryFrequencySource = {
+  value?: number;
+  max: number;
+  per: Pf2eFrequencyInterval;
 };
 
 type FoundryActorSpellcastingEntrySource = {
@@ -915,6 +980,151 @@ const ACTION_COST_SYSTEM_MAP: Record<ActorSchemaData["actions"][number]["actionC
   passive: { type: "passive", value: null },
 };
 
+const FREQUENCY_NUMBER_WORDS: Record<string, number> = {
+  once: 1,
+  twice: 2,
+  thrice: 3,
+  single: 1,
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+};
+
+function sanitizeActionTraits(
+  traits: ActorSchemaData["actions"][number]["traits"],
+): { value: string[]; otherTags: string[] } {
+  if (!Array.isArray(traits)) {
+    return { value: [], otherTags: [] };
+  }
+
+  const allowed: string[] = [];
+  const extra: string[] = [];
+  const seenAllowed = new Set<string>();
+  const seenExtra = new Set<string>();
+  const pf2eTraits = getPf2eActionTraits();
+  const allowUnknown = pf2eTraits.size === 0;
+
+  for (const value of traits) {
+    if (typeof value !== "string") {
+      continue;
+    }
+
+    const normalized = normalizeTraitKey(value);
+
+    if (!normalized) {
+      continue;
+    }
+
+    if (allowUnknown || pf2eTraits.has(normalized)) {
+      if (!seenAllowed.has(normalized)) {
+        allowed.push(normalized);
+        seenAllowed.add(normalized);
+      }
+      continue;
+    }
+
+    if (!seenExtra.has(normalized)) {
+      extra.push(normalized);
+      seenExtra.add(normalized);
+    }
+  }
+
+  return { value: allowed, otherTags: extra };
+}
+
+function parseFrequencyCount(token: string): number | null {
+  const trimmed = token.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const known = FREQUENCY_NUMBER_WORDS[trimmed];
+  if (known !== undefined) {
+    return known;
+  }
+  const numeric = Number.parseInt(trimmed, 10);
+  return Number.isNaN(numeric) ? null : numeric;
+}
+
+function normalizeFrequencyUnit(text: string): Pf2eFrequencyInterval | null {
+  const cleaned = text.split(/[()]/)[0]?.trim();
+  if (!cleaned) {
+    return null;
+  }
+  const normalized = cleaned.replace(/\s+/g, " ");
+  if (/round/.test(normalized)) {
+    return "round";
+  }
+  if (/turn/.test(normalized)) {
+    return "turn";
+  }
+  if (/10\s*-?\s*minute/.test(normalized)) {
+    return "PT10M";
+  }
+  if (/minute/.test(normalized)) {
+    return "PT1M";
+  }
+  if (/hour/.test(normalized)) {
+    return "PT1H";
+  }
+  if (/day/.test(normalized)) {
+    return "day";
+  }
+  return null;
+}
+
+function parseActionFrequency(raw: unknown): FoundryFrequencySource | null {
+  if (typeof raw !== "string") {
+    return null;
+  }
+
+  const normalized = raw.replace(/[\u2013\u2014]/g, "-").replace(/\s+/g, " ").trim().toLowerCase();
+  if (!normalized) {
+    return null;
+  }
+
+  let count: number | null = null;
+  let unitText: string | null = null;
+
+  const slashMatch = normalized.match(/(\d+)\s*\/\s*(round|turn|day|hour|minute|minutes|10\s*minutes)/);
+  if (slashMatch) {
+    count = Number.parseInt(slashMatch[1], 10);
+    unitText = slashMatch[2];
+  } else {
+    const perMatch = normalized.match(
+      /(once|twice|thrice|single|one|two|three|four|five|six|seven|eight|nine|ten|\d+)(?:\s+times?)?\s+(?:per|each|every)\s+([a-z0-9\s-]+)/,
+    );
+    if (perMatch) {
+      count = parseFrequencyCount(perMatch[1]);
+      unitText = perMatch[2];
+    }
+  }
+
+  if (!unitText) {
+    return null;
+  }
+
+  const per = normalizeFrequencyUnit(unitText);
+  if (!per || !PF2E_FREQUENCY_INTERVALS.has(per)) {
+    return null;
+  }
+
+  const uses = count ?? 1;
+  const max = Math.max(1, uses);
+  return {
+    value: max,
+    max,
+    per,
+  };
+}
+
+
 function createStrikeItem(
   actor: ActorSchemaData,
   strike: ActorSchemaData["strikes"][number],
@@ -964,6 +1174,8 @@ function createActionItem(
   index: number,
 ): FoundryActorActionSource {
   const { type, value } = ACTION_COST_SYSTEM_MAP[action.actionCost];
+  const traits = sanitizeActionTraits(action.traits);
+  const frequency = parseActionFrequency(action.frequency);
   const details: string[] = [];
   if (action.requirements) {
     details.push(`**Requirements** ${action.requirements}`);
@@ -987,13 +1199,13 @@ function createActionItem(
       actions: { value },
       category: "offensive",
       traits: {
-        value: (action.traits ?? []).map((trait) => trait.toLowerCase()),
-        otherTags: [],
+        value: traits.value,
+        otherTags: traits.otherTags,
       },
       description: { value: description, gm: "" },
       requirements: { value: action.requirements ?? "" },
       trigger: { value: action.trigger ?? "" },
-      frequency: { value: action.frequency ?? "" },
+      frequency: frequency,
       rules: [],
       publication: { title: "", authors: "", license: "OGL", remaster: false },
     },

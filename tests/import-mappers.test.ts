@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { beforeEach, test } from "node:test";
-import { importAction, toFoundryActionData } from "../src/scripts/mappers/import";
-import type { ActionSchemaData } from "../src/scripts/schemas";
+import { importAction, toFoundryActionData, toFoundryActorData } from "../src/scripts/mappers/import";
+import type { ActionSchemaData, ActorSchemaData } from "../src/scripts/schemas";
 import { cloneFixture, loadFixture } from "./helpers/fixtures";
 
 class MockItem {
@@ -79,6 +79,8 @@ class MockCollection<T extends { id: string }> extends Map<string, T> {
 
 const actionFixture = loadFixture<ActionSchemaData>("action.json");
 const createAction = (): ActionSchemaData => cloneFixture(actionFixture);
+const actorFixture = loadFixture<ActorSchemaData>("actor.json");
+const createActor = (): ActorSchemaData => cloneFixture(actorFixture);
 
 beforeEach(() => {
   MockItem.nextId = 1;
@@ -92,6 +94,15 @@ beforeEach(() => {
     user: { isGM: true },
     system: { id: "pf2e" }
   } satisfies Partial<Game>;
+
+  (globalThis as any).CONFIG = {
+    PF2E: {
+      actionTraits: {
+        fire: "Fire",
+        magical: "Magical",
+      },
+    },
+  } satisfies Partial<typeof CONFIG>;
 
   Object.defineProperty(globalThis, "Item", {
     configurable: true,
@@ -172,6 +183,29 @@ test("importAction creates a new world item when no match is found", async () =>
   const result = await importAction(createAction());
   assert.equal(result.name, "Stunning Strike");
   assert.equal(MockItem.created.length, 1);
+});
+
+test("toFoundryActorData filters action traits and normalizes frequency", () => {
+  const actor = createActor();
+  actor.actions = [
+    {
+      name: "Fiery Breath",
+      actionCost: "two-actions",
+      description: "Breathes fire.",
+      traits: ["fire", "evocation", "magical"],
+      requirements: null,
+      trigger: null,
+      frequency: "once per minute",
+    },
+  ];
+
+  const result = toFoundryActorData(actor);
+  const actionItem = result.items.find((item) => item.type === "action" && item.name === "Fiery Breath");
+
+  assert.ok(actionItem, "expected Fiery Breath action to be generated");
+  assert.deepEqual(actionItem!.system.traits.value, ["fire", "magical"]);
+  assert.deepEqual(actionItem!.system.traits.otherTags, ["evocation"]);
+  assert.deepEqual(actionItem!.system.frequency, { value: 1, max: 1, per: "PT1M" });
 });
 
 test("importAction rejects payloads for the wrong system", async () => {
