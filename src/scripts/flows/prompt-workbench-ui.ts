@@ -76,6 +76,7 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
         display: flex;
         flex-direction: column;
         gap: 1rem;
+        min-width: 640px;
       }
 
       .handy-dandy-workbench-grid {
