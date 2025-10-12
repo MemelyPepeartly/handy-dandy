@@ -1,4 +1,4 @@
-import { SYSTEM_IDS, type SystemId } from "../schemas/index";
+import { SYSTEM_IDS, type PublicationData, type SystemId } from "../schemas/index";
 
 export interface CorrectionContext {
   readonly summary: string;
@@ -62,4 +62,29 @@ export function wrapPrompt(
   return sections
     .filter((section) => section.length > 0)
     .join("\n\n");
+}
+
+export function renderPublicationSection(publication?: PublicationData): string {
+  if (!publication) return "";
+
+  const title = publication.title?.trim() ?? "";
+  const authors = publication.authors?.trim() ?? "";
+  const license = publication.license?.trim() ?? "";
+  const remaster = publication.remaster ? "true" : "false";
+
+  return [
+    "Publication metadata:",
+    `- Title: ${title}`,
+    `- Authors: ${authors}`,
+    `- License: ${license}`,
+    `- Remaster: ${remaster}`,
+    "Set the publication object in the JSON to match these values exactly.",
+  ].join("\n");
+}
+
+export function renderImageInstruction(img?: string): string {
+  const trimmed = img?.trim();
+  if (!trimmed) return "";
+
+  return `Set the top-level \"img\" property to \"${trimmed}\".`;
 }

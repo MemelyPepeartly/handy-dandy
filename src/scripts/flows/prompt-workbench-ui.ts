@@ -3,10 +3,11 @@ import {
   collectFailureMessages,
   exportSelectedEntities,
   generateWorkbenchEntry,
+  DEFAULT_IMAGE_PATH,
   type PromptWorkbenchRequest,
   type PromptWorkbenchResult,
 } from "./prompt-workbench";
-import { SYSTEM_IDS, type EntityType, type SystemId } from "../schemas";
+import { SYSTEM_IDS, type EntityType, type PublicationData, type SystemId } from "../schemas";
 
 export async function runExportSelectionFlow(): Promise<void> {
   try {
@@ -94,6 +95,31 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
         <label>Slug (optional)</label>
         <input type="text" name="slug" />
       </div>
+      <fieldset class="form-group">
+        <legend>Publication Details</legend>
+        <div class="form-group">
+          <label>Title</label>
+          <input type="text" name="publicationTitle" value="" />
+        </div>
+        <div class="form-group">
+          <label>Authors</label>
+          <input type="text" name="publicationAuthors" value="" />
+        </div>
+        <div class="form-group">
+          <label>License</label>
+          <input type="text" name="publicationLicense" value="OGL" />
+        </div>
+        <div class="form-group form-fields">
+          <label>
+            <input type="checkbox" name="publicationRemaster" /> Remaster
+          </label>
+        </div>
+      </fieldset>
+      <div class="form-group">
+        <label>Image Path</label>
+        <input type="text" name="img" value="${DEFAULT_IMAGE_PATH}" />
+        <p class="notes">Provide a Foundry asset path or URL for the generated image.</p>
+      </div>
       <div class="form-group">
         <label>Reference Text or Prompt</label>
         <textarea name="referenceText" rows="8" style="width: 100%;" required></textarea>
@@ -117,6 +143,11 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
       systemId: string;
       entryName: string;
       slug: string;
+      publicationTitle: string;
+      publicationAuthors: string;
+      publicationLicense: string;
+      publicationRemaster: string | null;
+      img: string;
       referenceText: string;
       seed: string;
       maxAttempts: string;
@@ -141,6 +172,11 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
         systemId: String(formData.get("systemId") ?? ""),
         entryName: String(formData.get("entryName") ?? ""),
         slug: String(formData.get("slug") ?? ""),
+        publicationTitle: String(formData.get("publicationTitle") ?? ""),
+        publicationAuthors: String(formData.get("publicationAuthors") ?? ""),
+        publicationLicense: String(formData.get("publicationLicense") ?? ""),
+        publicationRemaster: formData.get("publicationRemaster") as string | null,
+        img: String(formData.get("img") ?? ""),
         referenceText: String(formData.get("referenceText") ?? ""),
         seed: String(formData.get("seed") ?? ""),
         maxAttempts: String(formData.get("maxAttempts") ?? ""),
@@ -179,6 +215,15 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
     return null;
   }
 
+  const publication: PublicationData = {
+    title: response.publicationTitle.trim(),
+    authors: response.publicationAuthors.trim(),
+    license: response.publicationLicense.trim(),
+    remaster: Boolean(response.publicationRemaster),
+  };
+
+  const img = response.img.trim() || DEFAULT_IMAGE_PATH;
+
   return {
     type,
     systemId,
@@ -189,6 +234,8 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
     maxAttempts: parseOptionalNumber(response.maxAttempts),
     packId: response.packId.trim() || undefined,
     folderId: response.folderId.trim() || undefined,
+    publication,
+    img,
   } satisfies PromptWorkbenchRequest<EntityType>;
 }
 
