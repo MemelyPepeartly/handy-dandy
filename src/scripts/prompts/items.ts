@@ -1,5 +1,6 @@
 import {
   ITEM_CATEGORIES,
+  PUBLICATION_DEFAULT,
   RARITIES,
   itemSchema,
   type PublicationData,
@@ -35,9 +36,7 @@ function buildItemSchemaSection(): string {
     (itemSchema.properties.img as { default: string | null }).default
   );
   const sourceDefault = (itemSchema.properties.source as { default: string }).default;
-  const publicationDefault = JSON.stringify(
-    (itemSchema.properties.publication as { default: PublicationData }).default
-  );
+  const publicationDefault = JSON.stringify(PUBLICATION_DEFAULT);
   return [
     "Item schema overview:",
     `- schema_version: integer literal ${schemaVersion}.`,

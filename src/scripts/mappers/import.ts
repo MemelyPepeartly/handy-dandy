@@ -150,6 +150,7 @@ type FoundryActionSource = {
     actions: { value: number | null };
     requirements: { value: string };
     source: { value: string };
+    publication: { title: string; authors: string; license: string; remaster: boolean };
     rules: unknown[];
   };
   folder?: string;
@@ -166,6 +167,7 @@ type FoundryItemSource = {
     level: { value: number };
     price: { value: Record<string, number> };
     source: { value: string };
+    publication: { title: string; authors: string; license: string; remaster: boolean };
     rules: unknown[];
   };
   folder?: string;

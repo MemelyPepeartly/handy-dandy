@@ -1,5 +1,6 @@
 import {
   ACTION_EXECUTIONS,
+  PUBLICATION_DEFAULT,
   RARITIES,
   actionSchema,
   type PublicationData,
@@ -35,9 +36,7 @@ function buildActionSchemaSection(): string {
     (actionSchema.properties.img as { default: string | null }).default
   );
   const sourceDefault = (actionSchema.properties.source as { default: string }).default;
-  const publicationDefault = JSON.stringify(
-    (actionSchema.properties.publication as { default: PublicationData }).default
-  );
+  const publicationDefault = JSON.stringify(PUBLICATION_DEFAULT);
   return [
     "Action schema overview:",
     `- schema_version: integer literal ${schemaVersion}.`,
