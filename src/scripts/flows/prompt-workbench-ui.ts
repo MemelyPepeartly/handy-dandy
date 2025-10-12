@@ -7,7 +7,42 @@ import {
   type PromptWorkbenchRequest,
   type PromptWorkbenchResult,
 } from "./prompt-workbench";
-import { SYSTEM_IDS, type EntityType, type PublicationData, type SystemId } from "../schemas";
+import {
+  SYSTEM_IDS,
+  type EntityType,
+  type GeneratedEntityMap,
+  type PublicationData,
+  type SystemId,
+} from "../schemas";
+import { importAction, importActor } from "../mappers/import";
+
+interface WorkbenchHistoryEntry {
+  readonly id: string;
+  readonly result: PromptWorkbenchResult<EntityType>;
+  readonly json: string;
+  readonly importerAvailable: boolean;
+  readonly timestamp: number;
+}
+
+const WORKBENCH_HISTORY_LIMIT = 12;
+const WORKBENCH_HISTORY_STORAGE_KEY = `${CONSTANTS.MODULE_ID}.workbenchHistory` as const;
+
+type SerializableWorkbenchResult = Pick<
+  PromptWorkbenchResult<EntityType>,
+  "type" | "name" | "data" | "input"
+>;
+
+interface StoredWorkbenchHistoryEntry {
+  readonly id: string;
+  readonly json: string;
+  readonly timestamp: number;
+  readonly importerAvailable: boolean;
+  readonly result: SerializableWorkbenchResult;
+}
+
+const workbenchHistory: WorkbenchHistoryEntry[] = [];
+
+initialiseWorkbenchHistory();
 
 export async function runExportSelectionFlow(): Promise<void> {
   try {
@@ -70,8 +105,54 @@ export async function runPromptWorkbenchFlow(): Promise<void> {
 
 async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityType> | null> {
   const systemOptions = SYSTEM_IDS.map((id) => `<option value="${id}">${id.toUpperCase()}</option>`).join("");
+  const initialHistoryId = workbenchHistory[0]?.id;
+  const historyListMarkup = buildHistoryListMarkup(initialHistoryId);
+  const historyPlaceholder = buildHistoryViewPlaceholder();
+
   const content = `
     <style>
+      .handy-dandy-workbench-request {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        min-width: 720px;
+      }
+
+      .handy-dandy-workbench-tabs {
+        display: flex;
+        gap: 0.5rem;
+        border-bottom: 1px solid var(--color-border-dark, #333);
+        padding-bottom: 0.25rem;
+      }
+
+      .handy-dandy-workbench-tab {
+        appearance: none;
+        background: var(--color-bg-alt, rgba(255, 255, 255, 0.05));
+        border: 1px solid var(--color-border-dark, #333);
+        border-bottom: none;
+        border-radius: 6px 6px 0 0;
+        color: inherit;
+        cursor: pointer;
+        font-weight: 600;
+        padding: 0.35rem 0.9rem;
+        transition: background 0.2s ease, color 0.2s ease;
+      }
+
+      .handy-dandy-workbench-tab.active {
+        background: var(--color-border-light-1, rgba(255, 255, 255, 0.12));
+        color: var(--color-text-bright, #f0f0f0);
+      }
+
+      .handy-dandy-workbench-panel {
+        display: none;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+
+      .handy-dandy-workbench-panel.active {
+        display: flex;
+      }
+
       .handy-dandy-workbench-form {
         display: flex;
         flex-direction: column;
@@ -106,114 +187,286 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
         grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
         align-items: center;
       }
-    </style>
-    <form class="handy-dandy-workbench-form">
-      <div class="handy-dandy-workbench-grid">
-        <div class="form-group">
-          <label>Entity Type</label>
-          <select name="entityType">
-            <option value="actor">Actor</option>
-            <option value="action">Action</option>
-            <option value="item">Item</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Game System</label>
-          <select name="systemId">
-            ${systemOptions}
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Name / Title</label>
-          <input type="text" name="entryName" required />
-          <p class="notes">Use the actor name, action title, or item name you want in Foundry.</p>
-        </div>
-        <div class="form-group">
-          <label>Slug (optional)</label>
-          <input type="text" name="slug" />
-        </div>
-      </div>
-      <fieldset class="form-group">
-        <legend>Publication Details</legend>
-        <div class="form-fields">
-          <label>Title <input type="text" name="publicationTitle" value="" /></label>
-          <label>Authors <input type="text" name="publicationAuthors" value="" /></label>
-          <label>License <input type="text" name="publicationLicense" value="OGL" /></label>
-          <label><input type="checkbox" name="publicationRemaster" /> Remaster</label>
-        </div>
-      </fieldset>
-      <div class="handy-dandy-workbench-grid">
-        <div class="form-group">
-          <label>Image Path</label>
-          <input type="text" name="img" value="${DEFAULT_IMAGE_PATH}" />
-          <p class="notes">Provide a Foundry asset path or URL for the generated image.</p>
-        </div>
-        <fieldset class="form-group">
-          <legend>Advanced Options</legend>
-          <div class="form-fields">
-            <label>Seed <input type="number" name="seed" /></label>
-            <label>Max Attempts <input type="number" name="maxAttempts" min="1" /></label>
-            <label>Compendium Pack ID <input type="text" name="packId" /></label>
-            <label>Folder ID <input type="text" name="folderId" /></label>
-          </div>
-        </fieldset>
-      </div>
-      <div class="form-group">
-        <label>Reference Text or Prompt</label>
-        <textarea name="referenceText" required></textarea>
-        <p class="notes">Paste rules text, stat blocks, or a creative prompt for the generator to follow.</p>
-      </div>
-    </form>
-  `;
 
-  const response = await Dialog.prompt<
-    {
-      entityType: string;
-      systemId: string;
-      entryName: string;
-      slug: string;
-      publicationTitle: string;
-      publicationAuthors: string;
-      publicationLicense: string;
-      publicationRemaster: string | null;
-      img: string;
-      referenceText: string;
-      seed: string;
-      maxAttempts: string;
-      packId: string;
-      folderId: string;
-    } | null,
-    undefined,
-    { jQuery: true }
-  >({
-    title: `${CONSTANTS.MODULE_NAME} | Prompt Workbench`,
-    content,
-    label: "Generate",
-    callback: (html) => {
-      const form = html[0]?.querySelector("form");
-      if (!form) {
-        return null;
+      .handy-dandy-workbench-history {
+        display: flex;
+        gap: 1rem;
+        min-height: 18rem;
       }
 
-      const formData = new FormData(form as HTMLFormElement);
-      return {
-        entityType: String(formData.get("entityType") ?? ""),
-        systemId: String(formData.get("systemId") ?? ""),
-        entryName: String(formData.get("entryName") ?? ""),
-        slug: String(formData.get("slug") ?? ""),
-        publicationTitle: String(formData.get("publicationTitle") ?? ""),
-        publicationAuthors: String(formData.get("publicationAuthors") ?? ""),
-        publicationLicense: String(formData.get("publicationLicense") ?? ""),
-        publicationRemaster: formData.get("publicationRemaster") as string | null,
-        img: String(formData.get("img") ?? ""),
-        referenceText: String(formData.get("referenceText") ?? ""),
-        seed: String(formData.get("seed") ?? ""),
-        maxAttempts: String(formData.get("maxAttempts") ?? ""),
-        packId: String(formData.get("packId") ?? ""),
-        folderId: String(formData.get("folderId") ?? ""),
-      };
-    },
-    options: { jQuery: true, width: 680 },
+      .handy-dandy-workbench-history-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        width: 240px;
+        max-height: 24rem;
+        overflow-y: auto;
+      }
+
+      .handy-dandy-workbench-history-item {
+        align-items: stretch;
+        background: var(--color-bg-alt, rgba(255, 255, 255, 0.05));
+        border: 1px solid var(--color-border-dark, #333);
+        border-radius: 6px;
+        display: flex;
+        gap: 0.35rem;
+        padding: 0.3rem;
+        transition: border-color 0.2s ease, background 0.2s ease;
+      }
+
+      .handy-dandy-workbench-history-item.active {
+        border-color: var(--color-border-highlight, #ff8c00);
+        background: var(--color-border-light-1, rgba(255, 255, 255, 0.12));
+      }
+
+      .handy-dandy-workbench-history-select {
+        appearance: none;
+        background: transparent;
+        border: none;
+        color: inherit;
+        cursor: pointer;
+        flex: 1;
+        padding: 0.15rem 0.25rem;
+        text-align: left;
+      }
+
+      .handy-dandy-workbench-history-select:focus {
+        outline: none;
+      }
+
+      .handy-dandy-workbench-history-select .handy-dandy-workbench-history-name {
+        display: block;
+        font-weight: 600;
+        margin-bottom: 0.2rem;
+      }
+
+      .handy-dandy-workbench-history-select .handy-dandy-workbench-history-meta {
+        color: var(--color-text-light-6, #bbb);
+        display: block;
+        font-size: 0.85rem;
+      }
+
+      .handy-dandy-workbench-history-delete {
+        appearance: none;
+        background: transparent;
+        border: none;
+        border-radius: 4px;
+        color: var(--color-text-light-6, #bbb);
+        cursor: pointer;
+        padding: 0.25rem;
+        align-self: center;
+        transition: color 0.2s ease, background 0.2s ease;
+      }
+
+      .handy-dandy-workbench-history-delete:hover,
+      .handy-dandy-workbench-history-delete:focus-visible {
+        color: var(--color-text-bright, #f0f0f0);
+        background: var(--color-border-dark, rgba(255, 255, 255, 0.1));
+        outline: none;
+      }
+
+      .handy-dandy-workbench-history-view {
+        border: 1px solid var(--color-border-dark, #333);
+        border-radius: 6px;
+        flex: 1;
+        min-height: 18rem;
+        padding: 0.75rem;
+        overflow: auto;
+        background: var(--color-bg-alt, rgba(255, 255, 255, 0.04));
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+
+      .handy-dandy-workbench-history-empty {
+        color: var(--color-text-light-6, #bbb);
+        font-size: 0.95rem;
+        padding: 0.5rem 0;
+      }
+
+      .handy-dandy-workbench-request .notes {
+        color: var(--color-text-light-6, #bbb);
+        font-size: 0.9rem;
+        margin: 0;
+      }
+    </style>
+    <div class="handy-dandy-workbench-request">
+      <nav class="handy-dandy-workbench-tabs">
+        <button type="button" class="handy-dandy-workbench-tab active" data-tab="prompt">Prompt</button>
+        <button type="button" class="handy-dandy-workbench-tab" data-tab="history">History</button>
+      </nav>
+      <section class="handy-dandy-workbench-panel active" data-panel="prompt">
+        <form class="handy-dandy-workbench-form">
+          <div class="handy-dandy-workbench-grid">
+            <div class="form-group">
+              <label>Entity Type</label>
+              <select name="entityType">
+                <option value="actor">Actor</option>
+                <option value="action">Action</option>
+                <option value="item">Item</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Game System</label>
+              <select name="systemId">
+                ${systemOptions}
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Name / Title</label>
+              <input type="text" name="entryName" required />
+              <p class="notes">Use the actor name, action title, or item name you want in Foundry.</p>
+            </div>
+            <div class="form-group">
+              <label>Slug (optional)</label>
+              <input type="text" name="slug" />
+            </div>
+          </div>
+          <fieldset class="form-group">
+            <legend>Publication Details</legend>
+            <div class="form-fields">
+              <label>Title <input type="text" name="publicationTitle" value="" /></label>
+              <label>Authors <input type="text" name="publicationAuthors" value="" /></label>
+              <label>License <input type="text" name="publicationLicense" value="OGL" /></label>
+              <label><input type="checkbox" name="publicationRemaster" /> Remaster</label>
+            </div>
+          </fieldset>
+          <div class="handy-dandy-workbench-grid">
+            <div class="form-group">
+              <label>Image Path</label>
+              <input type="text" name="img" value="${DEFAULT_IMAGE_PATH}" />
+              <p class="notes">Provide a Foundry asset path or URL for the generated image.</p>
+            </div>
+            <fieldset class="form-group">
+              <legend>Advanced Options</legend>
+              <div class="form-fields">
+                <label>Seed <input type="number" name="seed" /></label>
+                <label>Max Attempts <input type="number" name="maxAttempts" min="1" /></label>
+                <label>Compendium Pack ID <input type="text" name="packId" /></label>
+                <label>Folder ID <input type="text" name="folderId" /></label>
+              </div>
+            </fieldset>
+          </div>
+          <div class="form-group">
+            <label>Reference Text or Prompt</label>
+            <textarea name="referenceText" required></textarea>
+            <p class="notes">Paste rules text, stat blocks, or a creative prompt for the generator to follow.</p>
+          </div>
+        </form>
+      </section>
+      <section class="handy-dandy-workbench-panel" data-panel="history">
+        <div class="handy-dandy-workbench-history">
+          <aside class="handy-dandy-workbench-history-list" data-history-list>
+            ${historyListMarkup}
+          </aside>
+          <div class="handy-dandy-workbench-history-view" data-history-view>${historyPlaceholder}</div>
+        </div>
+        <p class="notes">History entries persist locally in this browser. Remove any that you no longer need.</p>
+      </section>
+    </div>
+  `;
+
+  const response = await new Promise<
+    | {
+        entityType: string;
+        systemId: string;
+        entryName: string;
+        slug: string;
+        publicationTitle: string;
+        publicationAuthors: string;
+        publicationLicense: string;
+        publicationRemaster: string | null;
+        img: string;
+        referenceText: string;
+        seed: string;
+        maxAttempts: string;
+        packId: string;
+        folderId: string;
+      }
+    | null
+  >((resolve) => {
+    let settled = false;
+    const finish = (
+      value: | {
+        entityType: string;
+        systemId: string;
+        entryName: string;
+        slug: string;
+        publicationTitle: string;
+        publicationAuthors: string;
+        publicationLicense: string;
+        publicationRemaster: string | null;
+        img: string;
+        referenceText: string;
+        seed: string;
+        maxAttempts: string;
+        packId: string;
+        folderId: string;
+      }
+      | null,
+    ): void => {
+      if (!settled) {
+        settled = true;
+        resolve(value);
+      }
+    };
+
+    const dialog = new Dialog(
+      {
+        title: `${CONSTANTS.MODULE_NAME} | Prompt Workbench`,
+        content,
+        buttons: {
+          generate: {
+            icon: '<i class="fas fa-magic"></i>',
+            label: "Generate",
+            callback: (html) => {
+              const form = html[0]?.querySelector("form");
+              if (!form) {
+                finish(null);
+                return;
+              }
+
+              const formData = new FormData(form as HTMLFormElement);
+              finish({
+                entityType: String(formData.get("entityType") ?? ""),
+                systemId: String(formData.get("systemId") ?? ""),
+                entryName: String(formData.get("entryName") ?? ""),
+                slug: String(formData.get("slug") ?? ""),
+                publicationTitle: String(formData.get("publicationTitle") ?? ""),
+                publicationAuthors: String(formData.get("publicationAuthors") ?? ""),
+                publicationLicense: String(formData.get("publicationLicense") ?? ""),
+                publicationRemaster: formData.get("publicationRemaster") as string | null,
+                img: String(formData.get("img") ?? ""),
+                referenceText: String(formData.get("referenceText") ?? ""),
+                seed: String(formData.get("seed") ?? ""),
+                maxAttempts: String(formData.get("maxAttempts") ?? ""),
+                packId: String(formData.get("packId") ?? ""),
+                folderId: String(formData.get("folderId") ?? ""),
+              });
+            },
+          },
+          cancel: {
+            icon: '<i class="fas fa-times"></i>',
+            label: "Cancel",
+            callback: () => finish(null),
+          },
+        },
+        default: "generate",
+        close: () => finish(null),
+      },
+      { jQuery: true, width: 820 },
+    );
+
+    const hookId = Hooks.on("renderDialog", (app: Dialog, html: JQuery) => {
+      if (app !== dialog) {
+        return;
+      }
+
+      Hooks.off("renderDialog", hookId);
+      setupWorkbenchRequestDialog(html);
+    });
+
+    dialog.render(true);
   });
 
   if (!response) {
@@ -319,37 +572,33 @@ function showGeneratingDialog(request: PromptWorkbenchRequest<EntityType>): Dial
 
 async function showWorkbenchResult(result: PromptWorkbenchResult<EntityType>): Promise<void> {
   const json = JSON.stringify(result.data, null, 2);
-  const escaped = escapeJsonForTextarea(json);
   const importerAvailable = typeof result.importer === "function";
+  const currentEntry = recordHistoryEntry(result, json, importerAvailable);
 
-  const content = `
-    <form class="handy-dandy-workbench-result">
-      <style>
-        .handy-dandy-workbench-result {
-          display: flex;
-          flex-direction: column;
-          gap: 0.75rem;
-        }
-
-        .handy-dandy-workbench-result textarea {
-          min-height: 16rem;
-          resize: vertical;
-          width: 100%;
-        }
-      </style>
-      <p class="notes">Review the generated JSON below. Use the buttons to copy, download, or import.</p>
-      <textarea name="generatedJson" rows="16" readonly>${escaped}</textarea>
-    </form>
-  `;
+  const content = buildWorkbenchDialogContent(currentEntry);
 
   return new Promise((resolve) => {
     const dialog = new Dialog({
-      title: `${CONSTANTS.MODULE_NAME} | ${result.name}`,
+      title: `${CONSTANTS.MODULE_NAME} | Prompt Workbench`,
       content,
-      buttons: buildResultButtons(result, json, importerAvailable),
+      buttons: {
+        close: {
+          icon: '<i class="fas fa-check"></i>',
+          label: "Close",
+        },
+      },
       close: () => resolve(),
       default: "close",
-    }, { jQuery: true, width: 700 });
+    }, { jQuery: true, width: 760 });
+
+    const hookId = Hooks.on("renderDialog", (app: Dialog, html: JQuery) => {
+      if (app !== dialog) {
+        return;
+      }
+
+      Hooks.off("renderDialog", hookId);
+      setupWorkbenchResultDialog(html, currentEntry);
+    });
 
     dialog.render(true);
   });
@@ -359,66 +608,791 @@ function escapeJsonForTextarea(json: string): string {
   return escapeHtml(json);
 }
 
-function buildResultButtons(
-  result: PromptWorkbenchResult<EntityType>,
-  json: string,
-  importerAvailable: boolean,
-): Record<string, Dialog.Button> {
-  const filenameSlug = result.data.slug || result.name.toLowerCase().replace(/\s+/g, "-");
-  const filename = `${filenameSlug || "generated-entry"}.json`;
+function initialiseWorkbenchHistory(): void {
+  const storedEntries = loadStoredWorkbenchHistory();
+  if (!storedEntries.length) {
+    return;
+  }
 
-  const buttons: Record<string, Dialog.Button> = {
-    copy: {
-      icon: '<i class="fas fa-copy"></i>',
-      label: "Copy JSON",
-      callback: async () => {
-        try {
-          await navigator.clipboard.writeText(json);
-          ui.notifications?.info(`${CONSTANTS.MODULE_NAME} | Copied JSON to clipboard.`);
-        } catch (error) {
-          ui.notifications?.warn(`${CONSTANTS.MODULE_NAME} | Clipboard copy failed.`);
-          console.warn(`${CONSTANTS.MODULE_NAME} | Clipboard copy failed`, error);
-        }
-      },
+  workbenchHistory.splice(0, workbenchHistory.length, ...storedEntries);
+}
+
+function loadStoredWorkbenchHistory(): WorkbenchHistoryEntry[] {
+  const storage = getHistoryStorage();
+  if (!storage) {
+    return [];
+  }
+
+  try {
+    const raw = storage.getItem(WORKBENCH_HISTORY_STORAGE_KEY);
+    if (!raw) {
+      return [];
+    }
+
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    const entries = parsed
+      .map((entry) => deserializeHistoryEntry(entry))
+      .filter((entry): entry is WorkbenchHistoryEntry => Boolean(entry));
+
+    return entries.slice(0, WORKBENCH_HISTORY_LIMIT);
+  } catch (error) {
+    console.warn(`${CONSTANTS.MODULE_NAME} | Failed to load prompt workbench history`, error);
+    return [];
+  }
+}
+
+function getHistoryStorage(): Storage | null {
+  const candidate = (globalThis as { localStorage?: Storage }).localStorage;
+  return typeof candidate === "object" ? candidate : null;
+}
+
+function saveWorkbenchHistory(): void {
+  const storage = getHistoryStorage();
+  if (!storage) {
+    return;
+  }
+
+  try {
+    const serializable = workbenchHistory
+      .slice(0, WORKBENCH_HISTORY_LIMIT)
+      .map((entry) => serializeHistoryEntry(entry));
+    storage.setItem(WORKBENCH_HISTORY_STORAGE_KEY, JSON.stringify(serializable));
+  } catch (error) {
+    console.warn(`${CONSTANTS.MODULE_NAME} | Failed to persist prompt workbench history`, error);
+  }
+}
+
+function serializeHistoryEntry(entry: WorkbenchHistoryEntry): StoredWorkbenchHistoryEntry {
+  return {
+    id: entry.id,
+    json: entry.json,
+    timestamp: entry.timestamp,
+    importerAvailable: entry.importerAvailable,
+    result: {
+      type: entry.result.type,
+      name: entry.result.name,
+      data: entry.result.data,
+      input: entry.result.input,
     },
-    download: {
-      icon: '<i class="fas fa-download"></i>',
-      label: "Download JSON",
-      callback: () => {
-        downloadJson(json, filename);
-      },
-    },
-    close: {
-      icon: '<i class="fas fa-check"></i>',
-      label: "Close",
+  } satisfies StoredWorkbenchHistoryEntry;
+}
+
+function deserializeHistoryEntry(value: unknown): WorkbenchHistoryEntry | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  const id = record.id;
+  const json = record.json;
+  const timestamp = record.timestamp;
+  const importerAvailable = record.importerAvailable;
+  const result = record.result;
+
+  if (typeof id !== "string" || typeof json !== "string" || typeof timestamp !== "number") {
+    return null;
+  }
+
+  if (!result || typeof result !== "object") {
+    return null;
+  }
+
+  const { type, name, data, input } = result as Record<string, unknown>;
+  if (!isEntityType(type) || typeof name !== "string" || !isObject(data) || !isObject(input)) {
+    return null;
+  }
+
+  const typedData = data as unknown as GeneratedEntityMap[EntityType];
+  const importer = Boolean(importerAvailable) ? createHistoryImporter(type, typedData) : undefined;
+  const resolvedImporterAvailable = Boolean(importer);
+
+  const historyEntry: WorkbenchHistoryEntry = {
+    id,
+    json,
+    timestamp,
+    importerAvailable: resolvedImporterAvailable,
+    result: {
+      type,
+      name,
+      data: typedData,
+      input: input as unknown as PromptWorkbenchResult<EntityType>["input"],
+      importer,
     },
   };
 
-  if (importerAvailable && result.importer) {
-    const importLabel = result.type === "actor" ? "Create Actor" : "Import to World";
-    buttons.import = {
-      icon: '<i class="fas fa-cloud-upload-alt"></i>',
-      label: importLabel,
-      callback: async () => {
-        try {
-          const document = await result.importer?.();
-          const resolvedName = result.name.trim() || result.data.name;
-          ui.notifications?.info(
-            `${CONSTANTS.MODULE_NAME} | Imported ${resolvedName}${document?.uuid ? ` (${document.uuid})` : ""}.`,
-          );
-          if (result.type === "actor" && document instanceof Actor) {
-            document.sheet?.render(true);
-          }
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          ui.notifications?.error(`${CONSTANTS.MODULE_NAME} | Import failed: ${message}`);
-          console.error(`${CONSTANTS.MODULE_NAME} | Import failed`, error);
-        }
-      },
-    } satisfies Dialog.Button;
+  return historyEntry;
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isEntityType(value: unknown): value is EntityType {
+  return value === "action" || value === "item" || value === "actor";
+}
+
+function createHistoryImporter(
+  type: EntityType,
+  data: GeneratedEntityMap[EntityType],
+): WorkbenchHistoryEntry["result"]["importer"] {
+  switch (type) {
+    case "action":
+      return () => importAction(data as GeneratedEntityMap["action"]);
+    case "actor":
+      return () => importActor(data as GeneratedEntityMap["actor"]);
+    default:
+      return undefined;
+  }
+}
+
+function recordHistoryEntry(
+  result: PromptWorkbenchResult<EntityType>,
+  json: string,
+  importerAvailable: boolean,
+): WorkbenchHistoryEntry {
+  const entry: WorkbenchHistoryEntry = {
+    id: createHistoryId(),
+    result,
+    json,
+    importerAvailable,
+    timestamp: Date.now(),
+  };
+
+  workbenchHistory.unshift(entry);
+  if (workbenchHistory.length > WORKBENCH_HISTORY_LIMIT) {
+    workbenchHistory.length = WORKBENCH_HISTORY_LIMIT;
   }
 
-  return buttons;
+  saveWorkbenchHistory();
+
+  return entry;
+}
+
+function createHistoryId(): string {
+  return `history-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function buildWorkbenchDialogContent(currentEntry: WorkbenchHistoryEntry): string {
+  const latestMarkup = buildEntryDetailMarkup(currentEntry);
+  const historyListMarkup = buildHistoryListMarkup(currentEntry.id);
+  const historyPlaceholder = buildHistoryViewPlaceholder();
+
+  return `
+    <style>
+      .handy-dandy-workbench-dialog {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+
+      .handy-dandy-workbench-tabs {
+        display: flex;
+        gap: 0.5rem;
+        border-bottom: 1px solid var(--color-border-dark, #333);
+        padding-bottom: 0.25rem;
+      }
+
+      .handy-dandy-workbench-tab {
+        appearance: none;
+        background: var(--color-bg-alt, rgba(255, 255, 255, 0.05));
+        border: 1px solid var(--color-border-dark, #333);
+        border-bottom: none;
+        border-radius: 6px 6px 0 0;
+        color: inherit;
+        cursor: pointer;
+        font-weight: 600;
+        padding: 0.35rem 0.9rem;
+        transition: background 0.2s ease, color 0.2s ease;
+      }
+
+      .handy-dandy-workbench-tab.active {
+        background: var(--color-border-light-1, rgba(255, 255, 255, 0.12));
+        color: var(--color-text-bright, #f0f0f0);
+      }
+
+      .handy-dandy-workbench-panel {
+        display: none;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+
+      .handy-dandy-workbench-panel.active {
+        display: flex;
+      }
+
+      .handy-dandy-workbench-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+      }
+
+      .handy-dandy-workbench-heading {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+      }
+
+      .handy-dandy-workbench-name {
+        margin: 0;
+        font-size: 1.35rem;
+      }
+
+      .handy-dandy-workbench-meta {
+        margin: 0;
+        color: var(--color-text-light-6, #bbb);
+        font-size: 0.9rem;
+      }
+
+      .handy-dandy-workbench-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+      }
+
+      .handy-dandy-workbench-action {
+        align-items: center;
+        appearance: none;
+        background: var(--color-border-light-1, rgba(255, 255, 255, 0.12));
+        border: 1px solid var(--color-border-dark, #333);
+        border-radius: 4px;
+        color: inherit;
+        cursor: pointer;
+        display: inline-flex;
+        font-weight: 600;
+        gap: 0.4rem;
+        padding: 0.35rem 0.75rem;
+        text-decoration: none;
+        transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+      }
+
+      .handy-dandy-workbench-action[disabled] {
+        cursor: not-allowed;
+        opacity: 0.55;
+      }
+
+      .handy-dandy-workbench-json {
+        width: 100%;
+        min-height: 16rem;
+        resize: vertical;
+      }
+
+      .handy-dandy-workbench-history {
+        display: flex;
+        gap: 1rem;
+        min-height: 18rem;
+      }
+
+      .handy-dandy-workbench-history-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        width: 240px;
+        max-height: 24rem;
+        overflow-y: auto;
+      }
+
+      .handy-dandy-workbench-history-view {
+        border: 1px solid var(--color-border-dark, #333);
+        border-radius: 6px;
+        flex: 1;
+        min-height: 18rem;
+        padding: 0.75rem;
+        overflow: auto;
+        background: var(--color-bg-alt, rgba(255, 255, 255, 0.04));
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+
+      .handy-dandy-workbench-history-empty {
+        color: var(--color-text-light-6, #bbb);
+        font-size: 0.95rem;
+        padding: 0.5rem 0;
+      }
+
+      .handy-dandy-workbench-history-view .handy-dandy-workbench-header {
+        padding: 0;
+      }
+
+      .handy-dandy-workbench-history-view .handy-dandy-workbench-json {
+        min-height: 14rem;
+      }
+
+      .handy-dandy-workbench-dialog .notes {
+        margin: 0;
+        color: var(--color-text-light-6, #bbb);
+        font-size: 0.9rem;
+      }
+
+      .handy-dandy-workbench-history-item {
+        align-items: stretch;
+        background: var(--color-bg-alt, rgba(255, 255, 255, 0.05));
+        border: 1px solid var(--color-border-dark, #333);
+        border-radius: 6px;
+        display: flex;
+        gap: 0.35rem;
+        padding: 0.3rem;
+        transition: border-color 0.2s ease, background 0.2s ease;
+      }
+
+      .handy-dandy-workbench-history-item.active {
+        border-color: var(--color-border-highlight, #ff8c00);
+        background: var(--color-border-light-1, rgba(255, 255, 255, 0.12));
+      }
+
+      .handy-dandy-workbench-history-select {
+        appearance: none;
+        background: transparent;
+        border: none;
+        color: inherit;
+        cursor: pointer;
+        flex: 1;
+        padding: 0.15rem 0.25rem;
+        text-align: left;
+      }
+
+      .handy-dandy-workbench-history-select:focus {
+        outline: none;
+      }
+
+      .handy-dandy-workbench-history-select .handy-dandy-workbench-history-name {
+        display: block;
+        font-weight: 600;
+        margin-bottom: 0.2rem;
+      }
+
+      .handy-dandy-workbench-history-select .handy-dandy-workbench-history-meta {
+        color: var(--color-text-light-6, #bbb);
+        display: block;
+        font-size: 0.85rem;
+      }
+
+      .handy-dandy-workbench-history-delete {
+        appearance: none;
+        background: transparent;
+        border: none;
+        border-radius: 4px;
+        color: var(--color-text-light-6, #bbb);
+        cursor: pointer;
+        padding: 0.25rem;
+        align-self: center;
+        transition: color 0.2s ease, background 0.2s ease;
+      }
+
+      .handy-dandy-workbench-history-delete:hover,
+      .handy-dandy-workbench-history-delete:focus-visible {
+        color: var(--color-text-bright, #f0f0f0);
+        background: var(--color-border-dark, rgba(255, 255, 255, 0.1));
+        outline: none;
+      }
+
+    </style>
+
+    <div class="handy-dandy-workbench-dialog" data-current-entry="${currentEntry.id}">
+      <nav class="handy-dandy-workbench-tabs">
+        <button type="button" class="handy-dandy-workbench-tab active" data-tab="latest">Latest</button>
+        <button type="button" class="handy-dandy-workbench-tab" data-tab="history">History</button>
+      </nav>
+      <section class="handy-dandy-workbench-panel active" data-panel="latest">
+        ${latestMarkup}
+      </section>
+      <section class="handy-dandy-workbench-panel" data-panel="history">
+        <div class="handy-dandy-workbench-history">
+          <aside class="handy-dandy-workbench-history-list" data-history-list>
+            ${historyListMarkup}
+          </aside>
+          <div class="handy-dandy-workbench-history-view" data-history-view>${historyPlaceholder}</div>
+        </div>
+      </section>
+    </div>
+  `;
+}
+
+function buildHistoryListMarkup(activeEntryId?: string): string {
+  if (!workbenchHistory.length) {
+    return '<p class="handy-dandy-workbench-history-empty">No generations yet.</p>';
+  }
+
+  return workbenchHistory
+    .map((entry) => {
+      const isActive = entry.id === activeEntryId;
+      const classes = isActive
+        ? "handy-dandy-workbench-history-item active"
+        : "handy-dandy-workbench-history-item";
+      const name = escapeHtml(entry.result.name.trim() || entry.result.data.name || "Generated Entry");
+      const meta = escapeHtml(formatHistoryMeta(entry));
+      return `
+        <div class="${classes}" data-entry-id="${entry.id}">
+          <button type="button" class="handy-dandy-workbench-history-select" data-entry-id="${entry.id}">
+            <span class="handy-dandy-workbench-history-name">${name}</span>
+            <span class="handy-dandy-workbench-history-meta">${meta}</span>
+          </button>
+          <button type="button" class="handy-dandy-workbench-history-delete" data-entry-id="${entry.id}" aria-label="Remove from history">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+      `;
+    })
+    .join("");
+}
+
+function buildHistoryViewPlaceholder(): string {
+  if (!workbenchHistory.length) {
+    return '<p class="handy-dandy-workbench-history-empty">No generations yet.</p>';
+  }
+
+  return '<p class="notes">Select a previous generation to review its details.</p>';
+}
+
+function buildEntryDetailMarkup(entry: WorkbenchHistoryEntry): string {
+  const name = escapeHtml(entry.result.name.trim() || entry.result.data.name || "Generated Entry");
+  const typeLabel = escapeHtml(formatTypeLabel(entry.result.type));
+  const systemLabel = escapeHtml(formatSystemLabel(entry.result.input.systemId));
+  const timestamp = escapeHtml(formatTimestamp(entry.timestamp));
+  const importLabel = entry.result.type === "actor" ? "Create Actor" : "Import to World";
+  const importDisabled = entry.importerAvailable ? "" : " disabled title=\"Import is unavailable for this entry.\"";
+
+  return `
+    <header class="handy-dandy-workbench-header">
+      <div class="handy-dandy-workbench-heading">
+        <h2 class="handy-dandy-workbench-name">${name}</h2>
+        <p class="handy-dandy-workbench-meta">${typeLabel}${systemLabel ? ` • ${systemLabel}` : ""} • ${timestamp}</p>
+      </div>
+      <div class="handy-dandy-workbench-actions">
+        <button type="button" class="handy-dandy-workbench-action" data-action="copy" data-entry-id="${entry.id}">
+          <i class="fas fa-copy"></i>
+          <span>Copy JSON</span>
+        </button>
+        <button type="button" class="handy-dandy-workbench-action" data-action="download" data-entry-id="${entry.id}">
+          <i class="fas fa-download"></i>
+          <span>Download</span>
+        </button>
+        <button type="button" class="handy-dandy-workbench-action" data-action="import" data-entry-id="${entry.id}"${importDisabled}>
+          <i class="fas fa-cloud-upload-alt"></i>
+          <span>${importLabel}</span>
+        </button>
+      </div>
+    </header>
+    <p class="notes">Review the generated JSON below or revisit previous generations from the history tab.</p>
+    <textarea class="handy-dandy-workbench-json" rows="16" readonly>${escapeJsonForTextarea(entry.json)}</textarea>
+  `;
+}
+
+function formatHistoryMeta(entry: WorkbenchHistoryEntry): string {
+  const type = formatTypeLabel(entry.result.type);
+  const system = formatSystemLabel(entry.result.input.systemId);
+  const time = formatTimestamp(entry.timestamp);
+  return [type, system, time].filter(Boolean).join(" • ");
+}
+
+function formatTypeLabel(type: EntityType): string {
+  return type.charAt(0).toUpperCase() + type.slice(1);
+}
+
+function formatSystemLabel(systemId: string | undefined): string {
+  if (!systemId) {
+    return "";
+  }
+
+  return systemId.toUpperCase();
+}
+
+function formatTimestamp(value: number): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "Unknown time";
+  }
+
+  return date.toLocaleString();
+}
+
+function setupWorkbenchRequestDialog(html: JQuery): void {
+  const root = html[0];
+  if (!(root instanceof HTMLElement)) {
+    return;
+  }
+
+  const container = root.querySelector<HTMLElement>(".handy-dandy-workbench-request");
+  if (!container) {
+    return;
+  }
+
+  const historyList = container.querySelector<HTMLElement>("[data-history-list]");
+  const historyView = container.querySelector<HTMLElement>("[data-history-view]");
+  const initialEntry = workbenchHistory[0] ?? null;
+  const initialEntryId = initialEntry?.id;
+
+  setCurrentHistoryEntry(container, initialEntryId);
+  if (historyList) {
+    renderHistoryList(historyList, initialEntryId);
+  }
+  if (historyView) {
+    renderHistoryEntry(historyView, initialEntry);
+  }
+
+  container.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+
+    const tabButton = target.closest<HTMLButtonElement>(".handy-dandy-workbench-tab");
+    if (tabButton?.dataset.tab) {
+      activateWorkbenchTab(container, tabButton.dataset.tab);
+      return;
+    }
+
+    const deleteButton = target.closest<HTMLButtonElement>(".handy-dandy-workbench-history-delete");
+    if (deleteButton?.dataset.entryId) {
+      const removal = removeHistoryEntry(deleteButton.dataset.entryId);
+      if (!removal) {
+        return;
+      }
+
+      const wasActive = container.dataset.currentEntry === deleteButton.dataset.entryId;
+      let activeEntry: WorkbenchHistoryEntry | null = null;
+      if (wasActive) {
+        activeEntry = removal.fallback;
+      } else if (container.dataset.currentEntry) {
+        activeEntry = resolveHistoryEntry(container.dataset.currentEntry) ?? removal.fallback;
+      } else {
+        activeEntry = removal.fallback ?? workbenchHistory[0] ?? null;
+      }
+
+      const activeEntryId = activeEntry?.id;
+      setCurrentHistoryEntry(container, activeEntryId);
+      if (historyList) {
+        renderHistoryList(historyList, activeEntryId);
+      }
+      if (historyView) {
+        renderHistoryEntry(historyView, activeEntry);
+      }
+      return;
+    }
+
+    const historySelect = target.closest<HTMLButtonElement>(".handy-dandy-workbench-history-select");
+    if (historySelect?.dataset.entryId && historyView) {
+      const entry = resolveHistoryEntry(historySelect.dataset.entryId);
+      if (!entry) {
+        return;
+      }
+
+      setCurrentHistoryEntry(container, entry.id);
+      setActiveHistoryItem(container, entry.id);
+      renderHistoryEntry(historyView, entry);
+    }
+  });
+}
+
+function setupWorkbenchResultDialog(html: JQuery, currentEntry: WorkbenchHistoryEntry): void {
+  const root = html[0];
+  if (!(root instanceof HTMLElement)) {
+    return;
+  }
+
+  const container = root.querySelector<HTMLElement>(".handy-dandy-workbench-dialog");
+  if (!container) {
+    return;
+  }
+
+  const historyList = container.querySelector<HTMLElement>("[data-history-list]");
+  const historyView = container.querySelector<HTMLElement>("[data-history-view]");
+  setCurrentHistoryEntry(container, currentEntry.id);
+  if (historyList) {
+    renderHistoryList(historyList, currentEntry.id);
+  }
+  if (historyView) {
+    renderHistoryEntry(historyView, currentEntry);
+  }
+
+  container.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+
+    const tabButton = target.closest<HTMLButtonElement>(".handy-dandy-workbench-tab");
+    if (tabButton?.dataset.tab) {
+      activateWorkbenchTab(container, tabButton.dataset.tab);
+      return;
+    }
+
+    const deleteButton = target.closest<HTMLButtonElement>(".handy-dandy-workbench-history-delete");
+    if (deleteButton?.dataset.entryId) {
+      const removal = removeHistoryEntry(deleteButton.dataset.entryId);
+      if (!removal) {
+        return;
+      }
+
+      const wasActive = container.dataset.currentEntry === deleteButton.dataset.entryId;
+      let activeEntry: WorkbenchHistoryEntry | null = null;
+      if (wasActive) {
+        activeEntry = removal.fallback;
+      } else if (container.dataset.currentEntry) {
+        activeEntry = resolveHistoryEntry(container.dataset.currentEntry) ?? removal.fallback;
+      } else {
+        activeEntry = removal.fallback ?? workbenchHistory[0] ?? null;
+      }
+
+      const activeEntryId = activeEntry?.id;
+      setCurrentHistoryEntry(container, activeEntryId);
+      if (historyList) {
+        renderHistoryList(historyList, activeEntryId);
+      }
+      if (historyView) {
+        renderHistoryEntry(historyView, activeEntry);
+      }
+      return;
+    }
+
+    const actionButton = target.closest<HTMLButtonElement>(".handy-dandy-workbench-action");
+    if (actionButton?.dataset.action && actionButton.dataset.entryId) {
+      const entry = resolveHistoryEntry(actionButton.dataset.entryId);
+      if (entry) {
+        void handleWorkbenchAction(actionButton.dataset.action, entry);
+      }
+      return;
+    }
+
+    const historySelect = target.closest<HTMLButtonElement>(".handy-dandy-workbench-history-select");
+    if (historySelect?.dataset.entryId && historyView) {
+      const entry = resolveHistoryEntry(historySelect.dataset.entryId);
+      if (!entry) {
+        return;
+      }
+
+      setCurrentHistoryEntry(container, entry.id);
+      setActiveHistoryItem(container, entry.id);
+      renderHistoryEntry(historyView, entry);
+      return;
+    }
+  });
+}
+
+function activateWorkbenchTab(container: HTMLElement, tabId: string): void {
+  const tabs = container.querySelectorAll<HTMLButtonElement>(".handy-dandy-workbench-tab");
+  tabs.forEach((tab) => {
+    tab.classList.toggle("active", tab.dataset.tab === tabId);
+  });
+
+  const panels = container.querySelectorAll<HTMLElement>(".handy-dandy-workbench-panel");
+  panels.forEach((panel) => {
+    panel.classList.toggle("active", panel.dataset.panel === tabId);
+  });
+}
+
+function setActiveHistoryItem(container: HTMLElement, entryId: string): void {
+  const items = container.querySelectorAll<HTMLElement>(".handy-dandy-workbench-history-item");
+  items.forEach((item) => {
+    item.classList.toggle("active", item.dataset.entryId === entryId);
+  });
+}
+
+function renderHistoryList(target: HTMLElement, activeEntryId?: string): void {
+  target.innerHTML = buildHistoryListMarkup(activeEntryId);
+}
+
+function renderHistoryEntry(target: HTMLElement, entry: WorkbenchHistoryEntry | null | undefined): void {
+  if (!entry) {
+    target.innerHTML = buildHistoryViewPlaceholder();
+    return;
+  }
+
+  target.innerHTML = buildEntryDetailMarkup(entry);
+}
+
+function resolveHistoryEntry(entryId: string): WorkbenchHistoryEntry | undefined {
+  return workbenchHistory.find((entry) => entry.id === entryId);
+}
+
+function setCurrentHistoryEntry(container: HTMLElement, entryId: string | undefined): void {
+  if (entryId) {
+    container.dataset.currentEntry = entryId;
+  } else {
+    delete container.dataset.currentEntry;
+  }
+}
+
+function removeHistoryEntry(
+  entryId: string,
+): { removed: WorkbenchHistoryEntry; fallback: WorkbenchHistoryEntry | null } | null {
+  const index = workbenchHistory.findIndex((entry) => entry.id === entryId);
+  if (index === -1) {
+    return null;
+  }
+
+  const [removed] = workbenchHistory.splice(index, 1);
+  const fallback = workbenchHistory[index] ?? workbenchHistory[index - 1] ?? null;
+  saveWorkbenchHistory();
+
+  return { removed, fallback };
+}
+
+async function handleWorkbenchAction(action: string, entry: WorkbenchHistoryEntry): Promise<void> {
+  switch (action) {
+    case "copy":
+      await handleCopyAction(entry);
+      break;
+    case "download":
+      handleDownloadAction(entry);
+      break;
+    case "import":
+      await handleImportAction(entry);
+      break;
+    default:
+      break;
+  }
+}
+
+async function handleCopyAction(entry: WorkbenchHistoryEntry): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(entry.json);
+    ui.notifications?.info(`${CONSTANTS.MODULE_NAME} | Copied JSON to clipboard.`);
+  } catch (error) {
+    ui.notifications?.warn(`${CONSTANTS.MODULE_NAME} | Clipboard copy failed.`);
+    console.warn(`${CONSTANTS.MODULE_NAME} | Clipboard copy failed`, error);
+  }
+}
+
+function handleDownloadAction(entry: WorkbenchHistoryEntry): void {
+  const filename = resolveFilename(entry.result);
+  downloadJson(entry.json, filename);
+}
+
+async function handleImportAction(entry: WorkbenchHistoryEntry): Promise<void> {
+  if (!entry.importerAvailable || typeof entry.result.importer !== "function") {
+    ui.notifications?.warn(`${CONSTANTS.MODULE_NAME} | Import is not available for this entry.`);
+    return;
+  }
+
+  try {
+    const document = await entry.result.importer();
+    const resolvedName = entry.result.name.trim() || entry.result.data.name;
+    ui.notifications?.info(
+      `${CONSTANTS.MODULE_NAME} | Imported ${resolvedName}${document?.uuid ? ` (${document.uuid})` : ""}.`,
+    );
+    if (entry.result.type === "actor" && document instanceof Actor) {
+      document.sheet?.render(true);
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    ui.notifications?.error(`${CONSTANTS.MODULE_NAME} | Import failed: ${message}`);
+    console.error(`${CONSTANTS.MODULE_NAME} | Import failed`, error);
+  }
+}
+
+function resolveFilename(result: PromptWorkbenchResult<EntityType>): string {
+  const slug = (result.data as { slug?: string }).slug;
+  const fallback = result.name.trim().toLowerCase().replace(/\s+/g, "-");
+  const resolvedSlug = (slug ?? fallback) || "generated-entry";
+  const safeSlug = resolvedSlug.replace(/[^a-z0-9-]+/gi, "-");
+  return `${safeSlug}.json`;
 }
 
 function downloadJson(json: string, filename: string): void {
