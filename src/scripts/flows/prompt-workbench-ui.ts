@@ -185,7 +185,7 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
       folderId: string;
     } | null,
     undefined,
-    { jQuery: true }
+    Partial<Dialog.Options>
   >({
     title: `${CONSTANTS.MODULE_NAME} | Prompt Workbench`,
     content,
