@@ -71,69 +71,99 @@ export async function runPromptWorkbenchFlow(): Promise<void> {
 async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityType> | null> {
   const systemOptions = SYSTEM_IDS.map((id) => `<option value="${id}">${id.toUpperCase()}</option>`).join("");
   const content = `
+    <style>
+      .handy-dandy-workbench-form {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        min-width: 640px;
+      }
+
+      .handy-dandy-workbench-grid {
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      }
+
+      .handy-dandy-workbench-form fieldset {
+        margin: 0;
+      }
+
+      .handy-dandy-workbench-form .notes {
+        margin: 0.25rem 0 0;
+        font-size: 0.85em;
+        color: var(--color-text-light-6, #bbb);
+      }
+
+      .handy-dandy-workbench-form textarea {
+        min-height: 12rem;
+        resize: vertical;
+        width: 100%;
+      }
+
+      .handy-dandy-workbench-form .form-fields {
+        display: grid;
+        gap: 0.5rem;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        align-items: center;
+      }
+    </style>
     <form class="handy-dandy-workbench-form">
-      <div class="form-group">
-        <label>Entity Type</label>
-        <select name="entityType">
-          <option value="action">Action</option>
-          <option value="item">Item</option>
-          <option value="actor">Actor</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>Game System</label>
-        <select name="systemId">
-          ${systemOptions}
-        </select>
-      </div>
-      <div class="form-group">
-        <label>Name / Title</label>
-        <input type="text" name="entryName" required />
-        <p class="notes">Use the action title, item name, or actor name you want in Foundry.</p>
-      </div>
-      <div class="form-group">
-        <label>Slug (optional)</label>
-        <input type="text" name="slug" />
+      <div class="handy-dandy-workbench-grid">
+        <div class="form-group">
+          <label>Entity Type</label>
+          <select name="entityType">
+            <option value="actor">Actor</option>
+            <option value="action">Action</option>
+            <option value="item">Item</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Game System</label>
+          <select name="systemId">
+            ${systemOptions}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Name / Title</label>
+          <input type="text" name="entryName" required />
+          <p class="notes">Use the actor name, action title, or item name you want in Foundry.</p>
+        </div>
+        <div class="form-group">
+          <label>Slug (optional)</label>
+          <input type="text" name="slug" />
+        </div>
       </div>
       <fieldset class="form-group">
         <legend>Publication Details</legend>
-        <div class="form-group">
-          <label>Title</label>
-          <input type="text" name="publicationTitle" value="" />
-        </div>
-        <div class="form-group">
-          <label>Authors</label>
-          <input type="text" name="publicationAuthors" value="" />
-        </div>
-        <div class="form-group">
-          <label>License</label>
-          <input type="text" name="publicationLicense" value="OGL" />
-        </div>
-        <div class="form-group form-fields">
-          <label>
-            <input type="checkbox" name="publicationRemaster" /> Remaster
-          </label>
+        <div class="form-fields">
+          <label>Title <input type="text" name="publicationTitle" value="" /></label>
+          <label>Authors <input type="text" name="publicationAuthors" value="" /></label>
+          <label>License <input type="text" name="publicationLicense" value="OGL" /></label>
+          <label><input type="checkbox" name="publicationRemaster" /> Remaster</label>
         </div>
       </fieldset>
-      <div class="form-group">
-        <label>Image Path</label>
-        <input type="text" name="img" value="${DEFAULT_IMAGE_PATH}" />
-        <p class="notes">Provide a Foundry asset path or URL for the generated image.</p>
+      <div class="handy-dandy-workbench-grid">
+        <div class="form-group">
+          <label>Image Path</label>
+          <input type="text" name="img" value="${DEFAULT_IMAGE_PATH}" />
+          <p class="notes">Provide a Foundry asset path or URL for the generated image.</p>
+        </div>
+        <fieldset class="form-group">
+          <legend>Advanced Options</legend>
+          <div class="form-fields">
+            <label>Seed <input type="number" name="seed" /></label>
+            <label>Max Attempts <input type="number" name="maxAttempts" min="1" /></label>
+            <label>Compendium Pack ID <input type="text" name="packId" /></label>
+            <label>Folder ID <input type="text" name="folderId" /></label>
+          </div>
+        </fieldset>
       </div>
       <div class="form-group">
         <label>Reference Text or Prompt</label>
-        <textarea name="referenceText" rows="8" style="width: 100%;" required></textarea>
+        <textarea name="referenceText" required></textarea>
         <p class="notes">Paste rules text, stat blocks, or a creative prompt for the generator to follow.</p>
       </div>
-      <fieldset class="form-group">
-        <legend>Advanced Options</legend>
-        <div class="form-fields">
-          <label>Seed <input type="number" name="seed" /></label>
-          <label>Max Attempts <input type="number" name="maxAttempts" min="1" /></label>
-          <label>Compendium Pack ID <input type="text" name="packId" /></label>
-          <label>Folder ID <input type="text" name="folderId" /></label>
-        </div>
-      </fieldset>
     </form>
   `;
 
@@ -155,7 +185,7 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
       folderId: string;
     } | null,
     undefined,
-    { jQuery: true }
+    Partial<Dialog.Options>
   >({
     title: `${CONSTANTS.MODULE_NAME} | Prompt Workbench`,
     content,
@@ -295,8 +325,21 @@ async function showWorkbenchResult(result: PromptWorkbenchResult<EntityType>): P
 
   const content = `
     <form class="handy-dandy-workbench-result">
+      <style>
+        .handy-dandy-workbench-result {
+          display: flex;
+          flex-direction: column;
+          gap: 0.75rem;
+        }
+
+        .handy-dandy-workbench-result textarea {
+          min-height: 16rem;
+          resize: vertical;
+          width: 100%;
+        }
+      </style>
       <p class="notes">Review the generated JSON below. Use the buttons to copy, download, or import.</p>
-      <textarea name="generatedJson" rows="16" readonly style="width: 100%;">${escaped}</textarea>
+      <textarea name="generatedJson" rows="16" readonly>${escaped}</textarea>
     </form>
   `;
 
@@ -307,7 +350,7 @@ async function showWorkbenchResult(result: PromptWorkbenchResult<EntityType>): P
       buttons: buildResultButtons(result, json, importerAvailable),
       close: () => resolve(),
       default: "close",
-    }, { jQuery: true });
+    }, { jQuery: true, width: 700 });
 
     dialog.render(true);
   });
@@ -353,9 +396,10 @@ function buildResultButtons(
   };
 
   if (importerAvailable && result.importer) {
+    const importLabel = result.type === "actor" ? "Create Actor" : "Import to World";
     buttons.import = {
       icon: '<i class="fas fa-cloud-upload-alt"></i>',
-      label: "Import to World",
+      label: importLabel,
       callback: async () => {
         try {
           const document = await result.importer?.();
@@ -363,6 +407,9 @@ function buildResultButtons(
           ui.notifications?.info(
             `${CONSTANTS.MODULE_NAME} | Imported ${resolvedName}${document?.uuid ? ` (${document.uuid})` : ""}.`,
           );
+          if (result.type === "actor" && document instanceof Actor) {
+            document.sheet?.render(true);
+          }
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           ui.notifications?.error(`${CONSTANTS.MODULE_NAME} | Import failed: ${message}`);
