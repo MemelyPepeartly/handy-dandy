@@ -350,7 +350,7 @@ async function showWorkbenchResult(result: PromptWorkbenchResult<EntityType>): P
       default: "close",
     }, { jQuery: true, width: 760 });
 
-    const hookId = Hooks.on("renderDialog", (app, html: JQuery) => {
+    const hookId = Hooks.on("renderDialog", (app: Dialog, html: JQuery) => {
       if (app !== dialog) {
         return;
       }
@@ -815,7 +815,8 @@ async function handleImportAction(entry: WorkbenchHistoryEntry): Promise<void> {
 function resolveFilename(result: PromptWorkbenchResult<EntityType>): string {
   const slug = (result.data as { slug?: string }).slug;
   const fallback = result.name.trim().toLowerCase().replace(/\s+/g, "-");
-  const safeSlug = (slug ?? fallback || "generated-entry").replace(/[^a-z0-9-]+/gi, "-");
+  const resolvedSlug = (slug ?? fallback) || "generated-entry";
+  const safeSlug = resolvedSlug.replace(/[^a-z0-9-]+/gi, "-");
   return `${safeSlug}.json`;
 }
 
