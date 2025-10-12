@@ -214,7 +214,7 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
         folderId: String(formData.get("folderId") ?? ""),
       };
     },
-    options: { jQuery: true },
+    options: { jQuery: true, width: 680 },
   });
 
   if (!response) {
