@@ -2,6 +2,7 @@
 import { CONSTANTS } from "../constants";
 import { ToolOverview } from "../ui/tool-overview";
 import { DEFAULT_GPT_MODEL, GPT_MODEL_CHOICES } from "../gpt/models";
+import { updateGPTClientFromSettings } from "../gpt/client";
 
 export function registerSettings(): void {
   const settings = game.settings!;
@@ -32,6 +33,9 @@ export function registerSettings(): void {
     type: String,
     choices: GPT_MODEL_CHOICES,
     default: DEFAULT_GPT_MODEL,
+    onChange: () => {
+      updateGPTClientFromSettings();
+    },
   });
 
   settings.register(CONSTANTS.MODULE_ID, "GPTTemperature", {
@@ -40,7 +44,10 @@ export function registerSettings(): void {
     scope: "client",
     config: true,
     type: Number,
-    default: 0.2
+    default: 0.2,
+    onChange: () => {
+      updateGPTClientFromSettings();
+    },
   });
 
   settings.register(CONSTANTS.MODULE_ID, "GPTTopP", {
@@ -49,7 +56,10 @@ export function registerSettings(): void {
     scope: "client",
     config: true,
     type: Number,
-    default: 1
+    default: 1,
+    onChange: () => {
+      updateGPTClientFromSettings();
+    },
   });
 
   settings.register(CONSTANTS.MODULE_ID, "GPTSeed", {
@@ -58,7 +68,10 @@ export function registerSettings(): void {
     scope: "client",
     config: true,
     type: Number,
-    default: null
+    default: null,
+    onChange: () => {
+      updateGPTClientFromSettings();
+    },
   });
 
   settings.registerMenu(CONSTANTS.MODULE_ID, "toolGuide", {
