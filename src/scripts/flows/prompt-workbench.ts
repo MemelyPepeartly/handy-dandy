@@ -1,5 +1,5 @@
 import { fromFoundryAction, fromFoundryActor, fromFoundryItem } from "../mappers/export";
-import { importAction } from "../mappers/import";
+import { importAction, importActor } from "../mappers/import";
 import {
   PUBLICATION_DEFAULT,
   type CanonicalEntityMap,
@@ -82,7 +82,7 @@ type GeneratorMap = {
 
 type ImporterMap = {
   [K in EntityType]: (
-    json: CanonicalEntityMap[K],
+    json: GeneratedEntityMap[K],
     options?: ImporterOptions,
   ) => Promise<ClientDocument>;
 };
@@ -95,6 +95,7 @@ const GENERATION_METHOD_MAP: Record<EntityType, keyof NonNullable<Game["handyDan
 
 const DEFAULT_IMPORTERS: Partial<ImporterMap> = {
   action: async (json, options) => importAction(json, options),
+  actor: async (json, options) => importActor(json, options),
 };
 
 interface BoundGenerationOptions {
@@ -193,8 +194,7 @@ export async function generateWorkbenchEntry<T extends EntityType>(
   const resolvedName = data.name.trim() || inferInputName(type, input);
 
   const importerFn = importer
-    ? (options?: ImporterOptions) =>
-        importer(data as unknown as CanonicalEntityMap[T], { packId, folderId, ...options })
+    ? (options?: ImporterOptions) => importer(data, { packId, folderId, ...options })
     : undefined;
 
   return {
