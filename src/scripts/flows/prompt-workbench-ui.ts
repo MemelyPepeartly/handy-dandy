@@ -40,6 +40,26 @@ interface StoredWorkbenchHistoryEntry {
   readonly result: SerializableWorkbenchResult;
 }
 
+type WorkbenchFormResponse = {
+  readonly entityType: string;
+  readonly systemId: string;
+  readonly entryName: string;
+  readonly slug: string;
+  readonly level: string;
+  readonly publicationTitle: string;
+  readonly publicationAuthors: string;
+  readonly publicationLicense: string;
+  readonly publicationRemaster: string | null;
+  readonly img: string;
+  readonly referenceText: string;
+  readonly seed: string;
+  readonly maxAttempts: string;
+  readonly packId: string;
+  readonly folderId: string;
+  readonly includeSpellcasting: string | null;
+  readonly includeInventory: string | null;
+};
+
 const workbenchHistory: WorkbenchHistoryEntry[] = [];
 
 Hooks.once("ready", () => {
@@ -193,6 +213,14 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
 
       .handy-dandy-workbench-form fieldset {
         margin: 0;
+        border: 1px solid var(--color-border-dark, #333);
+        border-radius: 6px;
+        padding: 0.75rem;
+      }
+
+      .handy-dandy-workbench-form fieldset > legend {
+        font-weight: 600;
+        padding: 0 0.25rem;
       }
 
       .handy-dandy-workbench-form .notes {
@@ -214,35 +242,101 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
         align-items: center;
       }
 
-      .handy-dandy-workbench-history {
+      .handy-dandy-workbench-inline {
         display: flex;
-        gap: 1rem;
-        min-height: 18rem;
+        gap: 0.5rem;
+        align-items: center;
+        flex-wrap: wrap;
+        margin-top: 0.5rem;
+      }
+
+      .handy-dandy-workbench-inline label {
+        font-weight: 600;
+      }
+
+      .handy-dandy-workbench-inline input {
+        max-width: 120px;
+      }
+
+      .handy-dandy-workbench-advanced {
+        border: 1px solid var(--color-border-dark, #333);
+        border-radius: 6px;
+        padding: 0.75rem;
+        background: var(--color-bg-alt, rgba(255, 255, 255, 0.04));
+      }
+
+      .handy-dandy-workbench-advanced > summary {
+        cursor: pointer;
+        font-weight: 600;
+        list-style: none;
+        margin: -0.75rem -0.75rem 0;
+        padding: 0.75rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .handy-dandy-workbench-advanced > summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .handy-dandy-workbench-advanced > summary::after {
+        content: "\25bc";
+        font-size: 0.85em;
+        transition: transform 0.2s ease;
+      }
+
+      .handy-dandy-workbench-advanced[open] > summary {
+        border-bottom: 1px solid var(--color-border-dark, #333);
+        margin-bottom: 0.75rem;
+      }
+
+      .handy-dandy-workbench-advanced[open] > summary::after {
+        transform: rotate(-180deg);
+      }
+
+      .handy-dandy-workbench-advanced-fields {
+        display: grid;
+        gap: 0.5rem;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      }
+
+      .handy-dandy-workbench-history {
+        display: grid;
+        gap: 0.75rem;
+        grid-template-columns: minmax(180px, 220px) 1fr;
+        align-items: start;
       }
 
       .handy-dandy-workbench-history-list {
         display: flex;
         flex-direction: column;
-        gap: 0.35rem;
-        width: 240px;
+        gap: 0.25rem;
         max-height: 24rem;
         overflow-y: auto;
+        border: 1px solid var(--color-border-dark, #333);
+        border-radius: 6px;
+        padding: 0.35rem;
+        background: var(--color-bg-alt, rgba(255, 255, 255, 0.04));
       }
 
       .handy-dandy-workbench-history-item {
-        align-items: stretch;
-        background: var(--color-bg-alt, rgba(255, 255, 255, 0.05));
-        border: 1px solid var(--color-border-dark, #333);
-        border-radius: 6px;
+        align-items: center;
+        border-radius: 4px;
+        border: 1px solid transparent;
         display: flex;
-        gap: 0.35rem;
-        padding: 0.3rem;
         transition: border-color 0.2s ease, background 0.2s ease;
       }
 
       .handy-dandy-workbench-history-item.active {
         border-color: var(--color-border-highlight, #ff8c00);
         background: var(--color-border-light-1, rgba(255, 255, 255, 0.12));
+      }
+
+      .handy-dandy-workbench-history-item:not(.active):hover,
+      .handy-dandy-workbench-history-item:not(.active):focus-within {
+        border-color: var(--color-border-light-2, rgba(255, 255, 255, 0.2));
+        background: var(--color-border-dark, rgba(255, 255, 255, 0.08));
       }
 
       .handy-dandy-workbench-history-select {
@@ -252,8 +346,11 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
         color: inherit;
         cursor: pointer;
         flex: 1;
-        padding: 0.15rem 0.25rem;
+        padding: 0.45rem 0.5rem;
         text-align: left;
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
       }
 
       .handy-dandy-workbench-history-select:focus {
@@ -261,40 +358,39 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
       }
 
       .handy-dandy-workbench-history-select .handy-dandy-workbench-history-name {
-        display: block;
         font-weight: 600;
-        margin-bottom: 0.2rem;
+        font-size: 0.95rem;
       }
 
       .handy-dandy-workbench-history-select .handy-dandy-workbench-history-meta {
         color: var(--color-text-light-6, #bbb);
-        display: block;
-        font-size: 0.85rem;
+        font-size: 0.8rem;
       }
 
       .handy-dandy-workbench-history-delete {
         appearance: none;
         background: transparent;
         border: none;
-        border-radius: 4px;
+        border-radius: 0 4px 4px 0;
         color: var(--color-text-light-6, #bbb);
         cursor: pointer;
-        padding: 0.25rem;
-        align-self: center;
+        padding: 0.35rem;
         transition: color 0.2s ease, background 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
       }
 
       .handy-dandy-workbench-history-delete:hover,
       .handy-dandy-workbench-history-delete:focus-visible {
         color: var(--color-text-bright, #f0f0f0);
-        background: var(--color-border-dark, rgba(255, 255, 255, 0.1));
+        background: var(--color-border-dark, rgba(255, 255, 255, 0.12));
         outline: none;
       }
 
       .handy-dandy-workbench-history-view {
         border: 1px solid var(--color-border-dark, #333);
         border-radius: 6px;
-        flex: 1;
         min-height: 18rem;
         padding: 0.75rem;
         overflow: auto;
@@ -323,31 +419,53 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
       </nav>
       <section class="handy-dandy-workbench-panel active" data-panel="prompt">
         <form class="handy-dandy-workbench-form">
-          <div class="handy-dandy-workbench-grid">
-            <div class="form-group">
-              <label>Entity Type</label>
-              <select name="entityType">
-                <option value="actor">Actor</option>
-                <option value="action">Action</option>
-                <option value="item">Item</option>
-              </select>
+          <fieldset class="form-group">
+            <legend>Type</legend>
+            <div class="form-fields">
+              <div>
+                <label for="handy-dandy-workbench-entity-type">Entity Type</label>
+                <select id="handy-dandy-workbench-entity-type" name="entityType">
+                  <option value="actor">Actor</option>
+                  <option value="action">Action</option>
+                  <option value="item">Item</option>
+                </select>
+              </div>
+              <div>
+                <label for="handy-dandy-workbench-system">Game System</label>
+                <select id="handy-dandy-workbench-system" name="systemId">
+                  ${systemOptions}
+                </select>
+              </div>
             </div>
-            <div class="form-group">
-              <label>Game System</label>
-              <select name="systemId">
-                ${systemOptions}
-              </select>
-            </div>
-            <div class="form-group">
-              <label>Name / Title</label>
-              <input type="text" name="entryName" required />
-              <p class="notes">Use the actor name, action title, or item name you want in Foundry.</p>
-            </div>
-            <div class="form-group">
-              <label>Slug (optional)</label>
-              <input type="text" name="slug" />
-            </div>
+          </fieldset>
+          <div class="form-group">
+            <label for="handy-dandy-workbench-title">Title</label>
+            <input id="handy-dandy-workbench-title" type="text" name="entryName" required />
+            <p class="notes">Use the actor name, action title, or item name you want in Foundry.</p>
           </div>
+          <div class="form-group">
+            <label for="handy-dandy-workbench-image">Image Path</label>
+            <input id="handy-dandy-workbench-image" type="text" name="img" value="${DEFAULT_IMAGE_PATH}" />
+            <p class="notes">Provide a Foundry asset path or URL for the generated image.</p>
+          </div>
+          <div class="form-group">
+            <label for="handy-dandy-workbench-prompt">Prompt</label>
+            <textarea id="handy-dandy-workbench-prompt" name="referenceText" required></textarea>
+            <p class="notes">Paste rules text, stat blocks, or a creative prompt for the generator to follow.</p>
+            <div class="handy-dandy-workbench-inline">
+              <label for="handy-dandy-workbench-level">What level?</label>
+              <input id="handy-dandy-workbench-level" type="number" name="level" min="0" />
+            </div>
+            <p class="notes">Provide a level for actors; leave blank for other entries.</p>
+          </div>
+          <fieldset class="form-group">
+            <legend>Actor Content</legend>
+            <div class="form-fields">
+              <label><input type="checkbox" name="includeSpellcasting" /> Spellcasting?</label>
+              <label><input type="checkbox" name="includeInventory" /> Inventory?</label>
+            </div>
+            <p class="notes">Use these options to guide actor prompts.</p>
+          </fieldset>
           <fieldset class="form-group">
             <legend>Publication Details</legend>
             <div class="form-fields">
@@ -357,27 +475,19 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
               <label><input type="checkbox" name="publicationRemaster" /> Remaster</label>
             </div>
           </fieldset>
-          <div class="handy-dandy-workbench-grid">
-            <div class="form-group">
-              <label>Image Path</label>
-              <input type="text" name="img" value="${DEFAULT_IMAGE_PATH}" />
-              <p class="notes">Provide a Foundry asset path or URL for the generated image.</p>
-            </div>
-            <fieldset class="form-group">
-              <legend>Advanced Options</legend>
-              <div class="form-fields">
-                <label>Seed <input type="number" name="seed" /></label>
-                <label>Max Attempts <input type="number" name="maxAttempts" min="1" /></label>
-                <label>Compendium Pack ID <input type="text" name="packId" /></label>
-                <label>Folder ID <input type="text" name="folderId" /></label>
-              </div>
-            </fieldset>
-          </div>
           <div class="form-group">
-            <label>Reference Text or Prompt</label>
-            <textarea name="referenceText" required></textarea>
-            <p class="notes">Paste rules text, stat blocks, or a creative prompt for the generator to follow.</p>
+            <label for="handy-dandy-workbench-slug">Slug (optional)</label>
+            <input id="handy-dandy-workbench-slug" type="text" name="slug" />
           </div>
+          <details class="handy-dandy-workbench-advanced">
+            <summary>Advanced Options</summary>
+            <div class="handy-dandy-workbench-advanced-fields">
+              <label>Seed <input type="number" name="seed" /></label>
+              <label>Max Attempts <input type="number" name="maxAttempts" min="1" /></label>
+              <label>Compendium Pack ID <input type="text" name="packId" /></label>
+              <label>Folder ID <input type="text" name="folderId" /></label>
+            </div>
+          </details>
         </form>
       </section>
       <section class="handy-dandy-workbench-panel" data-panel="history">
@@ -392,45 +502,9 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
     </div>
   `;
 
-  const response = await new Promise<
-    | {
-        entityType: string;
-        systemId: string;
-        entryName: string;
-        slug: string;
-        publicationTitle: string;
-        publicationAuthors: string;
-        publicationLicense: string;
-        publicationRemaster: string | null;
-        img: string;
-        referenceText: string;
-        seed: string;
-        maxAttempts: string;
-        packId: string;
-        folderId: string;
-      }
-    | null
-  >((resolve) => {
+  const response = await new Promise<WorkbenchFormResponse | null>((resolve) => {
     let settled = false;
-    const finish = (
-      value: | {
-        entityType: string;
-        systemId: string;
-        entryName: string;
-        slug: string;
-        publicationTitle: string;
-        publicationAuthors: string;
-        publicationLicense: string;
-        publicationRemaster: string | null;
-        img: string;
-        referenceText: string;
-        seed: string;
-        maxAttempts: string;
-        packId: string;
-        folderId: string;
-      }
-      | null,
-    ): void => {
+    const finish = (value: WorkbenchFormResponse | null): void => {
       if (!settled) {
         settled = true;
         resolve(value);
@@ -458,6 +532,7 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
                 systemId: String(formData.get("systemId") ?? ""),
                 entryName: String(formData.get("entryName") ?? ""),
                 slug: String(formData.get("slug") ?? ""),
+                level: String(formData.get("level") ?? ""),
                 publicationTitle: String(formData.get("publicationTitle") ?? ""),
                 publicationAuthors: String(formData.get("publicationAuthors") ?? ""),
                 publicationLicense: String(formData.get("publicationLicense") ?? ""),
@@ -468,6 +543,8 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
                 maxAttempts: String(formData.get("maxAttempts") ?? ""),
                 packId: String(formData.get("packId") ?? ""),
                 folderId: String(formData.get("folderId") ?? ""),
+                includeSpellcasting: formData.get("includeSpellcasting") as string | null,
+                includeInventory: formData.get("includeInventory") as string | null,
               });
             },
           },
@@ -538,12 +615,15 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
     entryName,
     referenceText,
     slug: response.slug.trim() || undefined,
+    level: parseOptionalNumber(response.level),
     seed: parseOptionalNumber(response.seed),
     maxAttempts: parseOptionalNumber(response.maxAttempts),
     packId: response.packId.trim() || undefined,
     folderId: response.folderId.trim() || undefined,
     publication,
     img,
+    includeSpellcasting: response.includeSpellcasting ? true : undefined,
+    includeInventory: response.includeInventory ? true : undefined,
   } satisfies PromptWorkbenchRequest<EntityType>;
 }
 
@@ -903,24 +983,27 @@ function buildWorkbenchDialogContent(currentEntry: WorkbenchHistoryEntry): strin
       }
 
       .handy-dandy-workbench-history {
-        display: flex;
-        gap: 1rem;
-        min-height: 18rem;
+        display: grid;
+        gap: 0.75rem;
+        grid-template-columns: minmax(180px, 220px) 1fr;
+        align-items: start;
       }
 
       .handy-dandy-workbench-history-list {
         display: flex;
         flex-direction: column;
-        gap: 0.35rem;
-        width: 240px;
+        gap: 0.25rem;
         max-height: 24rem;
         overflow-y: auto;
+        border: 1px solid var(--color-border-dark, #333);
+        border-radius: 6px;
+        padding: 0.35rem;
+        background: var(--color-bg-alt, rgba(255, 255, 255, 0.04));
       }
 
       .handy-dandy-workbench-history-view {
         border: 1px solid var(--color-border-dark, #333);
         border-radius: 6px;
-        flex: 1;
         min-height: 18rem;
         padding: 0.75rem;
         overflow: auto;
@@ -951,19 +1034,22 @@ function buildWorkbenchDialogContent(currentEntry: WorkbenchHistoryEntry): strin
       }
 
       .handy-dandy-workbench-history-item {
-        align-items: stretch;
-        background: var(--color-bg-alt, rgba(255, 255, 255, 0.05));
-        border: 1px solid var(--color-border-dark, #333);
-        border-radius: 6px;
+        align-items: center;
+        border-radius: 4px;
+        border: 1px solid transparent;
         display: flex;
-        gap: 0.35rem;
-        padding: 0.3rem;
         transition: border-color 0.2s ease, background 0.2s ease;
       }
 
       .handy-dandy-workbench-history-item.active {
         border-color: var(--color-border-highlight, #ff8c00);
         background: var(--color-border-light-1, rgba(255, 255, 255, 0.12));
+      }
+
+      .handy-dandy-workbench-history-item:not(.active):hover,
+      .handy-dandy-workbench-history-item:not(.active):focus-within {
+        border-color: var(--color-border-light-2, rgba(255, 255, 255, 0.2));
+        background: var(--color-border-dark, rgba(255, 255, 255, 0.08));
       }
 
       .handy-dandy-workbench-history-select {
@@ -973,8 +1059,11 @@ function buildWorkbenchDialogContent(currentEntry: WorkbenchHistoryEntry): strin
         color: inherit;
         cursor: pointer;
         flex: 1;
-        padding: 0.15rem 0.25rem;
+        padding: 0.45rem 0.5rem;
         text-align: left;
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
       }
 
       .handy-dandy-workbench-history-select:focus {
@@ -982,33 +1071,33 @@ function buildWorkbenchDialogContent(currentEntry: WorkbenchHistoryEntry): strin
       }
 
       .handy-dandy-workbench-history-select .handy-dandy-workbench-history-name {
-        display: block;
         font-weight: 600;
-        margin-bottom: 0.2rem;
+        font-size: 0.95rem;
       }
 
       .handy-dandy-workbench-history-select .handy-dandy-workbench-history-meta {
         color: var(--color-text-light-6, #bbb);
-        display: block;
-        font-size: 0.85rem;
+        font-size: 0.8rem;
       }
 
       .handy-dandy-workbench-history-delete {
         appearance: none;
         background: transparent;
         border: none;
-        border-radius: 4px;
+        border-radius: 0 4px 4px 0;
         color: var(--color-text-light-6, #bbb);
         cursor: pointer;
-        padding: 0.25rem;
-        align-self: center;
+        padding: 0.35rem;
         transition: color 0.2s ease, background 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
       }
 
       .handy-dandy-workbench-history-delete:hover,
       .handy-dandy-workbench-history-delete:focus-visible {
         color: var(--color-text-bright, #f0f0f0);
-        background: var(--color-border-dark, rgba(255, 255, 255, 0.1));
+        background: var(--color-border-dark, rgba(255, 255, 255, 0.12));
         outline: none;
       }
 
@@ -1143,6 +1232,19 @@ function setupWorkbenchRequestDialog(html: JQuery): void {
     return;
   }
 
+  const dialogApp = root.closest<HTMLElement>(".window-app");
+  const dialogButtons = dialogApp?.querySelector<HTMLElement>(".dialog-buttons");
+
+  const updateDialogButtonsVisibility = (): void => {
+    if (!dialogButtons) {
+      return;
+    }
+
+    const activeTab = container.querySelector<HTMLButtonElement>(".handy-dandy-workbench-tab.active");
+    const shouldShowButtons = activeTab?.dataset.tab !== "history";
+    dialogButtons.style.display = shouldShowButtons ? "" : "none";
+  };
+
   const historyList = container.querySelector<HTMLElement>("[data-history-list]");
   const historyView = container.querySelector<HTMLElement>("[data-history-view]");
   const initialEntry = workbenchHistory[0] ?? null;
@@ -1156,6 +1258,8 @@ function setupWorkbenchRequestDialog(html: JQuery): void {
     renderHistoryEntry(historyView, initialEntry);
   }
 
+  updateDialogButtonsVisibility();
+
   container.addEventListener("click", (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) {
@@ -1165,6 +1269,7 @@ function setupWorkbenchRequestDialog(html: JQuery): void {
     const tabButton = target.closest<HTMLButtonElement>(".handy-dandy-workbench-tab");
     if (tabButton?.dataset.tab) {
       activateWorkbenchTab(container, tabButton.dataset.tab);
+      updateDialogButtonsVisibility();
       return;
     }
 

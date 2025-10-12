@@ -198,7 +198,10 @@ export class GPTClient {
     const prepared = this.#prepareSchemaDefinition(schema);
     const request: ResponseCreateParams = {
       model: this.#config.model,
-      input: prompt,
+      input: this.#createInputMessages(
+        prompt,
+        "You can consult the web_search tool to look up current and authoritative information before responding. Prefer using it whenever the prompt benefits from recent or factual context, then answer with valid JSON that satisfies the requested schema.",
+      ),
       metadata: this.#createMetadata(options?.seed),
       text: {
         format: {
@@ -209,6 +212,9 @@ export class GPTClient {
           strict: true,
         },
       },
+      tools: [
+        { type: "web_search_preview" },
+      ],
     };
 
     this.#applySamplingParameters(request);
@@ -230,14 +236,12 @@ export class GPTClient {
     const request: ResponseCreateParams = {
       model: this.#config.model,
       metadata: this.#createMetadata(options?.seed),
-      input: [
-        {
-          role: "system",
-          content: `You are a JSON serializer. Always provide valid JSON for the ${schema.name} tool that satisfies the supplied schema.`,
-        },
-        { role: "user", content: prompt },
-      ],
+      input: this.#createInputMessages(
+        prompt,
+        `You are a JSON serializer. Always provide valid JSON for the ${schema.name} tool that satisfies the supplied schema. When helpful, consult the web_search tool to gather up-to-date information before returning your final answer.`,
+      ),
       tools: [
+        { type: "web_search_preview" },
         {
           type: "function",
           name: prepared.name,
@@ -257,6 +261,16 @@ export class GPTClient {
       response,
       result: this.#extractJson<T>(response, schema),
     } satisfies GPTGenerationAttempt<T>;
+  }
+
+  #createInputMessages(
+    prompt: string,
+    systemInstruction: string,
+  ): Array<{ role: "system" | "user"; content: string }> {
+    return [
+      { role: "system", content: systemInstruction },
+      { role: "user", content: prompt },
+    ];
   }
 
   #prepareSchemaDefinition(schema: JsonSchemaDefinition): JsonSchemaDefinition {

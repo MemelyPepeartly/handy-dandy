@@ -21,6 +21,9 @@ export interface ActorPromptInput {
   readonly correction?: CorrectionContext;
   readonly img?: string;
   readonly publication?: PublicationData;
+  readonly level?: number;
+  readonly includeSpellcasting?: boolean;
+  readonly includeInventory?: boolean;
 }
 
 function buildActorSchemaSection(): string {
@@ -81,8 +84,17 @@ function buildActorRequest(input: ActorPromptInput): string {
     input.referenceText.trim()
   ];
 
+  const details: string[] = [];
   if (input.slug) {
-    parts.splice(1, 0, `Slug suggestion: ${input.slug}`);
+    details.push(`Slug suggestion: ${input.slug}`);
+  }
+
+  if (typeof input.level === "number" && Number.isFinite(input.level)) {
+    details.push(`Target level: ${input.level}`);
+  }
+
+  if (details.length) {
+    parts.splice(1, 0, ...details);
   }
 
   const publicationSection = renderPublicationSection(input.publication);
@@ -93,6 +105,14 @@ function buildActorRequest(input: ActorPromptInput): string {
   const imageInstruction = renderImageInstruction(input.img);
   if (imageInstruction) {
     parts.push(imageInstruction);
+  }
+
+  if (input.includeSpellcasting) {
+    parts.push("Include spellcasting data that aligns with the reference text.");
+  }
+
+  if (input.includeInventory) {
+    parts.push("List an inventory section covering notable gear, treasure, and equipment carried.");
   }
 
   return parts.join("\n\n");
