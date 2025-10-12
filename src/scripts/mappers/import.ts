@@ -1,5 +1,6 @@
 import type {
   ActionSchemaData,
+  ActorGenerationResult,
   ActorSchemaData,
   ItemSchemaData,
   PublicationData,
@@ -137,6 +138,7 @@ export type ImportOptions = {
 };
 
 type ItemCompendium = CompendiumCollection<CompendiumCollection.Metadata & { type: "Item" }>;
+type ActorCompendium = CompendiumCollection<CompendiumCollection.Metadata & { type: "Actor" }>;
 
 type FoundryActionSource = {
   name: string;
@@ -778,6 +780,29 @@ async function findPackDocument(pack: ItemCompendium, slug: string): Promise<Ite
   return existing ?? undefined;
 }
 
+async function findActorPackDocument(pack: ActorCompendium, slug: string): Promise<Actor | undefined> {
+  const indexEntries = extractIndexEntries(pack.index);
+  let entry = indexEntries.find((item) => matchesSlug(item, slug));
+
+  if (!entry && typeof pack.getIndex === "function") {
+    const index = await pack.getIndex({ fields: ["slug", "system.slug"] as any });
+    const candidates = extractIndexEntries(index);
+    entry = candidates.find((item) => matchesSlug(item, slug));
+  }
+
+  if (!entry) {
+    return undefined;
+  }
+
+  const id = entry._id ?? entry.id;
+  if (!id) {
+    return undefined;
+  }
+
+  const existing = (await pack.getDocument(id)) as Actor | null | undefined;
+  return existing ?? undefined;
+}
+
 function findWorldItem(slug: string): Item | undefined {
   const collection = (game as Game).items as unknown;
   if (!collection) {
@@ -814,6 +839,49 @@ function findWorldItem(slug: string): Item | undefined {
     for (const item of (items as { values: () => Iterable<Item> }).values()!) {
       if (matchesSlug(item, slug)) {
         return item;
+      }
+    }
+  }
+
+  return undefined;
+}
+
+function findWorldActor(slug: string): Actor | undefined {
+  const collection = (game as Game).actors as unknown;
+  if (!collection) {
+    return undefined;
+  }
+
+  const actors = Array.isArray(collection)
+    ? collection
+    : (collection as { contents?: unknown; values?: () => Iterable<unknown>; find?: (predicate: (actor: Actor) => boolean) => Actor | undefined });
+
+  if (typeof actors.find === "function") {
+    const found = actors.find((actor: Actor) => matchesSlug(actor, slug));
+    if (found) {
+      return found;
+    }
+  }
+
+  const contentsCandidate = (actors as { contents?: unknown }).contents;
+  if (Array.isArray(contentsCandidate)) {
+    for (const actor of contentsCandidate as Actor[]) {
+      if (matchesSlug(actor, slug)) {
+        return actor;
+      }
+    }
+  } else if (contentsCandidate && typeof (contentsCandidate as { values?: () => Iterable<Actor> }).values === "function") {
+    for (const actor of (contentsCandidate as { values: () => Iterable<Actor> }).values()) {
+      if (matchesSlug(actor, slug)) {
+        return actor;
+      }
+    }
+  }
+
+  if (typeof (actors as { values?: () => Iterable<Actor> }).values === "function") {
+    for (const actor of (actors as { values: () => Iterable<Actor> }).values()!) {
+      if (matchesSlug(actor, slug)) {
+        return actor;
       }
     }
   }
@@ -992,6 +1060,25 @@ function prepareActorSource(actor: ActorSchemaData): FoundryActorSource {
     effects: [],
     folder: null,
     flags: {},
+  };
+}
+
+function prepareGeneratedActorSource(actor: ActorGenerationResult): FoundryActorSource {
+  const system = clone((actor.system ?? {}) as FoundryActorSource["system"]);
+  system.slug = actor.slug;
+
+  return {
+    name: actor.name,
+    type: actor.type,
+    img: actor.img?.trim() || DEFAULT_ACTOR_IMAGE,
+    system,
+    prototypeToken: clone(actor.prototypeToken ?? {}),
+    items: Array.isArray(actor.items)
+      ? (clone(actor.items) as FoundryActorItemSource[])
+      : [],
+    effects: Array.isArray(actor.effects) ? clone(actor.effects) : [],
+    folder: actor.folder ?? null,
+    flags: clone((actor.flags ?? {}) as Record<string, unknown>),
   };
 }
 
@@ -1501,6 +1588,52 @@ export function toFoundryActorData(actor: ActorSchemaData): FoundryActorSource {
   return prepareActorSource(actor);
 }
 
+export async function importActor(
+  json: ActorGenerationResult,
+  options: ImportOptions = {},
+): Promise<Actor> {
+  assertSystemCompatibility(json.systemId);
+  const source = prepareGeneratedActorSource(json);
+  const { packId, folderId } = options;
+
+  if (folderId) {
+    source.folder = folderId;
+  }
+
+  if (packId) {
+    const pack = game.packs?.get(packId) as ActorCompendium | undefined;
+    if (!pack) {
+      throw new Error(`Pack with id "${packId}" was not found.`);
+    }
+
+    const existing = await findActorPackDocument(pack, json.slug);
+    if (existing) {
+      await updateActorDocument(existing, source, folderId);
+      return existing;
+    }
+
+    const imported = (await pack.importDocument(clone(source) as any, { keepId: true } as any)) as Actor | null | undefined;
+    if (!imported) {
+      throw new Error(`Failed to import actor "${json.name}" into pack ${pack.collection}`);
+    }
+
+    return imported;
+  }
+
+  const existing = findWorldActor(json.slug);
+  if (existing) {
+    await updateActorDocument(existing, source, folderId);
+    return existing;
+  }
+
+  const created = (await Actor.create(clone(source) as any, { keepId: true } as any)) as Actor | null | undefined;
+  if (!created) {
+    throw new Error(`Failed to create actor "${json.name}" in the world.`);
+  }
+
+  return created;
+}
+
 export async function importAction(
   json: ActionSchemaData,
   options: ImportOptions = {}
@@ -1556,4 +1689,112 @@ export async function importAction(
   }
 
   return created;
+}
+
+async function updateActorDocument(
+  actor: Actor,
+  source: FoundryActorSource,
+  folderId: string | undefined,
+): Promise<void> {
+  const updateData = buildActorUpdateData(source, folderId);
+  await actor.update(updateData as any, { diff: false } as any);
+  await replaceActorItems(actor, source.items);
+  await replaceActorEffects(actor, source.effects);
+}
+
+function buildActorUpdateData(
+  source: FoundryActorSource,
+  folderId: string | undefined,
+): Record<string, unknown> {
+  const updateData: Record<string, unknown> = {
+    name: source.name,
+    type: source.type,
+    img: source.img,
+    system: clone(source.system),
+    prototypeToken: clone(source.prototypeToken),
+    flags: clone(source.flags ?? {}),
+  };
+
+  if (folderId !== undefined) {
+    updateData.folder = folderId;
+  } else if (source.folder !== undefined) {
+    updateData.folder = source.folder;
+  }
+
+  return updateData;
+}
+
+async function replaceActorItems(actor: Actor, items: FoundryActorItemSource[]): Promise<void> {
+  const existingItems = collectEmbeddedDocuments<Item>(actor.items);
+  const ids = existingItems
+    .map((item) => item.id)
+    .filter((id): id is string => typeof id === "string" && id.length > 0);
+
+  if (ids.length) {
+    await actor.deleteEmbeddedDocuments("Item", ids);
+  }
+
+  if (items.length) {
+    const payload = (clone(items) as FoundryActorItemSource[]).map((item) => ({ ...item, folder: null }));
+    await actor.createEmbeddedDocuments("Item", payload as any[]);
+  }
+}
+
+async function replaceActorEffects(actor: Actor, effects: unknown[]): Promise<void> {
+  const existingEffects = collectEmbeddedDocuments<ActiveEffect>(actor.effects);
+  const ids = existingEffects
+    .map((effect) => effect.id)
+    .filter((id): id is string => typeof id === "string" && id.length > 0);
+
+  if (ids.length) {
+    await actor.deleteEmbeddedDocuments("ActiveEffect", ids);
+  }
+
+  if (effects.length) {
+    const payload = clone(effects);
+    await actor.createEmbeddedDocuments("ActiveEffect", payload as any[]);
+  }
+}
+
+function collectEmbeddedDocuments<T extends ClientDocument>(collection: unknown): T[] {
+  if (!collection) {
+    return [];
+  }
+
+  if (Array.isArray(collection)) {
+    return collection as T[];
+  }
+
+  const candidate = collection as { contents?: unknown; values?: () => Iterable<unknown> };
+
+  if (Array.isArray(candidate.contents)) {
+    return candidate.contents as T[];
+  }
+
+  if (typeof candidate.values === "function") {
+    return Array.from(candidate.values() as Iterable<T>);
+  }
+
+  return [];
+}
+
+function clone<T>(value: T): T {
+  const foundryUtils = (globalThis as {
+    foundry?: { utils?: { deepClone?: <U>(input: U) => U } };
+  }).foundry?.utils;
+  if (foundryUtils?.deepClone) {
+    return foundryUtils.deepClone(value);
+  }
+
+  const structured = (globalThis as { structuredClone?: <U>(input: U) => U }).structuredClone;
+  if (structured) {
+    return structured(value);
+  }
+
+  try {
+    return JSON.parse(JSON.stringify(value)) as T;
+  } catch (error) {
+    console.warn("Handy Dandy | Fallback clone failed", error);
+    return value;
+  }
 }
