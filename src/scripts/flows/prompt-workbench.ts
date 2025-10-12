@@ -58,11 +58,14 @@ export interface PromptWorkbenchRequest<T extends EntityType> extends ImporterOp
   readonly entryName: string;
   readonly referenceText: string;
   readonly slug?: string;
+  readonly level?: number;
   readonly seed?: number;
   readonly maxAttempts?: number;
   readonly dependencies?: GenerationDependencyOverrides;
   readonly img?: string;
   readonly publication?: PublicationData;
+  readonly includeSpellcasting?: boolean;
+  readonly includeInventory?: boolean;
 }
 
 export interface PromptWorkbenchResult<T extends EntityType> {
@@ -170,6 +173,7 @@ export async function generateWorkbenchEntry<T extends EntityType>(
     entryName,
     referenceText,
     slug,
+    level,
     seed,
     maxAttempts,
     packId,
@@ -177,6 +181,8 @@ export async function generateWorkbenchEntry<T extends EntityType>(
     dependencies = {},
     img,
     publication,
+    includeSpellcasting,
+    includeInventory,
   } = request;
 
   const generator = resolveGenerator(type, dependencies.generators);
@@ -188,6 +194,9 @@ export async function generateWorkbenchEntry<T extends EntityType>(
     slug,
     img,
     publication,
+    level,
+    includeSpellcasting,
+    includeInventory,
   });
 
   const data = await generator(input, { seed, maxAttempts });
@@ -217,9 +226,20 @@ function buildPromptInput<T extends EntityType>(
     slug?: string;
     img?: string;
     publication?: PublicationData;
+    level?: number;
+    includeSpellcasting?: boolean;
+    includeInventory?: boolean;
   },
 ): PromptInputMap[T] {
-  const { systemId, entryName, referenceText, slug } = context;
+  const {
+    systemId,
+    entryName,
+    referenceText,
+    slug,
+    level,
+    includeSpellcasting,
+    includeInventory,
+  } = context;
   const img = context.img?.trim() || DEFAULT_IMAGE_PATH;
   const publication = normalizePublicationInput(context.publication);
   switch (type) {
@@ -249,6 +269,9 @@ function buildPromptInput<T extends EntityType>(
         slug,
         img,
         publication,
+        level,
+        includeSpellcasting,
+        includeInventory,
       } satisfies ActorPromptInput as PromptInputMap[T];
     default:
       throw new Error(`Unsupported entity type: ${type satisfies never}`);
