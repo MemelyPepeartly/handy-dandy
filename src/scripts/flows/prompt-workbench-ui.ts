@@ -40,6 +40,26 @@ interface StoredWorkbenchHistoryEntry {
   readonly result: SerializableWorkbenchResult;
 }
 
+type WorkbenchFormResponse = {
+  readonly entityType: string;
+  readonly systemId: string;
+  readonly entryName: string;
+  readonly slug: string;
+  readonly level: string;
+  readonly publicationTitle: string;
+  readonly publicationAuthors: string;
+  readonly publicationLicense: string;
+  readonly publicationRemaster: string | null;
+  readonly img: string;
+  readonly referenceText: string;
+  readonly seed: string;
+  readonly maxAttempts: string;
+  readonly packId: string;
+  readonly folderId: string;
+  readonly includeSpellcasting: string | null;
+  readonly includeInventory: string | null;
+};
+
 const workbenchHistory: WorkbenchHistoryEntry[] = [];
 
 Hooks.once("ready", () => {
@@ -414,48 +434,9 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
     </div>
   `;
 
-  const response = await new Promise<
-    | {
-        entityType: string;
-        systemId: string;
-        entryName: string;
-        slug: string;
-        level: string;
-        publicationTitle: string;
-        publicationAuthors: string;
-        publicationLicense: string;
-        publicationRemaster: string | null;
-        img: string;
-        referenceText: string;
-        seed: string;
-        maxAttempts: string;
-        packId: string;
-        folderId: string;
-        includeSpellcasting: string | null;
-        includeInventory: string | null;
-      }
-    | null
-  >((resolve) => {
+  const response = await new Promise<WorkbenchFormResponse | null>((resolve) => {
     let settled = false;
-    const finish = (
-      value: | {
-        entityType: string;
-        systemId: string;
-        entryName: string;
-        slug: string;
-        publicationTitle: string;
-        publicationAuthors: string;
-        publicationLicense: string;
-        publicationRemaster: string | null;
-        img: string;
-        referenceText: string;
-        seed: string;
-        maxAttempts: string;
-        packId: string;
-        folderId: string;
-      }
-      | null,
-    ): void => {
+    const finish = (value: WorkbenchFormResponse | null): void => {
       if (!settled) {
         settled = true;
         resolve(value);
