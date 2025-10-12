@@ -215,34 +215,41 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
       }
 
       .handy-dandy-workbench-history {
-        display: flex;
-        gap: 1rem;
-        min-height: 18rem;
+        display: grid;
+        gap: 0.75rem;
+        grid-template-columns: minmax(180px, 220px) 1fr;
+        align-items: start;
       }
 
       .handy-dandy-workbench-history-list {
         display: flex;
         flex-direction: column;
-        gap: 0.35rem;
-        width: 240px;
+        gap: 0.25rem;
         max-height: 24rem;
         overflow-y: auto;
+        border: 1px solid var(--color-border-dark, #333);
+        border-radius: 6px;
+        padding: 0.35rem;
+        background: var(--color-bg-alt, rgba(255, 255, 255, 0.04));
       }
 
       .handy-dandy-workbench-history-item {
-        align-items: stretch;
-        background: var(--color-bg-alt, rgba(255, 255, 255, 0.05));
-        border: 1px solid var(--color-border-dark, #333);
-        border-radius: 6px;
+        align-items: center;
+        border-radius: 4px;
+        border: 1px solid transparent;
         display: flex;
-        gap: 0.35rem;
-        padding: 0.3rem;
         transition: border-color 0.2s ease, background 0.2s ease;
       }
 
       .handy-dandy-workbench-history-item.active {
         border-color: var(--color-border-highlight, #ff8c00);
         background: var(--color-border-light-1, rgba(255, 255, 255, 0.12));
+      }
+
+      .handy-dandy-workbench-history-item:not(.active):hover,
+      .handy-dandy-workbench-history-item:not(.active):focus-within {
+        border-color: var(--color-border-light-2, rgba(255, 255, 255, 0.2));
+        background: var(--color-border-dark, rgba(255, 255, 255, 0.08));
       }
 
       .handy-dandy-workbench-history-select {
@@ -252,8 +259,11 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
         color: inherit;
         cursor: pointer;
         flex: 1;
-        padding: 0.15rem 0.25rem;
+        padding: 0.45rem 0.5rem;
         text-align: left;
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
       }
 
       .handy-dandy-workbench-history-select:focus {
@@ -261,40 +271,39 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
       }
 
       .handy-dandy-workbench-history-select .handy-dandy-workbench-history-name {
-        display: block;
         font-weight: 600;
-        margin-bottom: 0.2rem;
+        font-size: 0.95rem;
       }
 
       .handy-dandy-workbench-history-select .handy-dandy-workbench-history-meta {
         color: var(--color-text-light-6, #bbb);
-        display: block;
-        font-size: 0.85rem;
+        font-size: 0.8rem;
       }
 
       .handy-dandy-workbench-history-delete {
         appearance: none;
         background: transparent;
         border: none;
-        border-radius: 4px;
+        border-radius: 0 4px 4px 0;
         color: var(--color-text-light-6, #bbb);
         cursor: pointer;
-        padding: 0.25rem;
-        align-self: center;
+        padding: 0.35rem;
         transition: color 0.2s ease, background 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
       }
 
       .handy-dandy-workbench-history-delete:hover,
       .handy-dandy-workbench-history-delete:focus-visible {
         color: var(--color-text-bright, #f0f0f0);
-        background: var(--color-border-dark, rgba(255, 255, 255, 0.1));
+        background: var(--color-border-dark, rgba(255, 255, 255, 0.12));
         outline: none;
       }
 
       .handy-dandy-workbench-history-view {
         border: 1px solid var(--color-border-dark, #333);
         border-radius: 6px;
-        flex: 1;
         min-height: 18rem;
         padding: 0.75rem;
         overflow: auto;
@@ -903,24 +912,27 @@ function buildWorkbenchDialogContent(currentEntry: WorkbenchHistoryEntry): strin
       }
 
       .handy-dandy-workbench-history {
-        display: flex;
-        gap: 1rem;
-        min-height: 18rem;
+        display: grid;
+        gap: 0.75rem;
+        grid-template-columns: minmax(180px, 220px) 1fr;
+        align-items: start;
       }
 
       .handy-dandy-workbench-history-list {
         display: flex;
         flex-direction: column;
-        gap: 0.35rem;
-        width: 240px;
+        gap: 0.25rem;
         max-height: 24rem;
         overflow-y: auto;
+        border: 1px solid var(--color-border-dark, #333);
+        border-radius: 6px;
+        padding: 0.35rem;
+        background: var(--color-bg-alt, rgba(255, 255, 255, 0.04));
       }
 
       .handy-dandy-workbench-history-view {
         border: 1px solid var(--color-border-dark, #333);
         border-radius: 6px;
-        flex: 1;
         min-height: 18rem;
         padding: 0.75rem;
         overflow: auto;
@@ -951,19 +963,22 @@ function buildWorkbenchDialogContent(currentEntry: WorkbenchHistoryEntry): strin
       }
 
       .handy-dandy-workbench-history-item {
-        align-items: stretch;
-        background: var(--color-bg-alt, rgba(255, 255, 255, 0.05));
-        border: 1px solid var(--color-border-dark, #333);
-        border-radius: 6px;
+        align-items: center;
+        border-radius: 4px;
+        border: 1px solid transparent;
         display: flex;
-        gap: 0.35rem;
-        padding: 0.3rem;
         transition: border-color 0.2s ease, background 0.2s ease;
       }
 
       .handy-dandy-workbench-history-item.active {
         border-color: var(--color-border-highlight, #ff8c00);
         background: var(--color-border-light-1, rgba(255, 255, 255, 0.12));
+      }
+
+      .handy-dandy-workbench-history-item:not(.active):hover,
+      .handy-dandy-workbench-history-item:not(.active):focus-within {
+        border-color: var(--color-border-light-2, rgba(255, 255, 255, 0.2));
+        background: var(--color-border-dark, rgba(255, 255, 255, 0.08));
       }
 
       .handy-dandy-workbench-history-select {
@@ -973,8 +988,11 @@ function buildWorkbenchDialogContent(currentEntry: WorkbenchHistoryEntry): strin
         color: inherit;
         cursor: pointer;
         flex: 1;
-        padding: 0.15rem 0.25rem;
+        padding: 0.45rem 0.5rem;
         text-align: left;
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
       }
 
       .handy-dandy-workbench-history-select:focus {
@@ -982,33 +1000,33 @@ function buildWorkbenchDialogContent(currentEntry: WorkbenchHistoryEntry): strin
       }
 
       .handy-dandy-workbench-history-select .handy-dandy-workbench-history-name {
-        display: block;
         font-weight: 600;
-        margin-bottom: 0.2rem;
+        font-size: 0.95rem;
       }
 
       .handy-dandy-workbench-history-select .handy-dandy-workbench-history-meta {
         color: var(--color-text-light-6, #bbb);
-        display: block;
-        font-size: 0.85rem;
+        font-size: 0.8rem;
       }
 
       .handy-dandy-workbench-history-delete {
         appearance: none;
         background: transparent;
         border: none;
-        border-radius: 4px;
+        border-radius: 0 4px 4px 0;
         color: var(--color-text-light-6, #bbb);
         cursor: pointer;
-        padding: 0.25rem;
-        align-self: center;
+        padding: 0.35rem;
         transition: color 0.2s ease, background 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
       }
 
       .handy-dandy-workbench-history-delete:hover,
       .handy-dandy-workbench-history-delete:focus-visible {
         color: var(--color-text-bright, #f0f0f0);
-        background: var(--color-border-dark, rgba(255, 255, 255, 0.1));
+        background: var(--color-border-dark, rgba(255, 255, 255, 0.12));
         outline: none;
       }
 
@@ -1143,6 +1161,19 @@ function setupWorkbenchRequestDialog(html: JQuery): void {
     return;
   }
 
+  const dialogApp = root.closest<HTMLElement>(".window-app");
+  const dialogButtons = dialogApp?.querySelector<HTMLElement>(".dialog-buttons");
+
+  const updateDialogButtonsVisibility = (): void => {
+    if (!dialogButtons) {
+      return;
+    }
+
+    const activeTab = container.querySelector<HTMLButtonElement>(".handy-dandy-workbench-tab.active");
+    const shouldShowButtons = activeTab?.dataset.tab !== "history";
+    dialogButtons.style.display = shouldShowButtons ? "" : "none";
+  };
+
   const historyList = container.querySelector<HTMLElement>("[data-history-list]");
   const historyView = container.querySelector<HTMLElement>("[data-history-view]");
   const initialEntry = workbenchHistory[0] ?? null;
@@ -1156,6 +1187,8 @@ function setupWorkbenchRequestDialog(html: JQuery): void {
     renderHistoryEntry(historyView, initialEntry);
   }
 
+  updateDialogButtonsVisibility();
+
   container.addEventListener("click", (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) {
@@ -1165,6 +1198,7 @@ function setupWorkbenchRequestDialog(html: JQuery): void {
     const tabButton = target.closest<HTMLButtonElement>(".handy-dandy-workbench-tab");
     if (tabButton?.dataset.tab) {
       activateWorkbenchTab(container, tabButton.dataset.tab);
+      updateDialogButtonsVisibility();
       return;
     }
 
