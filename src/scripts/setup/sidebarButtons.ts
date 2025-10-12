@@ -75,7 +75,7 @@ export function insertSidebarButtons(controls: ControlCollection): void {
     icon: "fa-solid fa-screwdriver-wrench",
     layer: "interface",
     visible: true,
-    activeTool: "tool-guide",
+    activeTool: "",
     onChange: noop,
     onToolChange: noop,
     tools,
@@ -86,7 +86,6 @@ export function insertSidebarButtons(controls: ControlCollection): void {
     title: "Tool Guide",
     icon: "fa-solid fa-compass",
     toggle: true,
-    active: true,
     onClick: toggled => {
       const handyDandy = requireNamespace();
       const toolOverview = handyDandy.applications.toolOverview;
