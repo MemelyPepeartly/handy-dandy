@@ -3,6 +3,7 @@ import {
   PUBLICATION_DEFAULT,
   RARITIES,
   itemSchema,
+  type ItemCategory,
   type PublicationData,
   type SystemId,
 } from "../schemas/index";
@@ -18,6 +19,7 @@ export interface ItemPromptInput {
   readonly name: string;
   readonly referenceText: string;
   readonly slug?: string;
+  readonly itemType?: ItemCategory;
   readonly correction?: CorrectionContext;
   readonly img?: string;
   readonly publication?: PublicationData;
@@ -37,6 +39,22 @@ function buildItemSchemaSection(): string {
   );
   const sourceDefault = (itemSchema.properties.source as { default: string }).default;
   const publicationDefault = JSON.stringify(PUBLICATION_DEFAULT);
+  const canonicalKeys = [
+    "schema_version",
+    "systemId",
+    "type",
+    "slug",
+    "name",
+    "itemType",
+    "rarity",
+    "level",
+    "price",
+    "traits",
+    "description",
+    "img",
+    "source",
+    "publication",
+  ].join(", ");
   return [
     "Item schema overview:",
     `- schema_version: integer literal ${schemaVersion}.`,
@@ -51,7 +69,9 @@ function buildItemSchemaSection(): string {
     `- description: optional string; defaults to "${descriptionDefault}".`,
     `- img: optional string containing an image URL or Foundry asset path; defaults to ${imgDefault}.`,
     `- source: optional string; defaults to "${sourceDefault}".`,
-    `- publication: object { title, authors, license, remaster }; defaults to ${publicationDefault}.`
+    `- publication: object { title, authors, license, remaster }; defaults to ${publicationDefault}.`,
+    `- Always include every top-level property in the JSON response using this canonical set: ${canonicalKeys}.`,
+    `- When a property is optional, include it with the default value to preserve the exact structure shown in the reference assets.`
   ].join("\n");
 }
 
@@ -61,6 +81,10 @@ function buildItemRequest(input: ItemPromptInput): string {
     "Base your response on the following text:",
     input.referenceText.trim()
   ];
+
+  if (input.itemType) {
+    parts.splice(1, 0, `Item type: ${input.itemType}. Set the \"itemType\" field to this exact value.`);
+  }
 
   if (input.slug) {
     parts.splice(1, 0, `Slug suggestion: ${input.slug}`);

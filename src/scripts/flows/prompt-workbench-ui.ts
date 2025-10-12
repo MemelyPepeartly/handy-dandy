@@ -8,9 +8,11 @@ import {
   type PromptWorkbenchResult,
 } from "./prompt-workbench";
 import {
+  ITEM_CATEGORIES,
   SYSTEM_IDS,
   type EntityType,
   type GeneratedEntityMap,
+  type ItemCategory,
   type PublicationData,
   type SystemId,
 } from "../schemas";
@@ -45,6 +47,7 @@ type WorkbenchFormResponse = {
   readonly systemId: string;
   readonly entryName: string;
   readonly slug: string;
+  readonly itemType: string;
   readonly level: string;
   readonly publicationTitle: string;
   readonly publicationAuthors: string;
@@ -151,6 +154,9 @@ export async function runPromptWorkbenchFlow(): Promise<void> {
 
 async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityType> | null> {
   const systemOptions = SYSTEM_IDS.map((id) => `<option value="${id}">${id.toUpperCase()}</option>`).join("");
+  const itemTypeOptions = ITEM_CATEGORIES.map(
+    (category) => `<option value="${category}">${formatItemTypeLabel(category)}</option>`
+  ).join("");
   const initialHistoryId = workbenchHistory[0]?.id;
   const historyListMarkup = buildHistoryListMarkup(initialHistoryId);
   const historyPlaceholder = buildHistoryViewPlaceholder();
@@ -436,6 +442,14 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
                   ${systemOptions}
                 </select>
               </div>
+              <div data-entity-scope="item">
+                <label for="handy-dandy-workbench-item-type">Item Type</label>
+                <select id="handy-dandy-workbench-item-type" name="itemType">
+                  <option value="">Select a type</option>
+                  ${itemTypeOptions}
+                </select>
+                <p class="notes">Match the Foundry item category for the generated entry.</p>
+              </div>
             </div>
           </fieldset>
           <div class="form-group">
@@ -458,7 +472,7 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
             </div>
             <p class="notes">Provide a level for actors; leave blank for other entries.</p>
           </div>
-          <fieldset class="form-group">
+          <fieldset class="form-group" data-entity-scope="actor">
             <legend>Actor Content</legend>
             <div class="form-fields">
               <label><input type="checkbox" name="includeSpellcasting" /> Spellcasting?</label>
@@ -532,6 +546,7 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
                 systemId: String(formData.get("systemId") ?? ""),
                 entryName: String(formData.get("entryName") ?? ""),
                 slug: String(formData.get("slug") ?? ""),
+                itemType: String(formData.get("itemType") ?? ""),
                 level: String(formData.get("level") ?? ""),
                 publicationTitle: String(formData.get("publicationTitle") ?? ""),
                 publicationAuthors: String(formData.get("publicationAuthors") ?? ""),
@@ -594,6 +609,16 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
     return null;
   }
 
+  let itemType: ItemCategory | undefined;
+  if (type === "item") {
+    const resolved = sanitizeItemType(response.itemType);
+    if (!resolved) {
+      ui.notifications?.error(`${CONSTANTS.MODULE_NAME} | Select a valid item type.`);
+      return null;
+    }
+    itemType = resolved;
+  }
+
   const referenceText = response.referenceText.trim();
   if (!referenceText) {
     ui.notifications?.error(`${CONSTANTS.MODULE_NAME} | Reference text or prompt is required.`);
@@ -615,6 +640,7 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
     entryName,
     referenceText,
     slug: response.slug.trim() || undefined,
+    itemType,
     level: parseOptionalNumber(response.level),
     seed: parseOptionalNumber(response.seed),
     maxAttempts: parseOptionalNumber(response.maxAttempts),
@@ -637,6 +663,13 @@ function parseOptionalNumber(value: string): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
+function sanitizeItemType(value: string): ItemCategory | null {
+  const normalized = value.trim().toLowerCase();
+  return ITEM_CATEGORIES.includes(normalized as ItemCategory)
+    ? (normalized as ItemCategory)
+    : null;
+}
+
 function sanitizeEntityType(value: string): EntityType | null {
   switch (value) {
     case "action":
@@ -651,6 +684,13 @@ function sanitizeEntityType(value: string): EntityType | null {
 function sanitizeSystemId(value: string): SystemId | null {
   const normalised = value.trim().toLowerCase();
   return SYSTEM_IDS.includes(normalised as SystemId) ? (normalised as SystemId) : null;
+}
+
+function formatItemTypeLabel(value: ItemCategory): string {
+  return value
+    .split(/[-_]/)
+    .map((part) => (part ? part[0].toUpperCase() + part.slice(1) : part))
+    .join(" ");
 }
 
 function showGeneratingDialog(request: PromptWorkbenchRequest<EntityType>): Dialog {
@@ -1245,6 +1285,29 @@ function setupWorkbenchRequestDialog(html: JQuery): void {
     dialogButtons.style.display = shouldShowButtons ? "" : "none";
   };
 
+  const entityTypeField = container.querySelector<HTMLSelectElement>("#handy-dandy-workbench-entity-type");
+  const scopedFields = Array.from(container.querySelectorAll<HTMLElement>("[data-entity-scope]"));
+
+  const updateScopedFieldVisibility = (): void => {
+    const currentType = entityTypeField?.value ?? "";
+    for (const field of scopedFields) {
+      const scopes = (field.dataset.entityScope ?? "")
+        .split(/\s+/)
+        .map((value) => value.trim())
+        .filter(Boolean);
+      const shouldShow = scopes.includes(currentType);
+      field.style.display = shouldShow ? "" : "none";
+      field.setAttribute("aria-hidden", shouldShow ? "false" : "true");
+
+      if (field.dataset.entityScope?.includes("item")) {
+        const itemSelect = field.querySelector<HTMLSelectElement>("select[name=\"itemType\"]");
+        if (itemSelect) {
+          itemSelect.required = shouldShow;
+        }
+      }
+    }
+  };
+
   const historyList = container.querySelector<HTMLElement>("[data-history-list]");
   const historyView = container.querySelector<HTMLElement>("[data-history-view]");
   const initialEntry = workbenchHistory[0] ?? null;
@@ -1259,6 +1322,8 @@ function setupWorkbenchRequestDialog(html: JQuery): void {
   }
 
   updateDialogButtonsVisibility();
+  updateScopedFieldVisibility();
+  entityTypeField?.addEventListener("change", updateScopedFieldVisibility);
 
   container.addEventListener("click", (event) => {
     const target = event.target;

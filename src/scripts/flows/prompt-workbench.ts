@@ -5,6 +5,7 @@ import {
   type CanonicalEntityMap,
   type EntityType,
   type GeneratedEntityMap,
+  type ItemCategory,
   type PublicationData,
   type SystemId,
 } from "../schemas";
@@ -58,6 +59,7 @@ export interface PromptWorkbenchRequest<T extends EntityType> extends ImporterOp
   readonly entryName: string;
   readonly referenceText: string;
   readonly slug?: string;
+  readonly itemType?: ItemCategory;
   readonly level?: number;
   readonly seed?: number;
   readonly maxAttempts?: number;
@@ -173,6 +175,7 @@ export async function generateWorkbenchEntry<T extends EntityType>(
     entryName,
     referenceText,
     slug,
+    itemType,
     level,
     seed,
     maxAttempts,
@@ -192,6 +195,7 @@ export async function generateWorkbenchEntry<T extends EntityType>(
     entryName,
     referenceText,
     slug,
+    itemType,
     img,
     publication,
     level,
@@ -224,6 +228,7 @@ function buildPromptInput<T extends EntityType>(
     entryName: string;
     referenceText: string;
     slug?: string;
+    itemType?: ItemCategory;
     img?: string;
     publication?: PublicationData;
     level?: number;
@@ -236,6 +241,7 @@ function buildPromptInput<T extends EntityType>(
     entryName,
     referenceText,
     slug,
+    itemType,
     level,
     includeSpellcasting,
     includeInventory,
@@ -258,6 +264,7 @@ function buildPromptInput<T extends EntityType>(
         name: entryName,
         referenceText,
         slug,
+        itemType,
         img,
         publication,
       } satisfies ItemPromptInput as PromptInputMap[T];
