@@ -11,6 +11,7 @@ import { DeveloperConsole } from "./dev/developer-console";
 import { setDeveloperConsole } from "./dev/state";
 import { createDevNamespace, canUseDeveloperTools, type DevNamespace } from "./dev/tools";
 import { ToolOverview } from "./ui/tool-overview";
+import { registerNpcRemixButton } from "./ui/npc-remix-button";
 import {
   DEFAULT_GENERATION_SEED,
   generateAction,
@@ -51,6 +52,8 @@ type BoundGenerateActor = (
   input: ActorPromptInput,
   options?: BoundGenerationOptions,
 ) => Promise<ActorGenerationResult>;
+
+registerNpcRemixButton();
 
 function bindGenerator<TInput, TResult>(
   fn: GeneratorFunction<TInput, TResult>,
