@@ -30,7 +30,7 @@ function buildActionSchemaSection(): string {
     "- name: non-empty string.",
     `- actionType: string enum value (choose from: ${enumExecutions}).`,
     "- description: non-empty string containing the full action rules.",
-    `- traits: optional array of non-empty strings; defaults to ${traitsDefault}.`,
+    `- traits: optional array of lowercase PF2e trait slugs drawn from the active system; defaults to ${traitsDefault}.`,
     `- requirements: optional string; defaults to "${requirementsDefault}".`,
     `- img: optional string containing an image URL or Foundry asset path; defaults to ${imgDefault}.`,
     `- rarity: optional string enum (${rarities}); defaults to "${rarityDefault}".`,

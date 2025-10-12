@@ -8,6 +8,32 @@ import {
 } from "../src/scripts/validation/ensure-valid";
 import type { JsonSchemaDefinition, GPTClient } from "../src/scripts/gpt/client";
 
+(globalThis as { CONFIG?: unknown }).CONFIG = {
+  PF2E: {
+    actionTraits: {
+      attack: "PF2E.TraitAttack",
+      auditory: "PF2E.TraitAuditory",
+      fighter: "PF2E.TraitFighter",
+      press: "PF2E.TraitPress",
+    },
+    itemTraits: {
+      magical: "PF2E.ItemTraitMagical",
+      invested: "PF2E.ItemTraitInvested",
+    },
+    weaponTraits: {
+      agile: "PF2E.WeaponTraitAgile",
+      reach: "PF2E.WeaponTraitReach",
+      "deadly-d8": "PF2E.WeaponTraitDeadlyD8",
+    },
+    creatureTraits: {
+      brute: "PF2E.CreatureTraitBrute",
+      human: "PF2E.CreatureTraitHuman",
+      scout: "PF2E.CreatureTraitScout",
+    },
+    traitDescriptions: {},
+  },
+};
+
 class StubGPTClient {
   public calls: Array<{ prompt: string; schema: JsonSchemaDefinition }> = [];
   private readonly responses: Array<unknown> = [];
@@ -63,6 +89,63 @@ test("ensureValid normalises PF2e payloads before validation", async () => {
   assert.equal(result.rarity, "common");
   assert.equal(result.source, "");
   assert.equal(Object.hasOwn(result as Record<string, unknown>, "extra"), false);
+});
+
+test("ensureValid filters traits to the PF2e dictionary", async () => {
+  const payload = {
+    schema_version: 3,
+    systemId: "pf2e",
+    type: "actor",
+    slug: "filtered-actor",
+    name: "Filtered Actor",
+    actorType: "npc",
+    rarity: "common",
+    level: 1,
+    size: "med",
+    traits: ["brute", "mystery"],
+    languages: ["Common"],
+    attributes: {
+      hp: { value: 15, max: 15 },
+      ac: { value: 18 },
+      perception: { value: 6 },
+      speed: { value: 25 },
+      saves: {
+        fortitude: { value: 6 },
+        reflex: { value: 6 },
+        will: { value: 6 },
+      },
+    },
+    abilities: { str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0 },
+    skills: [],
+    strikes: [
+      {
+        name: "Claw",
+        type: "melee",
+        attackBonus: 10,
+        traits: ["agile", "unknown-strike"],
+        damage: [{ formula: "1d6+4", damageType: "slashing", notes: "" }],
+        effects: [],
+        description: "A vicious swipe.",
+      },
+    ],
+    actions: [
+      {
+        name: "Terrifying Roar",
+        actionCost: "one-action",
+        description: "An unsettling roar.",
+        traits: ["auditory", "mystery-action"],
+      },
+    ],
+    img: null,
+    source: "",
+  } as const;
+
+  const result = await ensureValid({ type: "actor", payload });
+
+  assert.deepEqual(result.traits, ["brute"]);
+  assert.equal(result.languages.length, 1);
+  assert.deepEqual(result.strikes[0]?.traits, ["agile"]);
+  assert.deepEqual(result.actions[0]?.traits, ["auditory"]);
 });
 
 test("ensureValid uses GPT repair when Ajv validation fails", async () => {

@@ -20,6 +20,32 @@ import type {
 } from "../src/scripts/prompts";
 import { cloneFixture, loadFixture } from "./helpers/fixtures";
 
+(globalThis as { CONFIG?: unknown }).CONFIG = {
+  PF2E: {
+    actionTraits: {
+      attack: "PF2E.TraitAttack",
+      auditory: "PF2E.TraitAuditory",
+      fighter: "PF2E.TraitFighter",
+      press: "PF2E.TraitPress",
+    },
+    itemTraits: {
+      magical: "PF2E.ItemTraitMagical",
+      invested: "PF2E.ItemTraitInvested",
+    },
+    weaponTraits: {
+      agile: "PF2E.WeaponTraitAgile",
+      reach: "PF2E.WeaponTraitReach",
+      "deadly-d8": "PF2E.WeaponTraitDeadlyD8",
+    },
+    creatureTraits: {
+      brute: "PF2E.CreatureTraitBrute",
+      human: "PF2E.CreatureTraitHuman",
+      scout: "PF2E.CreatureTraitScout",
+    },
+    traitDescriptions: {},
+  },
+};
+
 interface RecordedCall {
   prompt: string;
   schema: JsonSchemaDefinition;
