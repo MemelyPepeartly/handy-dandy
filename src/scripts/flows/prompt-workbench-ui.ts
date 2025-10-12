@@ -25,7 +25,7 @@ interface WorkbenchHistoryEntry {
 }
 
 const WORKBENCH_HISTORY_LIMIT = 12;
-const WORKBENCH_HISTORY_STORAGE_KEY = `${CONSTANTS.MODULE_ID}.workbenchHistory` as const;
+const WORKBENCH_HISTORY_FLAG_KEY = "workbenchHistory" as const;
 
 type SerializableWorkbenchResult = Pick<
   PromptWorkbenchResult<EntityType>,
@@ -42,7 +42,33 @@ interface StoredWorkbenchHistoryEntry {
 
 const workbenchHistory: WorkbenchHistoryEntry[] = [];
 
-initialiseWorkbenchHistory();
+Hooks.once("ready", () => {
+  initialiseWorkbenchHistory();
+});
+
+Hooks.on("updateUser", (user: User, changes: Record<string, unknown>) => {
+  const currentUserId = game.userId;
+  if (!currentUserId || user.id !== currentUserId) {
+    return;
+  }
+
+  const flags = (changes as { flags?: unknown }).flags;
+  if (!flags || typeof flags !== "object") {
+    return;
+  }
+
+  const moduleFlags = (flags as Record<string, unknown>)[CONSTANTS.MODULE_ID];
+  if (!moduleFlags || typeof moduleFlags !== "object") {
+    return;
+  }
+
+  if (!Object.prototype.hasOwnProperty.call(moduleFlags, WORKBENCH_HISTORY_FLAG_KEY)) {
+    return;
+  }
+
+  const value = (moduleFlags as Record<string, unknown>)[WORKBENCH_HISTORY_FLAG_KEY];
+  applyStoredWorkbenchHistory(value);
+});
 
 export async function runExportSelectionFlow(): Promise<void> {
   try {
@@ -609,50 +635,44 @@ function escapeJsonForTextarea(json: string): string {
 }
 
 function initialiseWorkbenchHistory(): void {
-  const storedEntries = loadStoredWorkbenchHistory();
-  if (!storedEntries.length) {
-    return;
-  }
-
-  workbenchHistory.splice(0, workbenchHistory.length, ...storedEntries);
+  const storedValue = getWorkbenchHistoryFlag();
+  applyStoredWorkbenchHistory(storedValue);
 }
 
-function loadStoredWorkbenchHistory(): WorkbenchHistoryEntry[] {
-  const storage = getHistoryStorage();
-  if (!storage) {
+function getWorkbenchHistoryFlag(): unknown {
+  const user = game.user;
+  if (!user) {
     return [];
   }
 
   try {
-    const raw = storage.getItem(WORKBENCH_HISTORY_STORAGE_KEY);
-    if (!raw) {
-      return [];
-    }
-
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-
-    const entries = parsed
-      .map((entry) => deserializeHistoryEntry(entry))
-      .filter((entry): entry is WorkbenchHistoryEntry => Boolean(entry));
-
-    return entries.slice(0, WORKBENCH_HISTORY_LIMIT);
+    return user.getFlag(CONSTANTS.MODULE_ID, WORKBENCH_HISTORY_FLAG_KEY) ?? [];
   } catch (error) {
     console.warn(`${CONSTANTS.MODULE_NAME} | Failed to load prompt workbench history`, error);
     return [];
   }
 }
 
-function getHistoryStorage(): Storage | null {
-  const candidate = (globalThis as { localStorage?: Storage }).localStorage;
-  return typeof candidate === "object" ? candidate : null;
+function applyStoredWorkbenchHistory(value: unknown): void {
+  const entries = normaliseStoredWorkbenchHistory(value);
+  workbenchHistory.splice(0, workbenchHistory.length, ...entries);
 }
 
-function saveWorkbenchHistory(): void {
-  const storage = getHistoryStorage();
-  if (!storage) {
+function normaliseStoredWorkbenchHistory(value: unknown): WorkbenchHistoryEntry[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const entries = value
+    .map((entry) => deserializeHistoryEntry(entry))
+    .filter((entry): entry is WorkbenchHistoryEntry => Boolean(entry));
+
+  return entries.slice(0, WORKBENCH_HISTORY_LIMIT);
+}
+
+async function persistWorkbenchHistory(): Promise<void> {
+  const user = game.user;
+  if (!user) {
     return;
   }
 
@@ -660,7 +680,7 @@ function saveWorkbenchHistory(): void {
     const serializable = workbenchHistory
       .slice(0, WORKBENCH_HISTORY_LIMIT)
       .map((entry) => serializeHistoryEntry(entry));
-    storage.setItem(WORKBENCH_HISTORY_STORAGE_KEY, JSON.stringify(serializable));
+    await user.setFlag(CONSTANTS.MODULE_ID, WORKBENCH_HISTORY_FLAG_KEY, serializable);
   } catch (error) {
     console.warn(`${CONSTANTS.MODULE_NAME} | Failed to persist prompt workbench history`, error);
   }
@@ -767,7 +787,7 @@ function recordHistoryEntry(
     workbenchHistory.length = WORKBENCH_HISTORY_LIMIT;
   }
 
-  saveWorkbenchHistory();
+  void persistWorkbenchHistory();
 
   return entry;
 }
@@ -1329,7 +1349,7 @@ function removeHistoryEntry(
 
   const [removed] = workbenchHistory.splice(index, 1);
   const fallback = workbenchHistory[index] ?? workbenchHistory[index - 1] ?? null;
-  saveWorkbenchHistory();
+  void persistWorkbenchHistory();
 
   return { removed, fallback };
 }
