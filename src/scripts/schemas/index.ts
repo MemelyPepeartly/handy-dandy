@@ -46,6 +46,33 @@ export type EntityType = (typeof ENTITY_TYPES)[number];
 
 export const LATEST_SCHEMA_VERSION = 3 as const;
 
+export interface PublicationData {
+  title: string;
+  authors: string;
+  license: string;
+  remaster: boolean;
+}
+
+export const PUBLICATION_DEFAULT = {
+  title: "",
+  authors: "",
+  license: "OGL",
+  remaster: false,
+} as const satisfies PublicationData;
+
+const publicationSchema: JSONSchemaType<PublicationData> = {
+  type: "object",
+  additionalProperties: false,
+  required: ["title", "authors", "license", "remaster"],
+  properties: {
+    title: { type: "string", default: PUBLICATION_DEFAULT.title },
+    authors: { type: "string", default: PUBLICATION_DEFAULT.authors },
+    license: { type: "string", default: PUBLICATION_DEFAULT.license },
+    remaster: { type: "boolean", default: PUBLICATION_DEFAULT.remaster },
+  },
+  default: PUBLICATION_DEFAULT,
+};
+
 type BaseEntity<TType extends EntityType> = {
   schema_version: typeof LATEST_SCHEMA_VERSION;
   systemId: SystemId;
@@ -62,6 +89,7 @@ export interface ActionSchemaData extends BaseEntity<"action"> {
   img?: string | null;
   rarity?: Rarity | null;
   source?: string | null;
+  publication: PublicationData;
 }
 
 export interface ItemSchemaData extends BaseEntity<"item"> {
@@ -73,6 +101,7 @@ export interface ItemSchemaData extends BaseEntity<"item"> {
   description?: string | null;
   img?: string | null;
   source?: string | null;
+  publication: PublicationData;
 }
 
 export interface ActorHitPointsData {
@@ -239,6 +268,7 @@ export interface ActorSchemaData extends BaseEntity<"actor"> {
   recallKnowledge?: string | null;
   img: string | null;
   source: string;
+  publication: PublicationData;
 }
 
 export interface ActorGenerationResult {
@@ -283,7 +313,16 @@ export const actionSchema = {
   $id: "Action",
   type: "object",
   additionalProperties: false,
-  required: ["schema_version", "systemId", "type", "slug", "name", "actionType", "description"],
+  required: [
+    "schema_version",
+    "systemId",
+    "type",
+    "slug",
+    "name",
+    "actionType",
+    "description",
+    "publication",
+  ],
   properties: {
     ...baseMeta,
     type: { type: "string", enum: ["action"] as const },
@@ -298,7 +337,8 @@ export const actionSchema = {
     description: { type: "string", minLength: 1 },
     img: { type: "string", nullable: true, default: null },
     rarity: { type: "string", enum: RARITIES, nullable: true, default: "common" as const },
-    source: { type: "string", nullable: true, default: "" }
+    source: { type: "string", nullable: true, default: "" },
+    publication: publicationSchema
   }
 } satisfies JSONSchemaType<ActionSchemaData>;
 
@@ -306,7 +346,17 @@ export const itemSchema = {
   $id: "Item",
   type: "object",
   additionalProperties: false,
-  required: ["schema_version", "systemId", "type", "slug", "name", "itemType", "rarity", "level"],
+  required: [
+    "schema_version",
+    "systemId",
+    "type",
+    "slug",
+    "name",
+    "itemType",
+    "rarity",
+    "level",
+    "publication",
+  ],
   properties: {
     ...baseMeta,
     type: { type: "string", enum: ["item"] as const },
@@ -322,7 +372,8 @@ export const itemSchema = {
     },
     description: { type: "string", nullable: true, default: "" },
     img: { type: "string", nullable: true, default: null },
-    source: { type: "string", nullable: true, default: "" }
+    source: { type: "string", nullable: true, default: "" },
+    publication: publicationSchema
   }
 } satisfies JSONSchemaType<ItemSchemaData>;
 
@@ -348,7 +399,8 @@ export const actorSchema = {
     "strikes",
     "actions",
     "img",
-    "source"
+    "source",
+    "publication"
   ],
   properties: {
     ...baseMeta,
@@ -667,8 +719,13 @@ export const actorSchema = {
     },
     description: { type: "string", nullable: true, default: null },
     recallKnowledge: { type: "string", nullable: true, default: null },
-    img: { type: "string", nullable: true, default: null },
-    source: { type: "string", default: "" }
+    img: {
+      type: "string",
+      nullable: true,
+      default: "systems/pf2e/icons/default-icons/npc.svg" as const,
+    },
+    source: { type: "string", default: "" },
+    publication: publicationSchema
   }
 } as unknown as JSONSchemaType<ActorSchemaData>;
 

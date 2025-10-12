@@ -5,14 +5,16 @@ import type {
   ItemSchemaData,
   ActorCategory,
   ItemCategory,
-  Rarity
+  PublicationData,
+  Rarity,
 } from "../schemas";
 import {
   ACTION_EXECUTIONS,
   ACTOR_CATEGORIES,
   ITEM_CATEGORIES,
   LATEST_SCHEMA_VERSION,
-  RARITIES
+  PUBLICATION_DEFAULT,
+  RARITIES,
 } from "../schemas";
 
 const DEFAULT_SCHEMA_VERSION = LATEST_SCHEMA_VERSION;
@@ -166,6 +168,29 @@ function normalizeString(value: unknown): string | undefined {
 
   const trimmed = value.trim();
   return trimmed.length ? trimmed : undefined;
+}
+
+function normalizePublication(value: unknown, fallbackTitle?: string): PublicationData {
+  if (!value || typeof value !== "object") {
+    return {
+      title: normalizeString(fallbackTitle) ?? PUBLICATION_DEFAULT.title,
+      authors: PUBLICATION_DEFAULT.authors,
+      license: PUBLICATION_DEFAULT.license,
+      remaster: PUBLICATION_DEFAULT.remaster,
+    };
+  }
+
+  const record = value as { title?: unknown; authors?: unknown; license?: unknown; remaster?: unknown };
+  const rawTitle = typeof record.title === "string" ? record.title.trim() : undefined;
+  const rawAuthors = typeof record.authors === "string" ? record.authors.trim() : undefined;
+  const rawLicense = typeof record.license === "string" ? record.license.trim() : undefined;
+  const remaster = typeof record.remaster === "boolean" ? record.remaster : PUBLICATION_DEFAULT.remaster;
+
+  const title = rawTitle !== undefined ? rawTitle : normalizeString(fallbackTitle) ?? PUBLICATION_DEFAULT.title;
+  const authors = rawAuthors !== undefined ? rawAuthors : PUBLICATION_DEFAULT.authors;
+  const license = rawLicense !== undefined ? rawLicense : PUBLICATION_DEFAULT.license;
+
+  return { title, authors, license, remaster };
 }
 
 function normalizeRarity(value: unknown): Rarity {
@@ -836,6 +861,12 @@ export type FoundryAction = FoundryBaseDocument & {
     actions?: { value?: number | string | null } | number | string | null;
     requirements?: { value?: string | null } | string | null;
     source?: { value?: string | null } | string | null;
+    publication?: {
+      title?: string | null;
+      authors?: string | null;
+      license?: string | null;
+      remaster?: boolean | null;
+    };
   } & Record<string, unknown>;
 };
 
@@ -852,6 +883,12 @@ export type FoundryItem = FoundryBaseDocument & {
     level?: { value?: number | string | null } | number | string | null;
     price?: { value?: unknown } | unknown;
     source?: { value?: string | null } | string | null;
+    publication?: {
+      title?: string | null;
+      authors?: string | null;
+      license?: string | null;
+      remaster?: boolean | null;
+    };
   } & Record<string, unknown>;
 };
 
@@ -876,6 +913,12 @@ export type FoundryActor = FoundryBaseDocument & {
       level?: { value?: number | string | null } | number | string | null;
       languages?: { value?: unknown } | unknown;
       source?: { value?: string | null } | string | null;
+      publication?: {
+        title?: string | null;
+        authors?: string | null;
+        license?: string | null;
+        remaster?: boolean | null;
+      };
     } & Record<string, unknown>;
   } & Record<string, unknown>;
   items?: FoundryActorItem[] | null;
@@ -908,6 +951,7 @@ export function fromFoundryAction(doc: FoundryAction): ActionSchemaData {
 
   const rarity = normalizeRarity(doc.system?.traits?.rarity);
   const source = normalizeSource(doc.system?.source);
+  const publication = normalizePublication(doc.system?.publication, source);
 
   const result: ActionSchemaData = {
     schema_version: DEFAULT_SCHEMA_VERSION,
@@ -918,7 +962,8 @@ export function fromFoundryAction(doc: FoundryAction): ActionSchemaData {
     actionType: resolveActionType(actionTypeRaw),
     requirements,
     description,
-    rarity
+    rarity,
+    publication,
   };
 
   const img = normalizeImg(doc.img);
@@ -959,6 +1004,7 @@ export function fromFoundryItem(doc: FoundryItem): ItemSchemaData {
     (typeof doc.system?.rarity === "string" ? doc.system.rarity : doc.system?.rarity?.value);
   const priceValue = doc.system?.price;
   const source = normalizeSource(doc.system?.source);
+  const publication = normalizePublication(doc.system?.publication, source);
 
   const result: ItemSchemaData = {
     schema_version: DEFAULT_SCHEMA_VERSION,
@@ -968,7 +1014,8 @@ export function fromFoundryItem(doc: FoundryItem): ItemSchemaData {
     name: doc.name,
     itemType: resolveItemType(doc.type),
     rarity: normalizeRarity(rarityValue),
-    level: Number.isFinite(level) ? Number(level) : 0
+    level: Number.isFinite(level) ? Number(level) : 0,
+    publication,
   };
 
   const price = normalizePrice(priceValue);
@@ -1013,6 +1060,7 @@ export function fromFoundryActor(doc: FoundryActor): ActorSchemaData {
 
   const languages = collectLanguages(doc);
   const source = normalizeSource(doc.system?.details?.source ?? doc.system?.source) ?? "";
+  const publication = normalizePublication(doc.system?.details?.publication, source);
   const img = normalizeImg(doc.img) ?? null;
 
   const result: ActorSchemaData = {
@@ -1042,6 +1090,7 @@ export function fromFoundryActor(doc: FoundryActor): ActorSchemaData {
     recallKnowledge: normalizeHtml(doc.system?.details?.privateNotes),
     img,
     source,
+    publication,
   };
 
   if (!result.spellcasting?.length) {

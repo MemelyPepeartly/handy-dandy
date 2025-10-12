@@ -173,8 +173,12 @@ function normalizeTraitSlug(slug: string): string {
   return slug.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 }
 
-if (import.meta.hot) {
-  import.meta.hot.accept(() => {
+const hot = (import.meta as ImportMeta & {
+  hot?: { accept: (callback: () => void) => void };
+}).hot;
+
+if (hot) {
+  hot.accept(() => {
     resetTraitSlugCache();
   });
 }

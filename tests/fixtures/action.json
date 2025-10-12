@@ -10,5 +10,11 @@
   "description": "Deliver a crushing blow.\n\n• On a success, r is triggered.\n• On a critical success, the target is knocked prone.",
   "rarity": "uncommon",
   "img": "icons/actions/stunning-strike.webp",
-  "source": "Pathfinder Core Rulebook"
+  "source": "Pathfinder Core Rulebook",
+  "publication": {
+    "title": "",
+    "authors": "",
+    "license": "OGL",
+    "remaster": false
+  }
 }
