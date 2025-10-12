@@ -13,6 +13,9 @@ written in TypeScript and built with Webpack.
   Foundry-ready rich text.  Options exist to add condition links, action icons
   and other tweaks.  The module is a straight port of the original Python script
   used by the maintainer.
+- **Trait Browser Tool** – explore Pathfinder 2e trait dictionaries straight
+  from the system configuration. Choose a trait category, view localized
+  details, and click to copy slugs for use in macros or data entry.
 - **OpenAI integration** – the module stores an OpenAI client on
   `game.handyDandy.openai` once you enter your API key.  Other modules or macros
   can make use of this client.

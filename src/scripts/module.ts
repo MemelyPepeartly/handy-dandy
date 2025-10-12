@@ -5,6 +5,7 @@ import { OpenAI } from "openai";
 import { insertSidebarButtons, type ControlCollection } from "./setup/sidebarButtons";
 import { SchemaTool } from "./tools/schema-tool";
 import { DataEntryTool } from "./tools/data-entry-tool";
+import { TraitBrowserTool } from "./tools/trait-browser-tool";
 import { GPTClient } from "./gpt/client";
 import { DeveloperConsole } from "./dev/developer-console";
 import { setDeveloperConsole } from "./dev/state";
@@ -83,6 +84,7 @@ declare global {
       applications: {
         schemaTool: SchemaTool,
         dataEntryTool: DataEntryTool,
+        traitBrowserTool: TraitBrowserTool,
         toolOverview: ToolOverview,
       },
       developer: {
@@ -107,6 +109,7 @@ Hooks.once("init", async () => {
     "schema-tool": `${CONSTANTS.TEMPLATE_PATH}/schema-tool.hbs`,
     "schema-node": `${CONSTANTS.TEMPLATE_PATH}/schema-node.hbs`,
     "data-entry-tool": `${CONSTANTS.TEMPLATE_PATH}/data-entry-tool.hbs`,
+    "trait-browser-tool": `${CONSTANTS.TEMPLATE_PATH}/trait-browser-tool.hbs`,
     "developer-console": `${CONSTANTS.TEMPLATE_PATH}/developer-console.hbs`,
     "tool-overview": `${CONSTANTS.TEMPLATE_PATH}/tool-overview.hbs`,
   });
@@ -140,6 +143,7 @@ Hooks.once("setup", () => {
     applications: {
       schemaTool: new SchemaTool,
       dataEntryTool: new DataEntryTool,
+      traitBrowserTool: new TraitBrowserTool,
       toolOverview: new ToolOverview(),
     },
     developer: {

@@ -131,6 +131,18 @@ export function insertSidebarButtons(controls: ControlCollection): void {
   });
 
   compatibilityAddTool(handyGroup.tools, {
+    name: "trait-browser",
+    title: "Trait Browser",
+    icon: "fa-solid fa-tags",
+    button: true,
+    onClick: () => {
+      console.debug(`${CONSTANTS.MODULE_NAME} | Opening Trait Browser Tool`);
+      requireNamespace().applications.traitBrowserTool.render(true);
+    },
+    onChange: noop,
+  });
+
+  compatibilityAddTool(handyGroup.tools, {
     name: "export-selection",
     title: "Export Selection",
     icon: "fa-solid fa-file-export",
