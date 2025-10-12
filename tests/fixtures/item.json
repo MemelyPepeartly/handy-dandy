@@ -11,5 +11,11 @@
   "traits": ["invested", "magical"],
   "description": "A gleaming shield that reflects hostile magic toward its source.",
   "img": "icons/items/mirror-shield.webp",
-  "source": "Pathfinder Secrets of Magic"
+  "source": "Pathfinder Secrets of Magic",
+  "publication": {
+    "title": "",
+    "authors": "",
+    "license": "OGL",
+    "remaster": false
+  }
 }

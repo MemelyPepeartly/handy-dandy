@@ -1,5 +1,17 @@
-import { ACTION_EXECUTIONS, RARITIES, actionSchema, type SystemId } from "../schemas/index";
-import { type CorrectionContext, wrapPrompt } from "./common";
+import {
+  ACTION_EXECUTIONS,
+  PUBLICATION_DEFAULT,
+  RARITIES,
+  actionSchema,
+  type PublicationData,
+  type SystemId,
+} from "../schemas/index";
+import {
+  renderImageInstruction,
+  renderPublicationSection,
+  type CorrectionContext,
+  wrapPrompt,
+} from "./common";
 
 export interface ActionPromptInput {
   readonly systemId: SystemId;
@@ -7,6 +19,8 @@ export interface ActionPromptInput {
   readonly referenceText: string;
   readonly slug?: string;
   readonly correction?: CorrectionContext;
+  readonly img?: string;
+  readonly publication?: PublicationData;
 }
 
 function buildActionSchemaSection(): string {
@@ -22,6 +36,7 @@ function buildActionSchemaSection(): string {
     (actionSchema.properties.img as { default: string | null }).default
   );
   const sourceDefault = (actionSchema.properties.source as { default: string }).default;
+  const publicationDefault = JSON.stringify(PUBLICATION_DEFAULT);
   return [
     "Action schema overview:",
     `- schema_version: integer literal ${schemaVersion}.`,
@@ -34,7 +49,8 @@ function buildActionSchemaSection(): string {
     `- requirements: optional string; defaults to "${requirementsDefault}".`,
     `- img: optional string containing an image URL or Foundry asset path; defaults to ${imgDefault}.`,
     `- rarity: optional string enum (${rarities}); defaults to "${rarityDefault}".`,
-    `- source: optional string; defaults to "${sourceDefault}".`
+    `- source: optional string; defaults to "${sourceDefault}".`,
+    `- publication: object { title, authors, license, remaster }; defaults to ${publicationDefault}.`
   ].join("\n");
 }
 
@@ -47,6 +63,16 @@ function buildActionRequest(input: ActionPromptInput): string {
 
   if (input.slug) {
     parts.splice(1, 0, `Slug suggestion: ${input.slug}`);
+  }
+
+  const publicationSection = renderPublicationSection(input.publication);
+  if (publicationSection) {
+    parts.push(publicationSection);
+  }
+
+  const imageInstruction = renderImageInstruction(input.img);
+  if (imageInstruction) {
+    parts.push(imageInstruction);
   }
 
   return parts.join("\n\n");

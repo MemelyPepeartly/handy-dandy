@@ -1,9 +1,16 @@
-import type { ActionSchemaData, ActorSchemaData, ItemSchemaData, SystemId } from "../schemas";
+import type {
+  ActionSchemaData,
+  ActorSchemaData,
+  ItemSchemaData,
+  PublicationData,
+  SystemId,
+} from "../schemas";
+import { PUBLICATION_DEFAULT } from "../schemas";
 import { validate, formatError } from "../helpers/validation";
 
 const DEFAULT_ACTION_IMAGE = "systems/pf2e/icons/default-icons/action.svg" as const;
 const DEFAULT_ITEM_IMAGE = "systems/pf2e/icons/default-icons/item.svg" as const;
-const DEFAULT_ACTOR_IMAGE = "systems/pf2e/icons/default-icons/monster.svg" as const;
+const DEFAULT_ACTOR_IMAGE = "systems/pf2e/icons/default-icons/npc.svg" as const;
 const DEFAULT_STRIKE_IMAGE = "systems/pf2e/icons/default-icons/melee.svg" as const;
 const DEFAULT_SPELL_IMAGE = "systems/pf2e/icons/default-icons/spell.svg" as const;
 const DEFAULT_SPELLCASTING_IMAGE = "systems/pf2e/icons/default-icons/spellcastingEntry.svg" as const;
@@ -143,6 +150,7 @@ type FoundryActionSource = {
     actions: { value: number | null };
     requirements: { value: string };
     source: { value: string };
+    publication: { title: string; authors: string; license: string; remaster: boolean };
     rules: unknown[];
   };
   folder?: string;
@@ -159,6 +167,7 @@ type FoundryItemSource = {
     level: { value: number };
     price: { value: Record<string, number> };
     source: { value: string };
+    publication: { title: string; authors: string; license: string; remaster: boolean };
     rules: unknown[];
   };
   folder?: string;
@@ -375,6 +384,24 @@ function trimArray(values: readonly string[] | null | undefined): string[] {
 
 function sanitizeText(value: string | null | undefined): string {
   return value?.trim() ?? "";
+}
+
+function normalizePublicationDetails(
+  publication: PublicationData | null | undefined,
+  fallbackTitle: string,
+): PublicationData {
+  const fallback = sanitizeText(fallbackTitle);
+  const titleValue = typeof publication?.title === "string" ? publication.title.trim() : undefined;
+  const authorsValue = typeof publication?.authors === "string" ? publication.authors.trim() : undefined;
+  const licenseValue = typeof publication?.license === "string" ? publication.license.trim() : undefined;
+  const remasterValue = typeof publication?.remaster === "boolean" ? publication.remaster : undefined;
+
+  return {
+    title: titleValue !== undefined ? titleValue : fallback || PUBLICATION_DEFAULT.title,
+    authors: authorsValue !== undefined ? authorsValue : PUBLICATION_DEFAULT.authors,
+    license: licenseValue !== undefined ? licenseValue : PUBLICATION_DEFAULT.license,
+    remaster: remasterValue ?? PUBLICATION_DEFAULT.remaster,
+  };
 }
 
 const SENSE_ACUITIES = new Set<NonNullable<FoundrySense["acuity"]>>([
@@ -800,6 +827,7 @@ function prepareActionSource(action: ActionSchemaData): FoundryActionSource {
   const description = toRichText(action.description);
   const requirements = toRichText(action.requirements);
   const source = action.source?.trim() ?? "";
+  const publication = normalizePublicationDetails(action.publication, source);
 
   return {
     name: action.name,
@@ -813,6 +841,7 @@ function prepareActionSource(action: ActionSchemaData): FoundryActionSource {
       actions: { value: actionType.count },
       requirements: { value: requirements },
       source: { value: source },
+      publication,
       rules: []
     }
   };
@@ -822,6 +851,7 @@ function prepareItemSource(item: ItemSchemaData): FoundryItemSource {
   const traits = trimArray(item.traits);
   const description = toRichText(item.description);
   const source = item.source?.trim() ?? "";
+  const publication = normalizePublicationDetails(item.publication, source);
 
   return {
     name: item.name,
@@ -834,6 +864,7 @@ function prepareItemSource(item: ItemSchemaData): FoundryItemSource {
       level: { value: item.level },
       price: { value: priceToCoins(item.price) },
       source: { value: source },
+      publication,
       rules: []
     }
   };
@@ -843,6 +874,7 @@ function prepareActorSource(actor: ActorSchemaData): FoundryActorSource {
   const traits = trimArray(actor.traits).map((value) => value.toLowerCase());
   const languages = trimArray(actor.languages).map((value) => value.toLowerCase());
   const source = sanitizeText(actor.source);
+  const publication = normalizePublicationDetails(actor.publication, source);
   const description = toRichText(actor.description);
   const privateNotes = toRichText(actor.recallKnowledge);
   const alignment = sanitizeText(actor.alignment);
@@ -877,7 +909,7 @@ function prepareActorSource(actor: ActorSchemaData): FoundryActorSource {
         blurb: "",
         languages: { value: languages, details: "" },
         source: { value: source },
-        publication: { title: source, authors: "", license: "OGL", remaster: false },
+        publication,
       },
       initiative: { statistic: "perception" },
       attributes: {

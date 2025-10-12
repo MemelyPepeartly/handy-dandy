@@ -1,5 +1,17 @@
-import { ACTOR_CATEGORIES, ACTOR_SIZES, RARITIES, actorSchema, type SystemId } from "../schemas/index";
-import { type CorrectionContext, wrapPrompt } from "./common";
+import {
+  ACTOR_CATEGORIES,
+  ACTOR_SIZES,
+  RARITIES,
+  actorSchema,
+  type PublicationData,
+  type SystemId,
+} from "../schemas/index";
+import {
+  renderImageInstruction,
+  renderPublicationSection,
+  type CorrectionContext,
+  wrapPrompt,
+} from "./common";
 
 export interface ActorPromptInput {
   readonly systemId: SystemId;
@@ -7,6 +19,8 @@ export interface ActorPromptInput {
   readonly referenceText: string;
   readonly slug?: string;
   readonly correction?: CorrectionContext;
+  readonly img?: string;
+  readonly publication?: PublicationData;
 }
 
 function buildActorSchemaSection(): string {
@@ -24,6 +38,9 @@ function buildActorSchemaSection(): string {
     (actorSchema.properties.img as { default: string | null }).default
   );
   const sourceDefault = (actorSchema.properties.source as { default: string }).default;
+  const publicationDefault = JSON.stringify(
+    (actorSchema.properties.publication as { default: PublicationData }).default
+  );
   return [
     "Actor schema overview:",
     `- schema_version: integer literal ${schemaVersion}.`,
@@ -52,7 +69,8 @@ function buildActorSchemaSection(): string {
     "- description: optional string; defaults to null.",
     "- recallKnowledge: optional string; defaults to null.",
     `- img: string or null containing an image URL or Foundry asset path; defaults to ${imgDefault}.`,
-    `- source: string; defaults to "${sourceDefault}".`
+    `- source: string; defaults to "${sourceDefault}".`,
+    `- publication: object { title, authors, license, remaster }; defaults to ${publicationDefault}.`
   ].join("\n");
 }
 
@@ -65,6 +83,16 @@ function buildActorRequest(input: ActorPromptInput): string {
 
   if (input.slug) {
     parts.splice(1, 0, `Slug suggestion: ${input.slug}`);
+  }
+
+  const publicationSection = renderPublicationSection(input.publication);
+  if (publicationSection) {
+    parts.push(publicationSection);
+  }
+
+  const imageInstruction = renderImageInstruction(input.img);
+  if (imageInstruction) {
+    parts.push(imageInstruction);
   }
 
   return parts.join("\n\n");
