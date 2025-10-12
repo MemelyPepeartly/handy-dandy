@@ -227,6 +227,12 @@ type FoundryActorItemSource =
   | FoundryActorSpellcastingEntrySource
   | FoundryActorSpellSource;
 
+type FoundrySense = {
+  type: string;
+  acuity?: "precise" | "imprecise" | "vague";
+  range?: number;
+};
+
 type FoundryActorSource = {
   name: string;
   type: string;
@@ -268,7 +274,7 @@ type FoundryActorSource = {
       version: number;
       previous: { schema: number; foundry: string; system: string };
     };
-    perception: { mod: number; details: string; senses: string[]; vision: boolean };
+    perception: { mod: number; details: string; senses: FoundrySense[]; vision: boolean };
     saves: {
       fortitude: { value: number; saveDetail: string };
       reflex: { value: number; saveDetail: string };
@@ -304,6 +310,184 @@ function trimArray(values: readonly string[] | null | undefined): string[] {
 
 function sanitizeText(value: string | null | undefined): string {
   return value?.trim() ?? "";
+}
+
+const SENSE_ACUITIES = new Set<NonNullable<FoundrySense["acuity"]>>([
+  "precise",
+  "imprecise",
+  "vague",
+]);
+
+function buildActorSenses(
+  senses: readonly (string | { type?: unknown; acuity?: unknown; range?: unknown })[] | null | undefined,
+): FoundrySense[] {
+  if (!senses?.length) {
+    return [];
+  }
+
+  return senses
+    .map((sense) => normalizeSenseEntry(sense))
+    .filter((entry): entry is FoundrySense => entry !== null);
+}
+
+function normalizeSenseEntry(sense: unknown): FoundrySense | null {
+  if (!sense) {
+    return null;
+  }
+
+  if (typeof sense === "object") {
+    const record = sense as { type?: unknown; acuity?: unknown; range?: unknown };
+    const type = normalizeSenseType(record.type);
+    if (!type) {
+      return null;
+    }
+
+    const normalized: FoundrySense = { type };
+    const acuity = normalizeSenseAcuity(record.acuity);
+    if (acuity) {
+      normalized.acuity = acuity;
+    }
+
+    const range = normalizeSenseRange(record.range);
+    if (range !== null) {
+      normalized.range = range;
+    }
+
+    return normalized;
+  }
+
+  if (typeof sense !== "string") {
+    return null;
+  }
+
+  let text = sense.trim();
+  if (!text) {
+    return null;
+  }
+
+  let acuity: FoundrySense["acuity"] | undefined;
+  let range: number | undefined;
+
+  for (const match of text.matchAll(/\(([^)]+)\)/g)) {
+    const inner = match[1];
+    if (!acuity) {
+      acuity = normalizeSenseAcuity(inner);
+    }
+    if (range === undefined) {
+      range = normalizeSenseRange(inner) ?? undefined;
+    }
+  }
+
+  text = text.replace(/\([^)]*\)/g, " ").trim();
+
+  if (!acuity) {
+    const prefixMatch = text.match(/^(precise|imprecise|vague)\s+/i);
+    if (prefixMatch) {
+      acuity = normalizeSenseAcuity(prefixMatch[1]);
+      text = text.slice(prefixMatch[0].length);
+    }
+  }
+
+  if (range === undefined) {
+    range = normalizeSenseRange(text) ?? undefined;
+  }
+
+  text = text
+    .replace(
+      /(\d+(?:\.\d+)?)\s*(?:-|–)?\s*(foot|feet|ft|meter|metre|meters|metres|mile|miles|yard|yards)\b/gi,
+      " ",
+    )
+    .replace(/\d+(?:\.\d+)?/g, " ")
+    .trim();
+
+  const type = normalizeSenseType(text);
+  if (!type) {
+    return null;
+  }
+
+  const normalized: FoundrySense = { type };
+  if (acuity) {
+    normalized.acuity = acuity;
+  }
+  if (typeof range === "number" && Number.isFinite(range) && range > 0) {
+    normalized.range = Math.round(range);
+  }
+
+  return normalized;
+}
+
+function normalizeSenseType(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim().toLowerCase();
+  if (!trimmed) {
+    return null;
+  }
+
+  const slug = trimmed
+    .replace(/[^a-z0-9\s-]/g, " ")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  return slug.length ? slug : null;
+}
+
+function normalizeSenseAcuity(value: unknown): FoundrySense["acuity"] | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (SENSE_ACUITIES.has(normalized as FoundrySense["acuity"])) {
+    return normalized as FoundrySense["acuity"];
+  }
+
+  return undefined;
+}
+
+function normalizeSenseRange(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value) && value > 0) {
+    return Math.round(value);
+  }
+
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const rangeMatch = value.match(/(\d+(?:\.\d+)?)/);
+  if (!rangeMatch) {
+    return null;
+  }
+
+  const amount = Number.parseFloat(rangeMatch[1]);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return null;
+  }
+
+  const unitMatch = value.match(
+    /(foot|feet|ft|meter|metre|meters|metres|mile|miles|yard|yards)/i,
+  );
+  const unit = unitMatch?.[1]?.toLowerCase();
+
+  const conversion: Record<string, number> = {
+    foot: 1,
+    feet: 1,
+    ft: 1,
+    yard: 3,
+    yards: 3,
+    meter: 3.28084,
+    metres: 3.28084,
+    metre: 3.28084,
+    meters: 3.28084,
+    mile: 5280,
+    miles: 5280,
+  };
+
+  const factor = unit ? conversion[unit] ?? 1 : 1;
+  return Math.round(amount * factor);
 }
 
 function resolveActiveSystemId(): string | undefined {
@@ -675,7 +859,7 @@ function prepareActorSource(actor: ActorSchemaData): FoundryActorSource {
       perception: {
         mod: actor.attributes.perception.value,
         details: sanitizeText(actor.attributes.perception.details),
-        senses: (actor.attributes.perception.senses ?? []).map((sense) => sense.toLowerCase()),
+        senses: buildActorSenses(actor.attributes.perception.senses),
         vision: true,
       },
       saves: {
