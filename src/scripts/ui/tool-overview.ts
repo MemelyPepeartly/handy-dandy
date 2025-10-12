@@ -58,6 +58,16 @@ export class ToolOverview extends FormApplication {
           buttonIcon: "fas fa-arrow-up-right-from-square",
         },
         {
+          id: "trait-browser",
+          title: "Trait Browser",
+          icon: "fas fa-tags",
+          description: "Browse PF2e trait dictionaries directly from the system and copy trait slugs with a click.",
+          location: "Scene Controls → Handy Dandy Tools → Trait Browser",
+          buttonAction: "open-trait-browser",
+          buttonLabel: "Open Trait Browser",
+          buttonIcon: "fas fa-arrow-up-right-from-square",
+        },
+        {
           id: "export-selection",
           title: "Export Selection",
           icon: "fas fa-file-export",
@@ -105,6 +115,9 @@ export class ToolOverview extends FormApplication {
         case "open-data-entry":
           this.#openDataEntryTool();
           break;
+        case "open-trait-browser":
+          this.#openTraitBrowserTool();
+          break;
         case "export-selection":
           this.#runExportSelection();
           break;
@@ -141,6 +154,14 @@ export class ToolOverview extends FormApplication {
       return;
     }
     game.handyDandy.applications.dataEntryTool.render(true);
+  }
+
+  #openTraitBrowserTool(): void {
+    if (!game.handyDandy?.applications.traitBrowserTool) {
+      ui.notifications?.error("Handy Dandy module is not initialized.");
+      return;
+    }
+    game.handyDandy.applications.traitBrowserTool.render(true);
   }
 
   #runExportSelection(): void {
