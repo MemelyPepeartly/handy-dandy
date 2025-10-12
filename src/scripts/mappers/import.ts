@@ -441,7 +441,11 @@ function normalizeSenseAcuity(value: unknown): FoundrySense["acuity"] | undefine
   }
 
   const normalized = value.trim().toLowerCase();
-  if (SENSE_ACUITIES.has(normalized as FoundrySense["acuity"])) {
+  if (!normalized) {
+    return undefined;
+  }
+
+  if (SENSE_ACUITIES.has(normalized as NonNullable<FoundrySense["acuity"]>)) {
     return normalized as FoundrySense["acuity"];
   }
 
