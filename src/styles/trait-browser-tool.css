@@ -1,0 +1,69 @@
+.trait-browser {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.trait-browser__error {
+  color: #b71c1c;
+  font-weight: bold;
+}
+
+.trait-browser__list {
+  flex: 1;
+  overflow: auto;
+}
+
+.trait-browser__list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.trait-browser__item {
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.trait-browser__item:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.trait-browser__item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.trait-browser__label {
+  font-weight: 600;
+}
+
+.trait-browser__slug {
+  font-family: var(--font-mono, "Courier New", Courier, monospace);
+  font-size: 0.85rem;
+  color: #555;
+}
+
+.trait-browser__description {
+  margin: 0.35rem 0 0;
+  font-size: 0.9rem;
+  color: #444;
+}
+
+.trait-browser__empty,
+.trait-browser__hint {
+  font-size: 0.9rem;
+  color: #555;
+}
+
+.trait-browser__hint {
+  text-align: right;
+}
