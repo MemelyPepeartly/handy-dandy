@@ -32,7 +32,7 @@ function buildItemSchemaSection(): string {
     `- rarity: string enum (${rarities}).`,
     "- level: integer >= 0.",
     `- price: optional number >= 0; defaults to ${priceDefault}.`,
-    `- traits: optional array of non-empty strings; defaults to ${traitsDefault}.`,
+    `- traits: optional array of lowercase PF2e trait slugs from the active system; defaults to ${traitsDefault}.`,
     `- description: optional string; defaults to "${descriptionDefault}".`,
     `- img: optional string containing an image URL or Foundry asset path; defaults to ${imgDefault}.`,
     `- source: optional string; defaults to "${sourceDefault}".`
