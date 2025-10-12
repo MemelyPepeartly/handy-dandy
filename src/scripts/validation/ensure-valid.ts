@@ -22,6 +22,7 @@ import { formatError } from "../helpers/validation";
 import type { JsonSchemaDefinition, GPTClient } from "../gpt/client";
 import { getDeveloperConsole } from "../dev/state";
 import type { ValidationLogPayload } from "../dev/developer-console";
+import { getTraitSlugSet } from "../data/trait-dictionaries";
 
 export type { SchemaDataFor, ValidatorKey } from "../schemas";
 
@@ -344,7 +345,12 @@ function coerceName(value: Record<string, unknown>): void {
 function coerceAction(value: Record<string, unknown>): void {
   value.type = "action";
   assignEnum(value, "actionType", ACTION_TYPE_LOOKUP);
-  assignStringArray(value, "traits");
+  const traits = normalizeTraitArray(value.traits);
+  if (traits.length > 0) {
+    value.traits = traits;
+  } else {
+    delete value.traits;
+  }
   assignOptionalString(value, "requirements");
   assignRequiredString(value, "description");
   assignOptionalString(value, "img", { allowEmpty: true });
@@ -358,7 +364,12 @@ function coerceItem(value: Record<string, unknown>): void {
   assignEnum(value, "rarity", RARITY_LOOKUP);
   assignInteger(value, "level");
   assignNumber(value, "price");
-  assignStringArray(value, "traits");
+  const traits = normalizeTraitArray(value.traits);
+  if (traits.length > 0) {
+    value.traits = traits;
+  } else {
+    delete value.traits;
+  }
   assignOptionalString(value, "description");
   assignOptionalString(value, "img", { allowEmpty: true });
   assignOptionalString(value, "source", { allowEmpty: true });
@@ -370,8 +381,6 @@ function coerceActor(value: Record<string, unknown>): void {
   assignEnum(value, "rarity", RARITY_LOOKUP);
   assignInteger(value, "level");
   assignEnum(value, "size", ACTOR_SIZE_LOOKUP);
-  assignStringArray(value, "traits");
-  assignStringArray(value, "languages");
   assignOptionalString(value, "alignment");
   assignOptionalString(value, "img", { allowEmpty: true });
   assignOptionalString(value, "source", { allowEmpty: true });
@@ -382,7 +391,7 @@ function coerceActor(value: Record<string, unknown>): void {
     value.size = "med";
   }
 
-  value.traits = normalizeLowercaseArray(value.traits);
+  value.traits = normalizeTraitArray(value.traits);
   value.languages = normalizeStringArray(value.languages);
   value.alignment = normalizeNullableString(value.alignment);
   value.img = normalizeImage(value.img);
@@ -623,7 +632,7 @@ function normalizeActorStrikes(raw: unknown): ActorSchemaData["strikes"] {
       name,
       type: type as "melee" | "ranged",
       attackBonus,
-      traits: normalizeLowercaseArray(strike.traits ?? strike.tags),
+      traits: normalizeTraitArray(strike.traits ?? strike.tags),
       damage,
       effects: normalizeLowercaseArray(strike.effects ?? strike.special ?? strike.additionalEffects),
       description: normalizeNullableString(strike.description ?? strike.note ?? strike.notes),
@@ -693,7 +702,7 @@ function normalizeActorActions(raw: unknown): ActorSchemaData["actions"] {
       name,
       actionCost: actionCost as ActorSchemaData["actions"][number]["actionCost"],
       description,
-      traits: normalizeLowercaseArray(source.traits ?? source.tags),
+      traits: normalizeTraitArray(source.traits ?? source.tags),
       requirements: normalizeNullableString(source.requirements),
       trigger: normalizeNullableString(source.trigger),
       frequency: normalizeNullableString(source.frequency),
@@ -767,6 +776,29 @@ function normalizeSpellList(raw: unknown): ActorSpellList {
       tradition: normalizeNullableString(source.tradition),
     });
   }
+  return result;
+}
+
+function normalizeTraitArray(value: unknown): string[] {
+  const entries = normalizeStringArray(value).map((entry) => normalizeEnumKey(entry));
+  const knownTraits = getTraitSlugSet();
+
+  const result: string[] = [];
+  const seen = new Set<string>();
+  for (const entry of entries) {
+    if (!entry) {
+      continue;
+    }
+    if (knownTraits && knownTraits.size > 0 && !knownTraits.has(entry)) {
+      continue;
+    }
+    if (seen.has(entry)) {
+      continue;
+    }
+    seen.add(entry);
+    result.push(entry);
+  }
+
   return result;
 }
 
@@ -920,16 +952,6 @@ function assignOptionalNullableString(
   }
   const trimmed = value.trim();
   target[key] = trimmed || null;
-}
-
-function assignStringArray(target: Record<string, unknown>, key: string): void {
-  if (!Object.hasOwn(target, key)) return;
-  const coerced = coerceStringArray(target[key]);
-  if (coerced && coerced.length) {
-    target[key] = coerced;
-  } else {
-    delete target[key];
-  }
 }
 
 function assignEnum(

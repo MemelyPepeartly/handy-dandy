@@ -1,15 +1,14 @@
 import { CONSTANTS } from "../constants";
+import {
+  collectTraitCategories,
+  type TraitCategory,
+  type TraitDisplayEntry,
+} from "../data/trait-dictionaries";
 
 interface TraitCategoryOption {
   key: string;
   label: string;
   count: number;
-}
-
-interface TraitDisplayEntry {
-  slug: string;
-  label: string;
-  description?: string;
 }
 
 interface TraitBrowserData {
@@ -18,12 +17,6 @@ interface TraitBrowserData {
   traits: TraitDisplayEntry[];
   error?: string;
 }
-
-type Pf2eTraitDictionary = Record<string, string>;
-
-type TraitCategory = TraitCategoryOption & {
-  traits: TraitDisplayEntry[];
-};
 
 export class TraitBrowserTool extends Application {
   #selectedKey: string | null = null;
@@ -93,114 +86,4 @@ export class TraitBrowserTool extends Application {
     this.#selectedKey = first.key;
     return first.key;
   }
-}
-
-function collectTraitCategories(): TraitCategory[] {
-  const pf2eConfig = (CONFIG as { PF2E?: Record<string, unknown> }).PF2E;
-  if (!pf2eConfig) return [];
-
-  const traitDescriptions = extractTraitDescriptions(pf2eConfig);
-
-  return Object.entries(pf2eConfig)
-    .filter(([key, value]) => isTraitDictionaryKey(key) && isTraitDictionary(value))
-    .map(([key, value]) => buildTraitCategory(key, value as Pf2eTraitDictionary, traitDescriptions))
-    .filter((category): category is TraitCategory => category.traits.length > 0)
-    .sort((a, b) => a.label.localeCompare(b.label));
-}
-
-function isTraitDictionaryKey(key: string): boolean {
-  return /(Traits|Tags)$/i.test(key) && key !== "traitDescriptions";
-}
-
-function isTraitDictionary(value: unknown): value is Pf2eTraitDictionary {
-  if (!value || typeof value !== "object") return false;
-  return Object.values(value as Record<string, unknown>).every(entry => typeof entry === "string");
-}
-
-function buildTraitCategory(
-  key: string,
-  traits: Pf2eTraitDictionary,
-  descriptions: Pf2eTraitDictionary,
-): TraitCategory {
-  const entries: TraitDisplayEntry[] = Object.entries(traits)
-    .map(([slug, labelKey]) => ({
-      slug,
-      label: localizeLabel(labelKey, slug),
-      description: localizeDescription(descriptions[slug]),
-    }))
-    .sort((a, b) => a.label.localeCompare(b.label));
-
-  return {
-    key,
-    label: formatCategoryLabel(key),
-    count: entries.length,
-    traits: entries,
-  } satisfies TraitCategory;
-}
-
-function extractTraitDescriptions(config: Record<string, unknown>): Pf2eTraitDictionary {
-  const rawDescriptions = config["traitDescriptions"];
-  if (!rawDescriptions || typeof rawDescriptions !== "object") return {};
-
-  return Object.fromEntries(
-    Object.entries(rawDescriptions as Record<string, unknown>)
-      .filter((entry): entry is [string, string] => typeof entry[1] === "string"),
-  );
-}
-
-function localizeLabel(labelKey: string, fallbackSlug: string): string {
-  if (typeof labelKey === "string" && game.i18n) {
-    const localized = game.i18n.localize(labelKey);
-    if (localized && localized !== labelKey) {
-      return localized;
-    }
-  }
-
-  return formatSlug(fallbackSlug);
-}
-
-function localizeDescription(descriptionKey: string | undefined): string | undefined {
-  if (!descriptionKey) return undefined;
-  if (!game.i18n) return descriptionKey;
-
-  const localized = game.i18n.localize(descriptionKey);
-  return localized && localized !== descriptionKey ? localized : descriptionKey;
-}
-
-function formatCategoryLabel(key: string): string {
-  const suffix = key.endsWith("Tags") ? " Tags" : " Traits";
-  const withoutSuffix = key.replace(/(Traits|Tags)$/i, "");
-  const spaced = withoutSuffix
-    .replace(/([a-z])([A-Z])/g, "$1 $2")
-    .replace(/[\-_]/g, " ")
-    .trim();
-
-  if (!spaced) {
-    return suffix.trim();
-  }
-
-  return `${toTitleCase(spaced)}${suffix}`;
-}
-
-function formatSlug(slug: string): string {
-  const spaced = slug.replace(/[-_]/g, " ");
-  return toTitleCase(spaced);
-}
-
-function toTitleCase(value: string): string {
-  const acronyms = new Set(["pf2e", "npc", "pc", "gm", "dc"]);
-  return value
-    .split(/\s+/)
-    .filter(Boolean)
-    .map(segment => {
-      const lower = segment.toLowerCase();
-      if (acronyms.has(lower)) {
-        return lower.toUpperCase();
-      }
-      if (segment.length <= 3 && segment === segment.toUpperCase()) {
-        return segment;
-      }
-      return segment.charAt(0).toUpperCase() + segment.slice(1);
-    })
-    .join(" ");
 }
