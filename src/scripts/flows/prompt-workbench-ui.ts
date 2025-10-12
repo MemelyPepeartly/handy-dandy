@@ -213,6 +213,14 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
 
       .handy-dandy-workbench-form fieldset {
         margin: 0;
+        border: 1px solid var(--color-border-dark, #333);
+        border-radius: 6px;
+        padding: 0.75rem;
+      }
+
+      .handy-dandy-workbench-form fieldset > legend {
+        font-weight: 600;
+        padding: 0 0.25rem;
       }
 
       .handy-dandy-workbench-form .notes {
@@ -232,6 +240,65 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
         gap: 0.5rem;
         grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
         align-items: center;
+      }
+
+      .handy-dandy-workbench-inline {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+        flex-wrap: wrap;
+        margin-top: 0.5rem;
+      }
+
+      .handy-dandy-workbench-inline label {
+        font-weight: 600;
+      }
+
+      .handy-dandy-workbench-inline input {
+        max-width: 120px;
+      }
+
+      .handy-dandy-workbench-advanced {
+        border: 1px solid var(--color-border-dark, #333);
+        border-radius: 6px;
+        padding: 0.75rem;
+        background: var(--color-bg-alt, rgba(255, 255, 255, 0.04));
+      }
+
+      .handy-dandy-workbench-advanced > summary {
+        cursor: pointer;
+        font-weight: 600;
+        list-style: none;
+        margin: -0.75rem -0.75rem 0;
+        padding: 0.75rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .handy-dandy-workbench-advanced > summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .handy-dandy-workbench-advanced > summary::after {
+        content: "\25bc";
+        font-size: 0.85em;
+        transition: transform 0.2s ease;
+      }
+
+      .handy-dandy-workbench-advanced[open] > summary {
+        border-bottom: 1px solid var(--color-border-dark, #333);
+        margin-bottom: 0.75rem;
+      }
+
+      .handy-dandy-workbench-advanced[open] > summary::after {
+        transform: rotate(-180deg);
+      }
+
+      .handy-dandy-workbench-advanced-fields {
+        display: grid;
+        gap: 0.5rem;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
       }
 
       .handy-dandy-workbench-history {
@@ -352,65 +419,44 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
       </nav>
       <section class="handy-dandy-workbench-panel active" data-panel="prompt">
         <form class="handy-dandy-workbench-form">
-          <div class="handy-dandy-workbench-grid">
-            <div class="form-group">
-              <label>Entity Type</label>
-              <select name="entityType">
-                <option value="actor">Actor</option>
-                <option value="action">Action</option>
-                <option value="item">Item</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>Game System</label>
-              <select name="systemId">
-                ${systemOptions}
-              </select>
-            </div>
-            <div class="form-group">
-              <label>Name / Title</label>
-              <input type="text" name="entryName" required />
-              <p class="notes">Use the actor name, action title, or item name you want in Foundry.</p>
-            </div>
-            <div class="form-group">
-              <label>Slug (optional)</label>
-              <input type="text" name="slug" />
-            </div>
-            <div class="form-group">
-              <label>Level</label>
-              <input type="number" name="level" min="0" />
-              <p class="notes">Provide a level for actors; leave blank for other entries.</p>
-            </div>
-          </div>
           <fieldset class="form-group">
-            <legend>Publication Details</legend>
+            <legend>Type</legend>
             <div class="form-fields">
-              <label>Title <input type="text" name="publicationTitle" value="" /></label>
-              <label>Authors <input type="text" name="publicationAuthors" value="" /></label>
-              <label>License <input type="text" name="publicationLicense" value="OGL" /></label>
-              <label><input type="checkbox" name="publicationRemaster" /> Remaster</label>
+              <div>
+                <label for="handy-dandy-workbench-entity-type">Entity Type</label>
+                <select id="handy-dandy-workbench-entity-type" name="entityType">
+                  <option value="actor">Actor</option>
+                  <option value="action">Action</option>
+                  <option value="item">Item</option>
+                </select>
+              </div>
+              <div>
+                <label for="handy-dandy-workbench-system">Game System</label>
+                <select id="handy-dandy-workbench-system" name="systemId">
+                  ${systemOptions}
+                </select>
+              </div>
             </div>
           </fieldset>
-          <div class="handy-dandy-workbench-grid">
-            <div class="form-group">
-              <label>Image Path</label>
-              <input type="text" name="img" value="${DEFAULT_IMAGE_PATH}" />
-              <p class="notes">Provide a Foundry asset path or URL for the generated image.</p>
-            </div>
-            <fieldset class="form-group">
-              <legend>Advanced Options</legend>
-              <div class="form-fields">
-                <label>Seed <input type="number" name="seed" /></label>
-                <label>Max Attempts <input type="number" name="maxAttempts" min="1" /></label>
-                <label>Compendium Pack ID <input type="text" name="packId" /></label>
-                <label>Folder ID <input type="text" name="folderId" /></label>
-              </div>
-            </fieldset>
+          <div class="form-group">
+            <label for="handy-dandy-workbench-title">Title</label>
+            <input id="handy-dandy-workbench-title" type="text" name="entryName" required />
+            <p class="notes">Use the actor name, action title, or item name you want in Foundry.</p>
           </div>
           <div class="form-group">
-            <label>Reference Text or Prompt</label>
-            <textarea name="referenceText" required></textarea>
+            <label for="handy-dandy-workbench-image">Image Path</label>
+            <input id="handy-dandy-workbench-image" type="text" name="img" value="${DEFAULT_IMAGE_PATH}" />
+            <p class="notes">Provide a Foundry asset path or URL for the generated image.</p>
+          </div>
+          <div class="form-group">
+            <label for="handy-dandy-workbench-prompt">Prompt</label>
+            <textarea id="handy-dandy-workbench-prompt" name="referenceText" required></textarea>
             <p class="notes">Paste rules text, stat blocks, or a creative prompt for the generator to follow.</p>
+            <div class="handy-dandy-workbench-inline">
+              <label for="handy-dandy-workbench-level">What level?</label>
+              <input id="handy-dandy-workbench-level" type="number" name="level" min="0" />
+            </div>
+            <p class="notes">Provide a level for actors; leave blank for other entries.</p>
           </div>
           <fieldset class="form-group">
             <legend>Actor Content</legend>
@@ -420,6 +466,28 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
             </div>
             <p class="notes">Use these options to guide actor prompts.</p>
           </fieldset>
+          <fieldset class="form-group">
+            <legend>Publication Details</legend>
+            <div class="form-fields">
+              <label>Title <input type="text" name="publicationTitle" value="" /></label>
+              <label>Authors <input type="text" name="publicationAuthors" value="" /></label>
+              <label>License <input type="text" name="publicationLicense" value="OGL" /></label>
+              <label><input type="checkbox" name="publicationRemaster" /> Remaster</label>
+            </div>
+          </fieldset>
+          <div class="form-group">
+            <label for="handy-dandy-workbench-slug">Slug (optional)</label>
+            <input id="handy-dandy-workbench-slug" type="text" name="slug" />
+          </div>
+          <details class="handy-dandy-workbench-advanced">
+            <summary>Advanced Options</summary>
+            <div class="handy-dandy-workbench-advanced-fields">
+              <label>Seed <input type="number" name="seed" /></label>
+              <label>Max Attempts <input type="number" name="maxAttempts" min="1" /></label>
+              <label>Compendium Pack ID <input type="text" name="packId" /></label>
+              <label>Folder ID <input type="text" name="folderId" /></label>
+            </div>
+          </details>
         </form>
       </section>
       <section class="handy-dandy-workbench-panel" data-panel="history">
