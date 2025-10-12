@@ -67,5 +67,11 @@
   "description": "A vigilant scout always ready to sound the alarm.",
   "recallKnowledge": "",
   "img": "icons/actors/cautious-scout.webp",
-  "source": "Pathfinder Bestiary"
+  "source": "Pathfinder Bestiary",
+  "publication": {
+    "title": "",
+    "authors": "",
+    "license": "OGL",
+    "remaster": false
+  }
 }

@@ -1,6 +1,13 @@
 import { fromFoundryAction, fromFoundryActor, fromFoundryItem } from "../mappers/export";
 import { importAction } from "../mappers/import";
-import type { CanonicalEntityMap, EntityType, GeneratedEntityMap, SystemId } from "../schemas";
+import {
+  PUBLICATION_DEFAULT,
+  type CanonicalEntityMap,
+  type EntityType,
+  type GeneratedEntityMap,
+  type PublicationData,
+  type SystemId,
+} from "../schemas";
 import type { ActionPromptInput, ActorPromptInput, ItemPromptInput } from "../prompts";
 
 type PromptInputMap = {
@@ -54,6 +61,8 @@ export interface PromptWorkbenchRequest<T extends EntityType> extends ImporterOp
   readonly seed?: number;
   readonly maxAttempts?: number;
   readonly dependencies?: GenerationDependencyOverrides;
+  readonly img?: string;
+  readonly publication?: PublicationData;
 }
 
 export interface PromptWorkbenchResult<T extends EntityType> {
@@ -165,6 +174,8 @@ export async function generateWorkbenchEntry<T extends EntityType>(
     packId,
     folderId,
     dependencies = {},
+    img,
+    publication,
   } = request;
 
   const generator = resolveGenerator(type, dependencies.generators);
@@ -174,6 +185,8 @@ export async function generateWorkbenchEntry<T extends EntityType>(
     entryName,
     referenceText,
     slug,
+    img,
+    publication,
   });
 
   const data = await generator(input, { seed, maxAttempts });
@@ -193,11 +206,22 @@ export async function generateWorkbenchEntry<T extends EntityType>(
   } satisfies PromptWorkbenchResult<T>;
 }
 
+export const DEFAULT_IMAGE_PATH = "systems/pf2e/icons/default-icons/npc.svg" as const;
+
 function buildPromptInput<T extends EntityType>(
   type: T,
-  context: { systemId: SystemId; entryName: string; referenceText: string; slug?: string },
+  context: {
+    systemId: SystemId;
+    entryName: string;
+    referenceText: string;
+    slug?: string;
+    img?: string;
+    publication?: PublicationData;
+  },
 ): PromptInputMap[T] {
   const { systemId, entryName, referenceText, slug } = context;
+  const img = context.img?.trim() || DEFAULT_IMAGE_PATH;
+  const publication = normalizePublicationInput(context.publication);
   switch (type) {
     case "action":
       return {
@@ -205,6 +229,8 @@ function buildPromptInput<T extends EntityType>(
         title: entryName,
         referenceText,
         slug,
+        img,
+        publication,
       } satisfies ActionPromptInput as PromptInputMap[T];
     case "item":
       return {
@@ -212,6 +238,8 @@ function buildPromptInput<T extends EntityType>(
         name: entryName,
         referenceText,
         slug,
+        img,
+        publication,
       } satisfies ItemPromptInput as PromptInputMap[T];
     case "actor":
       return {
@@ -219,10 +247,20 @@ function buildPromptInput<T extends EntityType>(
         name: entryName,
         referenceText,
         slug,
+        img,
+        publication,
       } satisfies ActorPromptInput as PromptInputMap[T];
     default:
       throw new Error(`Unsupported entity type: ${type satisfies never}`);
   }
+}
+
+function normalizePublicationInput(candidate: PublicationData | undefined): PublicationData {
+  const title = candidate?.title?.trim() ?? PUBLICATION_DEFAULT.title;
+  const authors = candidate?.authors?.trim() ?? PUBLICATION_DEFAULT.authors;
+  const license = candidate?.license?.trim() || PUBLICATION_DEFAULT.license;
+  const remaster = candidate?.remaster ?? PUBLICATION_DEFAULT.remaster;
+  return { title, authors, license, remaster };
 }
 
 function resolveGenerator<T extends EntityType>(
