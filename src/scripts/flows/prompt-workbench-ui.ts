@@ -356,6 +356,11 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
               <label>Slug (optional)</label>
               <input type="text" name="slug" />
             </div>
+            <div class="form-group">
+              <label>Level</label>
+              <input type="number" name="level" min="0" />
+              <p class="notes">Provide a level for actors; leave blank for other entries.</p>
+            </div>
           </div>
           <fieldset class="form-group">
             <legend>Publication Details</legend>
@@ -387,6 +392,14 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
             <textarea name="referenceText" required></textarea>
             <p class="notes">Paste rules text, stat blocks, or a creative prompt for the generator to follow.</p>
           </div>
+          <fieldset class="form-group">
+            <legend>Actor Content</legend>
+            <div class="form-fields">
+              <label><input type="checkbox" name="includeSpellcasting" /> Spellcasting?</label>
+              <label><input type="checkbox" name="includeInventory" /> Inventory?</label>
+            </div>
+            <p class="notes">Use these options to guide actor prompts.</p>
+          </fieldset>
         </form>
       </section>
       <section class="handy-dandy-workbench-panel" data-panel="history">
@@ -407,6 +420,7 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
         systemId: string;
         entryName: string;
         slug: string;
+        level: string;
         publicationTitle: string;
         publicationAuthors: string;
         publicationLicense: string;
@@ -417,6 +431,8 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
         maxAttempts: string;
         packId: string;
         folderId: string;
+        includeSpellcasting: string | null;
+        includeInventory: string | null;
       }
     | null
   >((resolve) => {
@@ -467,6 +483,7 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
                 systemId: String(formData.get("systemId") ?? ""),
                 entryName: String(formData.get("entryName") ?? ""),
                 slug: String(formData.get("slug") ?? ""),
+                level: String(formData.get("level") ?? ""),
                 publicationTitle: String(formData.get("publicationTitle") ?? ""),
                 publicationAuthors: String(formData.get("publicationAuthors") ?? ""),
                 publicationLicense: String(formData.get("publicationLicense") ?? ""),
@@ -477,6 +494,8 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
                 maxAttempts: String(formData.get("maxAttempts") ?? ""),
                 packId: String(formData.get("packId") ?? ""),
                 folderId: String(formData.get("folderId") ?? ""),
+                includeSpellcasting: formData.get("includeSpellcasting") as string | null,
+                includeInventory: formData.get("includeInventory") as string | null,
               });
             },
           },
@@ -547,12 +566,15 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
     entryName,
     referenceText,
     slug: response.slug.trim() || undefined,
+    level: parseOptionalNumber(response.level),
     seed: parseOptionalNumber(response.seed),
     maxAttempts: parseOptionalNumber(response.maxAttempts),
     packId: response.packId.trim() || undefined,
     folderId: response.folderId.trim() || undefined,
     publication,
     img,
+    includeSpellcasting: response.includeSpellcasting ? true : undefined,
+    includeInventory: response.includeInventory ? true : undefined,
   } satisfies PromptWorkbenchRequest<EntityType>;
 }
 
