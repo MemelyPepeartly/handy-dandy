@@ -10,6 +10,20 @@ export interface JsonSchemaDefinition {
   description?: string;
 }
 
+export function updateGPTClientFromSettings(): void {
+  const namespace = game.handyDandy;
+  if (!namespace) {
+    return;
+  }
+
+  const openai = namespace.openai;
+  if (!openai) {
+    return;
+  }
+
+  namespace.gptClient = GPTClient.fromSettings(openai);
+}
+
 type JsonValue =
   | string
   | number
@@ -17,6 +31,8 @@ type JsonValue =
   | null
   | JsonValue[]
   | { [key: string]: JsonValue };
+
+type ResponseCreateParams = Parameters<OpenAI["responses"]["create"]>[0];
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -180,11 +196,9 @@ export class GPTClient {
     options?: GenerateWithSchemaOptions,
   ): Promise<GPTGenerationAttempt<T>> {
     const prepared = this.#prepareSchemaDefinition(schema);
-    const response = await this.#openai.responses.create({
+    const request: ResponseCreateParams = {
       model: this.#config.model,
       input: prompt,
-      temperature: this.#config.temperature,
-      top_p: this.#config.top_p,
       metadata: this.#createMetadata(options?.seed),
       text: {
         format: {
@@ -195,7 +209,11 @@ export class GPTClient {
           strict: true,
         },
       },
-    });
+    };
+
+    this.#applySamplingParameters(request);
+
+    const response = await this.#openai.responses.create(request);
 
     return {
       response,
@@ -209,10 +227,8 @@ export class GPTClient {
     options?: GenerateWithSchemaOptions,
   ): Promise<GPTGenerationAttempt<T>> {
     const prepared = this.#prepareSchemaDefinition(schema);
-    const response = await this.#openai.responses.create({
+    const request: ResponseCreateParams = {
       model: this.#config.model,
-      temperature: this.#config.temperature,
-      top_p: this.#config.top_p,
       metadata: this.#createMetadata(options?.seed),
       input: [
         {
@@ -231,7 +247,11 @@ export class GPTClient {
         },
       ],
       tool_choice: { type: "function", name: prepared.name },
-    });
+    };
+
+    this.#applySamplingParameters(request);
+
+    const response = await this.#openai.responses.create(request);
 
     return {
       response,
@@ -322,6 +342,18 @@ export class GPTClient {
       usage: payload.usage,
       error: payload.error,
     });
+  }
+
+  #applySamplingParameters(request: ResponseCreateParams): void {
+    if (this.#supportsTemperature()) {
+      request.temperature = this.#config.temperature;
+    }
+
+    request.top_p = this.#config.top_p;
+  }
+
+  #supportsTemperature(): boolean {
+    return !this.#config.model.startsWith("gpt-5");
   }
 
   #createMetadata(seedOverride: number | undefined): Record<string, string> | undefined {
