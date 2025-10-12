@@ -213,7 +213,7 @@ export class GPTClient {
         },
       },
       tools: [
-        { type: "web_search" },
+        { type: "web_search_preview" },
       ],
     };
 
@@ -241,7 +241,7 @@ export class GPTClient {
         `You are a JSON serializer. Always provide valid JSON for the ${schema.name} tool that satisfies the supplied schema. When helpful, consult the web_search tool to gather up-to-date information before returning your final answer.`,
       ),
       tools: [
-        { type: "web_search" },
+        { type: "web_search_preview" },
         {
           type: "function",
           name: prepared.name,
