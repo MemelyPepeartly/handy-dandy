@@ -10,7 +10,7 @@ export function registerSettings(): void {
   settings.register(CONSTANTS.MODULE_ID, "GPTApiKey", {
     name: "GPT API Key",
     hint: "Insert your GPT API key here",
-    scope: "client",
+    scope: "world",
     config: true,
     type: String,
     default: ""
@@ -19,7 +19,7 @@ export function registerSettings(): void {
   settings.register(CONSTANTS.MODULE_ID, "GPTOrganization", {
     name: "GPT Organization",
     hint: "Insert your GPT organization ID here",
-    scope: "client",
+    scope: "world",
     config: true,
     type: String,
     default: ""
@@ -28,7 +28,7 @@ export function registerSettings(): void {
   settings.register(CONSTANTS.MODULE_ID, "GPTModel", {
     name: "GPT Model",
     hint: "The OpenAI model identifier that should be used for Handy-Dandy prompts.",
-    scope: "client",
+    scope: "world",
     config: true,
     type: String,
     choices: GPT_MODEL_CHOICES,
@@ -41,7 +41,7 @@ export function registerSettings(): void {
   settings.register(CONSTANTS.MODULE_ID, "GPTTemperature", {
     name: "GPT Temperature",
     hint: "Sampling temperature for OpenAI responses (0-2).",
-    scope: "client",
+    scope: "world",
     config: true,
     type: Number,
     default: 0.2,
@@ -53,7 +53,7 @@ export function registerSettings(): void {
   settings.register(CONSTANTS.MODULE_ID, "GPTTopP", {
     name: "GPT Top P",
     hint: "Nucleus sampling probability mass for OpenAI responses (0-1).",
-    scope: "client",
+    scope: "world",
     config: true,
     type: Number,
     default: 1,
@@ -65,7 +65,7 @@ export function registerSettings(): void {
   settings.register(CONSTANTS.MODULE_ID, "GPTSeed", {
     name: "GPT Seed",
     hint: "Optional deterministic seed for OpenAI responses (leave blank for random).",
-    scope: "client",
+    scope: "world",
     config: true,
     type: Number,
     default: null,
@@ -86,7 +86,7 @@ export function registerSettings(): void {
   settings.register(CONSTANTS.MODULE_ID, "developerDumpInvalidJson", {
     name: "Developer: Dump Invalid JSON",
     hint: "When enabled, failed Ensure Valid attempts will record the last invalid JSON in the developer console.",
-    scope: "client",
+    scope: "world",
     config: true,
     type: Boolean,
     default: false,
@@ -95,7 +95,7 @@ export function registerSettings(): void {
   settings.register(CONSTANTS.MODULE_ID, "developerDumpAjvErrors", {
     name: "Developer: Dump Ajv Errors",
     hint: "When enabled, failed Ensure Valid attempts will record Ajv error messages in the developer console.",
-    scope: "client",
+    scope: "world",
     config: true,
     type: Boolean,
     default: false,
