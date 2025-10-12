@@ -281,7 +281,7 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
       }
 
       .handy-dandy-workbench-advanced > summary::after {
-        content: "\25bc";
+        content: "\\25BC";
         font-size: 0.85em;
         transition: transform 0.2s ease;
       }
