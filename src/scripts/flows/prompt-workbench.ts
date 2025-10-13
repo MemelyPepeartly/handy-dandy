@@ -1,5 +1,5 @@
 import { fromFoundryAction, fromFoundryActor, fromFoundryItem } from "../mappers/export";
-import { importAction, importActor } from "../mappers/import";
+import { importAction, importActor, importItem } from "../mappers/import";
 import {
   PUBLICATION_DEFAULT,
   type CanonicalEntityMap,
@@ -100,6 +100,7 @@ const GENERATION_METHOD_MAP: Record<EntityType, keyof NonNullable<Game["handyDan
 
 const DEFAULT_IMPORTERS: Partial<ImporterMap> = {
   action: async (json, options) => importAction(json, options),
+  item: async (json, options) => importItem(json, options),
   actor: async (json, options) => importActor(json, options),
 };
 

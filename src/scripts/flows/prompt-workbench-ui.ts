@@ -16,7 +16,7 @@ import {
   type PublicationData,
   type SystemId,
 } from "../schemas";
-import { importAction, importActor } from "../mappers/import";
+import { importAction, importActor, importItem } from "../mappers/import";
 
 interface WorkbenchHistoryEntry {
   readonly id: string;
@@ -882,6 +882,8 @@ function createHistoryImporter(
   switch (type) {
     case "action":
       return () => importAction(data as GeneratedEntityMap["action"]);
+    case "item":
+      return () => importItem(data as GeneratedEntityMap["item"]);
     case "actor":
       return () => importActor(data as GeneratedEntityMap["actor"]);
     default:
