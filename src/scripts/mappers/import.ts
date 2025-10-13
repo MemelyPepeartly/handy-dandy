@@ -7,10 +7,10 @@ import type {
   SystemId,
 } from "../schemas";
 import { PUBLICATION_DEFAULT } from "../schemas";
+import { getDefaultItemImage } from "../data/item-images";
 import { validate, formatError } from "../helpers/validation";
 
 const DEFAULT_ACTION_IMAGE = "systems/pf2e/icons/default-icons/action.svg" as const;
-const DEFAULT_ITEM_IMAGE = "systems/pf2e/icons/default-icons/item.svg" as const;
 const DEFAULT_ACTOR_IMAGE = "systems/pf2e/icons/default-icons/npc.svg" as const;
 const DEFAULT_STRIKE_IMAGE = "systems/pf2e/icons/default-icons/melee.svg" as const;
 const DEFAULT_SPELL_IMAGE = "systems/pf2e/icons/default-icons/spell.svg" as const;
@@ -1107,7 +1107,7 @@ function prepareItemSource(item: ItemSchemaData): FoundryItemSource {
   const usage = resolveItemUsage(item.itemType);
   const carryType = resolveItemCarryType(item.itemType);
   const identification = resolveItemIdentification(item.itemType);
-  const img = item.img?.trim() || DEFAULT_ITEM_IMAGE;
+  const img = item.img?.trim() || getDefaultItemImage(item.itemType);
   const type = item.itemType === "other" ? "equipment" : item.itemType;
   const coins = priceToCoins(item.price);
   const coreVersion = resolveCoreVersion();

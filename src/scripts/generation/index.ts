@@ -8,6 +8,7 @@ import {
 } from "../prompts";
 import { ensureValid } from "../validation/ensure-valid";
 import { toFoundryActorData } from "../mappers/import";
+import { getDefaultItemImage } from "../data/item-images";
 import {
   actionSchema,
   actorSchema,
@@ -81,13 +82,25 @@ export async function generateItem(
     { seed },
   );
 
-  return ensureValid({
+  const canonical = await ensureValid({
     type: "item",
     payload: draft,
     gptClient,
     maxAttempts,
     schema: ITEM_SCHEMA_DEFINITION,
   });
+
+  const trimmedImg = canonical.img?.trim() ?? "";
+  const resolvedImg = trimmedImg || getDefaultItemImage(canonical.itemType);
+
+  if (resolvedImg === canonical.img) {
+    return canonical;
+  }
+
+  return {
+    ...canonical,
+    img: resolvedImg,
+  } satisfies ItemSchemaData;
 }
 
 export async function generateActor(

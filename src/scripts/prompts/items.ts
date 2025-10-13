@@ -66,8 +66,10 @@ function buildItemSchemaSection(): string {
     "- level: integer >= 0.",
     `- price: optional number >= 0; defaults to ${priceDefault}.`,
     `- traits: optional array of lowercase PF2e trait slugs from the active system; defaults to ${traitsDefault}.`,
-    `- description: optional string; defaults to "${descriptionDefault}".`,
-    `- img: optional string containing an image URL or Foundry asset path; defaults to ${imgDefault}.`,
+    `- description: optional string containing PF2e-formatted HTML box text; defaults to "${descriptionDefault}".`,
+    "- Format the description with HTML <p> paragraphs: start with italicised flavour text (<em>) then add mechanical paragraphs that cover activation, usage, damage, and other rules that fulfil the request.",
+    "- Summarise the requested mechanics instead of copying the prompt verbatim; explicitly mention damage dice, conditions, and other effects referenced in the request.",
+    `- img: optional string containing an image URL or Foundry asset path; defaults to ${imgDefault}. When omitted, apply the category default (armor → shield.svg, weapon → weapon.svg, equipment/other → equipment.svg, consumable → consumable.svg, feat → feat.svg, spell → spell.svg, wand → wand.svg, staff → staff.svg).`,
     `- source: optional string; defaults to "${sourceDefault}".`,
     `- publication: object { title, authors, license, remaster }; defaults to ${publicationDefault}.`,
     `- Always include every top-level property in the JSON response using this canonical set: ${canonicalKeys}.`,
@@ -89,6 +91,15 @@ function buildItemRequest(input: ItemPromptInput): string {
   if (input.slug) {
     parts.splice(1, 0, `Slug suggestion: ${input.slug}`);
   }
+
+  parts.push(
+    [
+      "Description guidelines:",
+      "- Write brand-new Pathfinder Second Edition item rules that realise the request without echoing it word for word.",
+      "- Use HTML <p> tags in the description; begin with <p><em>flavour text</em></p> followed by mechanical paragraphs.",
+      "- Call out level-appropriate activation details, usage requirements, damage dice, conditions, and other mechanical effects that the prompt implies.",
+    ].join("\n"),
+  );
 
   const publicationSection = renderPublicationSection(input.publication);
   if (publicationSection) {
