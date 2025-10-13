@@ -164,15 +164,68 @@ type FoundryItemSource = {
   img: string;
   system: {
     slug: string;
-    description: { value: string };
-    traits: { value: string[]; rarity: string };
+    description: { value: string; gm: string };
+    rules: unknown[];
+    _migration: { version: number; lastMigration: number | null };
+    traits: { value: string[]; otherTags: string[]; rarity: string };
+    publication: { title: string; authors: string; license: string; remaster: boolean };
     level: { value: number };
+    quantity: number;
+    baseItem: string | null;
+    bulk: { value: number | string | null };
+    hp: { value: number; max: number };
+    hardness: number;
     price: { value: Record<string, number> };
     source: { value: string };
-    publication: { title: string; authors: string; license: string; remaster: boolean };
-    rules: unknown[];
+    equipped: { carryType: string; invested: boolean | null; handsHeld?: number | null };
+    containerId: string | null;
+    size: string;
+    material: { type: string | null; grade: string | null };
+    identification: {
+      status: string;
+      unidentified: { name: string; img: string; data: { description: { value: string } } };
+      misidentified: Record<string, unknown>;
+    };
+    usage: { value: string };
+    subitems: unknown[];
+    category?: string | null;
+    group?: string | null;
+    bonus?: { value: number };
+    damage?: {
+      dice: number;
+      die: string | null;
+      damageType: string | null;
+      persistent?: { number: number; faces: number; type: string | null } | null;
+    };
+    splashDamage?: { value: number };
+    range?: number | null;
+    expend?: number | null;
+    reload?: { value: string | null };
+    grade?: string | null;
+    runes?: { potency: number; striking: number; property: string[] };
+    specific?: unknown;
   };
-  folder?: string;
+  effects: unknown[];
+  folder: string | null;
+  flags: Record<string, unknown>;
+  _stats: {
+    compendiumSource: string | null;
+    duplicateSource: string | null;
+    exportSource?: {
+      worldId: string;
+      uuid: string;
+      coreVersion: string;
+      systemId: string;
+      systemVersion: string;
+    };
+    coreVersion: string;
+    systemId: string;
+    systemVersion: string;
+    createdTime: number;
+    modifiedTime: number;
+    lastModifiedBy: string | null;
+  };
+  ownership: { default: number };
 };
 
 type FoundryActorStrikeSource = {
@@ -374,6 +427,16 @@ function ensureValidAction(data: ActionSchemaData): void {
 
   const messages = validation.errors.map((error) => formatError(error));
   throw new Error(`Action JSON failed validation:\n${messages.join("\n")}`);
+}
+
+function ensureValidItem(data: ItemSchemaData): void {
+  const validation = validate("item", data);
+  if (validation.ok) {
+    return;
+  }
+
+  const messages = validation.errors.map((error) => formatError(error));
+  throw new Error(`Item JSON failed validation:\n${messages.join("\n")}`);
 }
 
 function trimArray(values: readonly string[] | null | undefined): string[] {
@@ -714,6 +777,127 @@ function priceToCoins(price: number | null | undefined): Record<string, number> 
   return { pp, gp, sp, cp };
 }
 
+const ITEM_MIGRATION_VERSION = 0.946;
+
+const ITEM_IDENTIFICATION_DEFAULTS: Record<ItemSchemaData["itemType"], { name: string; img: string }> = {
+  armor: { name: "Unusual Armor", img: "systems/pf2e/icons/unidentified_item_icons/armor.webp" },
+  weapon: { name: "Unusual Weapon", img: "systems/pf2e/icons/unidentified_item_icons/weapon.webp" },
+  equipment: { name: "Unusual Object", img: "systems/pf2e/icons/unidentified_item_icons/adventuring_gear.webp" },
+  consumable: { name: "Unusual Consumable", img: "systems/pf2e/icons/unidentified_item_icons/consumable.webp" },
+  feat: { name: "Unusual Feat", img: "systems/pf2e/icons/unidentified_item_icons/feat.webp" },
+  spell: { name: "Unusual Spell", img: "systems/pf2e/icons/unidentified_item_icons/spell.webp" },
+  wand: { name: "Unusual Wand", img: "systems/pf2e/icons/unidentified_item_icons/wand.webp" },
+  staff: { name: "Unusual Staff", img: "systems/pf2e/icons/unidentified_item_icons/staff.webp" },
+  other: { name: "Unusual Object", img: "systems/pf2e/icons/unidentified_item_icons/adventuring_gear.webp" },
+};
+
+const ITEM_USAGE_DEFAULTS: Partial<Record<ItemSchemaData["itemType"], string>> = {
+  armor: "worn",
+  weapon: "held-in-one-hand",
+  equipment: "held-in-one-hand",
+  consumable: "held-in-one-hand",
+  wand: "held-in-one-hand",
+  staff: "held-in-two-hands",
+};
+
+const ITEM_CARRY_TYPE_DEFAULTS: Partial<Record<ItemSchemaData["itemType"], string>> = {
+  armor: "worn",
+  weapon: "worn",
+  equipment: "worn",
+  consumable: "worn",
+  wand: "worn",
+  staff: "worn",
+};
+
+function sanitizeItemTraits(traits: ItemSchemaData["traits"]): string[] {
+  const values = trimArray(traits ?? []);
+  if (!values.length) {
+    return [];
+  }
+
+  const seen = new Set<string>();
+  const normalized: string[] = [];
+  for (const trait of values) {
+    const key = trait.toLowerCase();
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    normalized.push(key);
+  }
+  return normalized;
+}
+
+function resolveItemIdentification(itemType: ItemSchemaData["itemType"]): {
+  name: string;
+  img: string;
+} {
+  const defaults = ITEM_IDENTIFICATION_DEFAULTS[itemType];
+  return defaults ?? ITEM_IDENTIFICATION_DEFAULTS.other;
+}
+
+function resolveItemUsage(itemType: ItemSchemaData["itemType"]): string {
+  const usage = ITEM_USAGE_DEFAULTS[itemType];
+  return usage ?? "";
+}
+
+function resolveItemCarryType(itemType: ItemSchemaData["itemType"]): string {
+  const carryType = ITEM_CARRY_TYPE_DEFAULTS[itemType];
+  return carryType ?? "worn";
+}
+
+function resolveCoreVersion(): string {
+  const gameInstance = (globalThis as { game?: Game }).game;
+  if (!gameInstance) {
+    return "";
+  }
+
+  const release = (gameInstance as { release?: { version?: unknown } }).release;
+  if (release && typeof release.version === "string") {
+    return release.version;
+  }
+
+  const version = (gameInstance as { version?: unknown }).version;
+  return typeof version === "string" ? version : "";
+}
+
+function resolveSystemVersion(): string {
+  const gameInstance = (globalThis as { game?: Game }).game;
+  const system = gameInstance?.system as { version?: unknown } | undefined;
+  if (system && typeof system.version === "string") {
+    return system.version;
+  }
+  return "";
+}
+
+function resolveWorldId(): string {
+  const gameInstance = (globalThis as { game?: Game }).game;
+  const world = gameInstance?.world as
+    | { id?: unknown; data?: { id?: unknown; name?: unknown } }
+    | undefined;
+  if (!world) {
+    return "";
+  }
+
+  if (typeof world.id === "string") {
+    return world.id;
+  }
+
+  const dataId = (world as { data?: { id?: unknown } }).data?.id;
+  if (typeof dataId === "string") {
+    return dataId;
+  }
+
+  const name = (world as { data?: { name?: unknown } }).data?.name;
+  return typeof name === "string" ? name : "";
+}
+
+function resolveCurrentUserId(): string | null {
+  const gameInstance = (globalThis as { game?: Game }).game;
+  const current = gameInstance?.userId ?? (gameInstance?.user ? gameInstance.user.id : null);
+  return typeof current === "string" && current ? current : null;
+}
+
 function matchesSlug(candidate: unknown, slug: string): boolean {
   if (!candidate) {
     return false;
@@ -916,25 +1100,105 @@ function prepareActionSource(action: ActionSchemaData): FoundryActionSource {
 }
 
 function prepareItemSource(item: ItemSchemaData): FoundryItemSource {
-  const traits = trimArray(item.traits);
+  const traits = sanitizeItemTraits(item.traits);
   const description = toRichText(item.description);
-  const source = item.source?.trim() ?? "";
+  const source = sanitizeText(item.source);
   const publication = normalizePublicationDetails(item.publication, source);
+  const usage = resolveItemUsage(item.itemType);
+  const carryType = resolveItemCarryType(item.itemType);
+  const identification = resolveItemIdentification(item.itemType);
+  const img = item.img?.trim() || DEFAULT_ITEM_IMAGE;
+  const type = item.itemType === "other" ? "equipment" : item.itemType;
+  const coins = priceToCoins(item.price);
+  const coreVersion = resolveCoreVersion();
+  const systemVersion = resolveSystemVersion();
+  const timestamp = Date.now();
+  const userId = resolveCurrentUserId();
+  const worldId = resolveWorldId();
+
+  const systemData: FoundryItemSource["system"] = {
+    slug: item.slug,
+    description: { value: description, gm: "" },
+    rules: [],
+    _migration: { version: ITEM_MIGRATION_VERSION, lastMigration: null },
+    traits: { value: traits, otherTags: [], rarity: item.rarity },
+    publication,
+    level: { value: item.level },
+    quantity: 1,
+    baseItem: null,
+    bulk: { value: 0 },
+    hp: { value: 0, max: 0 },
+    hardness: 0,
+    price: { value: coins },
+    source: { value: source },
+    equipped: { carryType, invested: null },
+    containerId: null,
+    size: "med",
+    material: { type: null, grade: null },
+    identification: {
+      status: "identified",
+      unidentified: {
+        name: identification.name,
+        img: identification.img,
+        data: { description: { value: "" } },
+      },
+      misidentified: {},
+    },
+    usage: { value: usage },
+    subitems: [],
+  };
+
+  if (type === "weapon") {
+    systemData.category = "simple";
+    systemData.group = null;
+    systemData.bonus = { value: 0 };
+    systemData.damage = {
+      dice: 1,
+      die: "d4",
+      damageType: null,
+      persistent: null,
+    };
+    systemData.splashDamage = { value: 0 };
+    systemData.range = 0;
+    systemData.expend = null;
+    systemData.reload = { value: "0" };
+    systemData.grade = null;
+    systemData.runes = { potency: 0, striking: 0, property: [] };
+    systemData.specific = null;
+    systemData.equipped = { ...systemData.equipped, handsHeld: 0 };
+  }
+
+  const stats: FoundryItemSource["_stats"] = {
+    compendiumSource: null,
+    duplicateSource: null,
+    coreVersion,
+    systemId: item.systemId,
+    systemVersion,
+    createdTime: timestamp,
+    modifiedTime: timestamp,
+    lastModifiedBy: userId,
+  };
+
+  if (worldId && coreVersion && systemVersion) {
+    stats.exportSource = {
+      worldId,
+      uuid: `Item.${generateId()}`,
+      coreVersion,
+      systemId: item.systemId,
+      systemVersion,
+    };
+  }
 
   return {
     name: item.name,
-    type: item.itemType,
-    img: item.img?.trim() || DEFAULT_ITEM_IMAGE,
-    system: {
-      slug: item.slug,
-      description: { value: description },
-      traits: { value: traits, rarity: item.rarity },
-      level: { value: item.level },
-      price: { value: priceToCoins(item.price) },
-      source: { value: source },
-      publication,
-      rules: []
-    }
+    type,
+    img,
+    system: systemData,
+    effects: [],
+    folder: null,
+    flags: {},
+    _stats: stats,
+    ownership: { default: 0 },
   };
 }
 
@@ -1686,6 +1950,63 @@ export async function importAction(
   const created = await Item.create(source as any, { keepId: true } as any);
   if (!created) {
     throw new Error(`Failed to create action "${json.name}" in the world.`);
+  }
+
+  return created;
+}
+
+export async function importItem(
+  json: ItemSchemaData,
+  options: ImportOptions = {},
+): Promise<Item> {
+  assertSystemCompatibility(json.systemId);
+  ensureValidItem(json);
+  const source = prepareItemSource(json);
+  const { packId, folderId } = options;
+
+  if (folderId) {
+    source.folder = folderId;
+  }
+
+  if (packId) {
+    const pack = game.packs?.get(packId) as ItemCompendium | undefined;
+    if (!pack) {
+      throw new Error(`Pack with id "${packId}" was not found.`);
+    }
+
+    const existing = await findPackDocument(pack, json.slug);
+    if (existing) {
+      const updateData = { ...source } as Record<string, unknown>;
+      if (folderId) {
+        updateData.folder = folderId;
+      }
+
+      await existing.update(updateData as any);
+      return existing;
+    }
+
+    const imported = (await pack.importDocument(source as any, { keepId: true } as any)) as Item | null | undefined;
+    if (!imported) {
+      throw new Error(`Failed to import item "${json.name}" into pack ${pack.collection}`);
+    }
+
+    return imported;
+  }
+
+  const existing = findWorldItem(json.slug);
+  if (existing) {
+    const updateData = { ...source } as Record<string, unknown>;
+    if (folderId) {
+      updateData.folder = folderId;
+    }
+
+    await existing.update(updateData as any);
+    return existing;
+  }
+
+  const created = await Item.create(source as any, { keepId: true } as any);
+  if (!created) {
+    throw new Error(`Failed to create item "${json.name}" in the world.`);
   }
 
   return created;
