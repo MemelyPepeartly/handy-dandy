@@ -1,13 +1,25 @@
 import { CONSTANTS } from "../constants";
 import { fromFoundryActor } from "../mappers/export";
 import { importActor } from "../mappers/import";
+import type { ActorGenerationResult, ActorSchemaData } from "../schemas";
+
+type RemixMode = "scale" | "features" | "remake" | "equipment" | "spells";
 
 interface RemixRequest {
   instructions: string;
-  mode: "scale" | "features" | "remake" | "equipment" | "spells";
+  mode: RemixMode;
   targetLevel?: number;
   generateTokenImage?: boolean;
   tokenPrompt?: string;
+}
+
+export interface NpcRemixPreset {
+  mode?: RemixMode;
+  instructions?: string;
+  targetLevel?: number;
+  generateTokenImage?: boolean;
+  tokenPrompt?: string;
+  title?: string;
 }
 
 type RemixFormResponse = {
@@ -16,6 +28,21 @@ type RemixFormResponse = {
   targetLevel: string;
   generateTokenImage: string | null;
   tokenPrompt: string;
+};
+
+const REMIX_RETRY_LIMIT = 2;
+
+const QUICK_MODE_DEFAULTS: Record<Extract<RemixMode, "equipment" | "spells">, string> = {
+  equipment: [
+    "Refresh this NPC's inventory with level-appropriate official PF2E equipment.",
+    "Keep the creature's core identity while improving tactical gear variety.",
+    "Prefer official weapons, armor, consumables, and utility items already present in PF2E content.",
+  ].join(" "),
+  spells: [
+    "Refresh this NPC's spellcasting with official PF2E spells appropriate to role and level.",
+    "Ensure there is at least one spellcasting entry and a useful spread of combat and utility spells.",
+    "Prefer official spells from Foundry compendia instead of inventing replacements.",
+  ].join(" "),
 };
 
 function escapeHtml(value: string): string {
@@ -32,7 +59,7 @@ function escapeHtml(value: string): string {
     .replace(/'/g, "&#39;");
 }
 
-function buildModeInstruction(mode: RemixRequest["mode"]): string {
+function buildModeInstruction(mode: RemixMode): string {
   switch (mode) {
     case "scale":
       return "Prioritise level scaling while preserving creature identity and theme.";
@@ -48,6 +75,23 @@ function buildModeInstruction(mode: RemixRequest["mode"]): string {
   }
 }
 
+function buildModeRequirements(mode: RemixMode): string[] {
+  switch (mode) {
+    case "equipment":
+      return [
+        "- Required output: include a non-empty inventory array with at least 3 meaningful equipment entries unless explicitly constrained otherwise.",
+        "- Keep item names and slugs aligned to official PF2E content when available.",
+      ];
+    case "spells":
+      return [
+        "- Required output: include non-empty spellcasting entries and at least 3 total spells across entries.",
+        "- Preserve or improve spell DC/attack values relative to level and role.",
+      ];
+    default:
+      return [];
+  }
+}
+
 function parseOptionalNumber(value: string): number | undefined {
   const trimmed = value.trim();
   if (!trimmed) return undefined;
@@ -55,35 +99,172 @@ function parseOptionalNumber(value: string): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
-async function promptRemixRequest(actor: Actor): Promise<RemixRequest | null> {
+function parseRemixMode(raw: string, fallback: RemixMode): RemixMode {
+  switch (raw) {
+    case "scale":
+    case "features":
+    case "remake":
+    case "equipment":
+    case "spells":
+      return raw;
+    default:
+      return fallback;
+  }
+}
+
+function summarizeInventory(canonical: ActorSchemaData): string {
+  const entries = canonical.inventory ?? [];
+  if (!entries.length) {
+    return "No inventory entries found.";
+  }
+
+  return entries
+    .slice(0, 20)
+    .map((entry) => {
+      const quantity = typeof entry.quantity === "number" && Number.isFinite(entry.quantity) ? ` x${entry.quantity}` : "";
+      const level = typeof entry.level === "number" && Number.isFinite(entry.level) ? ` (L${entry.level})` : "";
+      return `- ${entry.name}${quantity}${level}`;
+    })
+    .join("\n");
+}
+
+function summarizeSpellcasting(canonical: ActorSchemaData): string {
+  const entries = canonical.spellcasting ?? [];
+  if (!entries.length) {
+    return "No spellcasting entries found.";
+  }
+
+  const lines: string[] = [];
+  for (const entry of entries.slice(0, 8)) {
+    const sampleSpells = entry.spells
+      .slice(0, 10)
+      .map((spell) => `${spell.name} (L${spell.level})`)
+      .join(", ");
+    lines.push(`- ${entry.name}: ${sampleSpells || "no listed spells"}`);
+  }
+
+  return lines.join("\n");
+}
+
+function buildRemixReferenceText(
+  actorName: string,
+  canonical: ActorSchemaData,
+  request: RemixRequest,
+  retryGap?: string,
+): string {
+  const modeRequirements = buildModeRequirements(request.mode);
+  const parts = [
+    `Remix the existing PF2E NPC "${actorName}".`,
+    buildModeInstruction(request.mode),
+    `Target level: ${request.targetLevel ?? "keep current level unless otherwise required"}.`,
+    "Apply this remix specification:",
+    request.instructions,
+    "Current inventory snapshot:",
+    summarizeInventory(canonical),
+    "Current spellcasting snapshot:",
+    summarizeSpellcasting(canonical),
+    "Current canonical actor data (JSON):",
+    JSON.stringify(canonical, null, 2),
+    "Important constraints:",
+    "- Preserve PF2E sheet structure and valid stat relationships.",
+    "- Reuse official PF2E spells/items/actions/effects whenever they exist; do not fabricate duplicates.",
+    "- Ensure descriptions use PF2E inline formatting (@Check, @Damage, @Template, @UUID).",
+    ...modeRequirements,
+  ];
+
+  if (retryGap) {
+    parts.push(`Retry requirement: ${retryGap}`);
+  }
+
+  return parts.join("\n\n");
+}
+
+type RemixCoverage = {
+  inventoryCount: number;
+  spellEntryCount: number;
+  spellCount: number;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function collectRemixCoverage(generated: ActorGenerationResult): RemixCoverage {
+  let inventoryCount = 0;
+  let spellEntryCount = 0;
+  let spellCount = 0;
+
+  for (const item of generated.items) {
+    if (!isRecord(item)) {
+      continue;
+    }
+    const type = typeof item.type === "string" ? item.type : "";
+    if (type === "spell") {
+      spellCount += 1;
+      continue;
+    }
+    if (type === "spellcastingEntry") {
+      spellEntryCount += 1;
+      continue;
+    }
+    if (type === "melee" || type === "action") {
+      continue;
+    }
+    inventoryCount += 1;
+  }
+
+  return { inventoryCount, spellEntryCount, spellCount };
+}
+
+function getCoverageGap(mode: RemixMode, coverage: RemixCoverage): string | null {
+  if (mode === "equipment" && coverage.inventoryCount < 3) {
+    return `inventory is too sparse (${coverage.inventoryCount} entries found; need at least 3).`;
+  }
+  if (mode === "spells" && coverage.spellEntryCount < 1) {
+    return "spellcasting entries are missing.";
+  }
+  if (mode === "spells" && coverage.spellCount < 3) {
+    return `spell list is too small (${coverage.spellCount} spells found; need at least 3).`;
+  }
+  return null;
+}
+
+async function promptRemixRequest(actor: Actor, preset: NpcRemixPreset): Promise<RemixRequest | null> {
+  const defaultMode = preset.mode ?? "remake";
+  const defaultTargetLevel = typeof preset.targetLevel === "number" ? String(Math.max(0, Math.trunc(preset.targetLevel))) : "";
+  const defaultInstructions = preset.instructions?.trim() ?? "";
+  const defaultTokenPrompt = preset.tokenPrompt?.trim() ?? "";
+  const title = preset.title?.trim() || `Remix ${actor.name ?? "NPC"}`;
+
   const content = `
-    <form class="handy-dandy-remix-form" style="display:flex;flex-direction:column;gap:0.75rem;min-width:540px;">
+    <form class="handy-dandy-remix-form" style="display:flex;flex-direction:column;gap:0.75rem;min-width:560px;">
       <div class="form-group">
         <label for="handy-dandy-remix-mode">Remix Mode</label>
         <select id="handy-dandy-remix-mode" name="mode">
-          <option value="scale">Scale Up/Down</option>
-          <option value="features">Add Features</option>
-          <option value="remake">Complete Remake</option>
-          <option value="equipment">Equipment Refresh</option>
-          <option value="spells">Spellcasting Refresh</option>
+          <option value="scale"${defaultMode === "scale" ? " selected" : ""}>Scale Up/Down</option>
+          <option value="features"${defaultMode === "features" ? " selected" : ""}>Add Features</option>
+          <option value="remake"${defaultMode === "remake" ? " selected" : ""}>Complete Remake</option>
+          <option value="equipment"${defaultMode === "equipment" ? " selected" : ""}>Equipment Refresh</option>
+          <option value="spells"${defaultMode === "spells" ? " selected" : ""}>Spellcasting Refresh</option>
         </select>
       </div>
       <div class="form-group">
         <label for="handy-dandy-remix-target-level">Target Level (optional)</label>
-        <input id="handy-dandy-remix-target-level" type="number" name="targetLevel" min="0" />
+        <input id="handy-dandy-remix-target-level" type="number" name="targetLevel" min="0" value="${escapeHtml(defaultTargetLevel)}" />
       </div>
       <div class="form-group">
         <label for="handy-dandy-remix-instructions">Remix Instructions</label>
-        <textarea id="handy-dandy-remix-instructions" name="instructions" rows="10" placeholder="Examples: make this creature level 11 elite controller, swap weapons to polearms, add occult spells, keep defensive profile but increase battlefield mobility." required></textarea>
+        <textarea id="handy-dandy-remix-instructions" name="instructions" rows="10" placeholder="Examples: make this creature level 11 elite controller, swap weapons to polearms, add occult spells, keep defensive profile but increase battlefield mobility.">${escapeHtml(defaultInstructions)}</textarea>
       </div>
       <div class="form-group">
-        <label><input type="checkbox" name="generateTokenImage" /> Generate transparent token image</label>
+        <label><input type="checkbox" name="generateTokenImage"${preset.generateTokenImage ? " checked" : ""} /> Generate transparent token image</label>
       </div>
       <div class="form-group">
         <label for="handy-dandy-remix-token-prompt">Token Prompt Override (optional)</label>
-        <input id="handy-dandy-remix-token-prompt" type="text" name="tokenPrompt" placeholder="Optional art direction for token generation" />
+        <input id="handy-dandy-remix-token-prompt" type="text" name="tokenPrompt" placeholder="Optional art direction for token generation" value="${escapeHtml(defaultTokenPrompt)}" />
       </div>
       <p class="notes">Current actor: <strong>${escapeHtml(actor.name ?? "Unnamed NPC")}</strong></p>
+      <p class="notes">Tip: leave instructions blank to use mode defaults.</p>
     </form>
   `;
 
@@ -98,7 +279,7 @@ async function promptRemixRequest(actor: Actor): Promise<RemixRequest | null> {
 
     const dialog = new Dialog(
       {
-        title: `${CONSTANTS.MODULE_NAME} | Remix ${actor.name ?? "NPC"}`,
+        title: `${CONSTANTS.MODULE_NAME} | ${title}`,
         content,
         buttons: {
           remix: {
@@ -129,7 +310,7 @@ async function promptRemixRequest(actor: Actor): Promise<RemixRequest | null> {
         default: "remix",
         close: () => finish(null),
       },
-      { jQuery: true, width: 680 },
+      { jQuery: true, width: 700 },
     );
 
     dialog.render(true);
@@ -139,24 +320,14 @@ async function promptRemixRequest(actor: Actor): Promise<RemixRequest | null> {
     return null;
   }
 
-  const instructions = response.instructions.trim();
+  const mode = parseRemixMode(response.mode, defaultMode);
+  const modeDefaultInstruction = (mode === "equipment" || mode === "spells") ? QUICK_MODE_DEFAULTS[mode] : "";
+  const fallbackInstruction = preset.instructions?.trim() || modeDefaultInstruction;
+  const instructions = response.instructions.trim() || fallbackInstruction;
   if (!instructions) {
     ui.notifications?.warn(`${CONSTANTS.MODULE_NAME} | Remix instructions are required.`);
     return null;
   }
-
-  const mode = (() => {
-    switch (response.mode) {
-      case "scale":
-      case "features":
-      case "remake":
-      case "equipment":
-      case "spells":
-        return response.mode;
-      default:
-        return "remake";
-    }
-  })();
 
   return {
     instructions,
@@ -165,27 +336,6 @@ async function promptRemixRequest(actor: Actor): Promise<RemixRequest | null> {
     generateTokenImage: response.generateTokenImage ? true : undefined,
     tokenPrompt: response.tokenPrompt.trim() || undefined,
   };
-}
-
-function buildRemixReferenceText(
-  actorName: string,
-  canonical: Record<string, unknown>,
-  request: RemixRequest,
-): string {
-  const parts = [
-    `Remix the existing PF2E NPC "${actorName}".`,
-    buildModeInstruction(request.mode),
-    `Target level: ${request.targetLevel ?? "keep current level unless otherwise required"}.`,
-    "Apply this remix specification:",
-    request.instructions,
-    "Current canonical actor data (JSON):",
-    JSON.stringify(canonical, null, 2),
-    "Important constraints:",
-    "- Preserve PF2E sheet structure and valid stat relationships.",
-    "- Reuse official PF2E spells/items/actions/effects whenever they exist; do not fabricate duplicates.",
-    "- Ensure descriptions use PF2E inline formatting (@Check, @Damage, @Template, @UUID).",
-  ];
-  return parts.join("\n\n");
 }
 
 function showWorkingDialog(actorName: string): Dialog {
@@ -211,8 +361,8 @@ function showWorkingDialog(actorName: string): Dialog {
   return dialog;
 }
 
-export async function runNpcRemixFlow(actor: Actor): Promise<void> {
-  const request = await promptRemixRequest(actor);
+export async function runNpcRemixFlow(actor: Actor, preset: NpcRemixPreset = {}): Promise<void> {
+  const request = await promptRemixRequest(actor, preset);
   if (!request) {
     return;
   }
@@ -225,25 +375,46 @@ export async function runNpcRemixFlow(actor: Actor): Promise<void> {
 
   const actorObject = actor.toObject() as unknown;
   const canonical = fromFoundryActor(actorObject as any);
-  const referenceText = buildRemixReferenceText(actor.name ?? canonical.name, canonical as unknown as Record<string, unknown>, request);
 
   let workingDialog: Dialog | null = null;
   try {
     workingDialog = showWorkingDialog(actor.name ?? canonical.name);
 
-    const generated = await generation({
-      systemId: canonical.systemId,
-      name: actor.name ?? canonical.name,
-      slug: canonical.slug,
-      referenceText,
-      level: request.targetLevel ?? canonical.level,
-      includeSpellcasting: true,
-      includeInventory: true,
-      generateTokenImage: request.generateTokenImage,
-      tokenPrompt: request.tokenPrompt,
-      img: canonical.img ?? undefined,
-      publication: canonical.publication,
-    });
+    let generated: ActorGenerationResult | null = null;
+    let referenceText = buildRemixReferenceText(actor.name ?? canonical.name, canonical, request);
+
+    for (let attempt = 1; attempt <= REMIX_RETRY_LIMIT; attempt += 1) {
+      generated = await generation({
+        systemId: canonical.systemId,
+        name: actor.name ?? canonical.name,
+        slug: canonical.slug,
+        referenceText,
+        level: request.targetLevel ?? canonical.level,
+        includeSpellcasting: true,
+        includeInventory: true,
+        generateTokenImage: request.generateTokenImage,
+        tokenPrompt: request.tokenPrompt,
+        img: canonical.img ?? undefined,
+        publication: canonical.publication,
+      });
+
+      const coverage = collectRemixCoverage(generated);
+      const gap = getCoverageGap(request.mode, coverage);
+      if (!gap) {
+        break;
+      }
+
+      if (attempt < REMIX_RETRY_LIMIT) {
+        console.warn(`${CONSTANTS.MODULE_NAME} | Remix attempt ${attempt} incomplete (${gap}). Retrying once.`);
+        referenceText = buildRemixReferenceText(actor.name ?? canonical.name, canonical, request, gap);
+      } else {
+        ui.notifications?.warn(`${CONSTANTS.MODULE_NAME} | Remix completed, but ${gap}`);
+      }
+    }
+
+    if (!generated) {
+      throw new Error("No remixed actor data was generated.");
+    }
 
     const imported = await importActor(generated, {
       actorId: actor.id ?? undefined,
