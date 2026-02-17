@@ -26,6 +26,12 @@ jobs:
       - name: Install Dependencies
         run: npm install
 
+      - name: Run tests
+        run: npm run test:validation
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
       - name: Build Project
         run: npm run build
       
