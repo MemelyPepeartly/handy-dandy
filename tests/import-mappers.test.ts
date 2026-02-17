@@ -237,6 +237,71 @@ test("toFoundryActorData routes strike HTML and UUID effect text into descriptio
   );
 });
 
+test("toFoundryActorData normalizes lowercase UUID macros inside HTML descriptions", () => {
+  const actor = createActor();
+  actor.strikes = [
+    {
+      name: "Shimmer Blade",
+      type: "melee",
+      attackBonus: 10,
+      traits: ["magical"],
+      damage: [{ formula: "1d8+4", damageType: "slashing", notes: null }],
+      effects: [],
+      description: "<p>On hit, target is @uuid[compendium.pf2e.conditionitems.item.dazzled]{dazzled}.</p>",
+    },
+  ];
+
+  const result = toFoundryActorData(actor);
+  const strike = result.items.find((item) => item.type === "melee" && item.name === "Shimmer Blade");
+
+  assert.ok(strike, "expected generated strike item");
+  assert.equal(strike!.system.description.value.includes("@uuid["), false);
+  assert.equal(strike!.system.description.value.includes("@UUID["), true);
+});
+
+test("toFoundryActorData links condition-style strike effects in descriptions", () => {
+  const actor = createActor();
+  actor.strikes = [
+    {
+      name: "Grasping Tendril",
+      type: "melee",
+      attackBonus: 12,
+      traits: ["magical"],
+      damage: [{ formula: "2d6+6", damageType: "bludgeoning", notes: null }],
+      effects: ["off-guard", "dazzled"],
+      description: null,
+    },
+  ];
+
+  const result = toFoundryActorData(actor);
+  const strike = result.items.find((item) => item.type === "melee" && item.name === "Grasping Tendril");
+
+  assert.ok(strike, "expected generated strike item");
+  assert.deepEqual(strike!.system.attackEffects.value, ["off-guard", "dazzled"]);
+  assert.match(strike!.system.description.value, /@UUID\[Compendium\.pf2e\.conditionitems\.Item\.Off-Guard\]\{Off-Guard\}/);
+  assert.match(strike!.system.description.value, /@UUID\[Compendium\.pf2e\.conditionitems\.Item\.Dazzled\]\{Dazzled\}/);
+});
+
+test("toFoundryActorData applies fallback images to custom inventory items", () => {
+  const actor = createActor();
+  actor.inventory = [
+    {
+      name: "Prototype Gizmo",
+      itemType: "equipment",
+      quantity: 1,
+      level: 2,
+      description: "Experimental gear.",
+      img: null,
+    },
+  ];
+
+  const result = toFoundryActorData(actor);
+  const inventoryItem = result.items.find((item) => item.name === "Prototype Gizmo");
+
+  assert.ok(inventoryItem, "expected custom inventory item");
+  assert.equal(inventoryItem!.img, "systems/pf2e/icons/default-icons/equipment.svg");
+});
+
 test("importAction rejects payloads for the wrong system", async () => {
   (game as Game).system = { id: "sf2e" } as any;
   await assert.rejects(() => importAction(createAction()), /System ID mismatch/);
