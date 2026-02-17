@@ -1596,6 +1596,15 @@ function setupWorkbenchRequestDialog(html: JQuery): void {
       return;
     }
 
+    const actionButton = target.closest<HTMLButtonElement>(".handy-dandy-workbench-action");
+    if (actionButton?.dataset.action && actionButton.dataset.entryId) {
+      const entry = resolveHistoryEntry(actionButton.dataset.entryId);
+      if (entry) {
+        void handleWorkbenchAction(actionButton.dataset.action, entry);
+      }
+      return;
+    }
+
     const historySelect = target.closest<HTMLButtonElement>(".handy-dandy-workbench-history-select");
     if (historySelect?.dataset.entryId && historyView) {
       const entry = resolveHistoryEntry(historySelect.dataset.entryId);
