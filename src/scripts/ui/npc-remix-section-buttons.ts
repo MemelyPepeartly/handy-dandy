@@ -1,6 +1,7 @@
 import { runNpcRemixFlow } from "../flows/npc-remix";
 
 const BUTTON_BASE_CLASS = "handy-dandy-npc-remix-section-button" as const;
+const BUTTON_ROW_CLASS = "handy-dandy-npc-remix-section-controls" as const;
 const INVENTORY_BUTTON_CLASS = "handy-dandy-npc-remix-inventory-button" as const;
 const SPELLS_BUTTON_CLASS = "handy-dandy-npc-remix-spells-button" as const;
 
@@ -17,19 +18,30 @@ function appendSectionButton(
   if (container.length === 0) return;
   if (container.find(`.${className}`).length > 0) return;
 
-  container.css("position", "relative");
+  const controlsRow = (() => {
+    const existing = container.children(`.${BUTTON_ROW_CLASS}`).first();
+    if (existing.length > 0) {
+      return existing;
+    }
+
+    const row = $(`<div class="${BUTTON_ROW_CLASS}"></div>`);
+    row.css({
+      display: "flex",
+      "justify-content": "flex-end",
+      "margin-bottom": "8px",
+    });
+    container.prepend(row);
+    return row;
+  })();
 
   const button = $(
-    `<a class="${BUTTON_BASE_CLASS} ${className}" title="${title}" aria-label="${title}">
+    `<a class="${BUTTON_BASE_CLASS} ${className}" role="button" title="${title}" aria-label="${title}">
       <i class="${iconClass}"></i>
       <span>${label}</span>
     </a>`,
   );
 
   button.css({
-    position: "absolute",
-    top: "8px",
-    right: "8px",
     display: "inline-flex",
     "align-items": "center",
     gap: "6px",
@@ -49,7 +61,7 @@ function appendSectionButton(
     onClick();
   });
 
-  container.append(button);
+  controlsRow.append(button);
 }
 
 export function registerNpcRemixSectionButtons(): void {
