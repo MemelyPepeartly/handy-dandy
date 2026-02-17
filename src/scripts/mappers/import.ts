@@ -1684,6 +1684,55 @@ function parseActionFrequency(raw: unknown): FoundryFrequencySource | null {
   };
 }
 
+const HTML_TAG_DETECTION_PATTERN = /<\/?[a-z][^>]*>/i;
+const INLINE_MACRO_PATTERN = /@[A-Za-z]+\[/;
+const SLUG_EFFECT_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/i;
+
+function splitStrikeEffects(
+  effects: readonly string[],
+): { attackEffects: string[]; descriptionAdditions: string[] } {
+  const attackEffects: string[] = [];
+  const descriptionAdditions: string[] = [];
+  const seen = new Set<string>();
+
+  for (const rawEffect of effects) {
+    const effect = rawEffect.trim();
+    if (!effect) {
+      continue;
+    }
+
+    const dedupeKey = effect.toLowerCase();
+    if (seen.has(dedupeKey)) {
+      continue;
+    }
+    seen.add(dedupeKey);
+
+    if (HTML_TAG_DETECTION_PATTERN.test(effect) || INLINE_MACRO_PATTERN.test(effect)) {
+      descriptionAdditions.push(effect);
+      continue;
+    }
+
+    attackEffects.push(SLUG_EFFECT_PATTERN.test(effect) ? effect.toLowerCase() : effect);
+  }
+
+  return { attackEffects, descriptionAdditions };
+}
+
+function formatStrikeDescription(
+  description: string | null | undefined,
+  additions: readonly string[],
+): string {
+  const parts = [description ?? "", ...additions]
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+
+  if (parts.length === 0) {
+    return "";
+  }
+
+  return parts.map((part) => toRichText(part)).filter((part) => part.length > 0).join("");
+}
+
 
 function createStrikeItem(
   actor: ActorSchemaData,
@@ -1702,6 +1751,8 @@ function createStrikeItem(
   }
 
   const slug = toSlug(strike.name) || toSlug(generateId());
+  const { attackEffects, descriptionAdditions } = splitStrikeEffects(strike.effects ?? []);
+  const description = formatStrikeDescription(strike.description, descriptionAdditions);
 
   return {
     _id: generateStableId(`strike:${actorKey}:${index}`),
@@ -1717,9 +1768,9 @@ function createStrikeItem(
         otherTags: [],
       },
       rules: [],
-      description: { value: toRichText(strike.description), gm: "" },
+      description: { value: description, gm: "" },
       publication: { title: "", authors: "", license: "OGL", remaster: false },
-      attackEffects: { value: (strike.effects ?? []).map((effect) => effect.toLowerCase()) },
+      attackEffects: { value: attackEffects },
     },
     effects: [],
     folder: null,

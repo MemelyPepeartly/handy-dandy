@@ -87,6 +87,9 @@ const DETAIL_HEADERS = [
   "Stage",
 ] as const;
 
+const HTML_TAG_PATTERN =
+  /<\/?(?:p|ul|ol|li|hr|strong|em|span|br|code|blockquote|h[1-6]|table|thead|tbody|tr|td|th)\b/i;
+
 function escapeHtml(value: string): string {
   const utils = (globalThis as { foundry?: { utils?: { escapeHTML?: (input: string) => string } } }).foundry?.utils;
   if (typeof utils?.escapeHTML === "function") {
@@ -107,6 +110,10 @@ function normalizeText(value: string): string {
     .replace(/[\u2018\u2019]/g, "'")
     .replace(/[\u201C\u201D]/g, '"')
     .replace(/\u00A0/g, " ");
+}
+
+function isLikelyHtml(value: string): boolean {
+  return HTML_TAG_PATTERN.test(value);
 }
 
 function applyActionGlyphs(value: string): string {
@@ -266,6 +273,10 @@ export function toPf2eRichText(value: string | null | undefined): string {
   }
 
   const normalized = normalizeText(raw);
+  if (isLikelyHtml(normalized)) {
+    return normalized;
+  }
+
   const lines = normalized.split(/\r?\n/);
 
   const blocks: string[] = [];
@@ -294,7 +305,7 @@ export function toPf2eRichText(value: string | null | undefined): string {
       continue;
     }
 
-    const bullet = line.match(/^(?:[-*•]\s+)(.+)$/);
+    const bullet = line.match(/^(?:[-*\u2022]\s+)(.+)$/);
     if (bullet) {
       flushParagraph();
       list.push(formatInline(bullet[1].trim()));

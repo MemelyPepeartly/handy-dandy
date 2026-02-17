@@ -641,7 +641,7 @@ function normalizeActorStrikes(raw: unknown): ActorSchemaData["strikes"] {
       attackBonus,
       traits: normalizeTraitArray(strike.traits ?? strike.tags),
       damage,
-      effects: normalizeLowercaseArray(strike.effects ?? strike.special ?? strike.additionalEffects),
+      effects: normalizeStrikeEffects(strike.effects ?? strike.special ?? strike.additionalEffects),
       description: normalizeNullableString(strike.description ?? strike.note ?? strike.notes),
     });
   }
@@ -865,6 +865,21 @@ function normalizeTraitArray(value: unknown): string[] {
 function normalizeLowercaseArray(value: unknown): string[] {
   const entries = normalizeStringArray(value);
   return entries.map((entry) => entry.toLowerCase());
+}
+
+function normalizeStrikeEffects(value: unknown): string[] {
+  const entries = normalizeStringArray(value);
+  const result: string[] = [];
+  const seen = new Set<string>();
+  for (const entry of entries) {
+    const key = entry.toLowerCase();
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    result.push(entry);
+  }
+  return result;
 }
 
 function normalizeStringArray(value: unknown): string[] {

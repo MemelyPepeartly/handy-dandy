@@ -138,6 +138,7 @@ export async function generateActor(
         actorSlug: canonical.slug,
         actorDescription: canonical.description ?? input.referenceText,
         customPrompt: input.tokenPrompt,
+        imageCategory: "actor",
       });
       canonical.img = generatedToken;
     } catch (error) {

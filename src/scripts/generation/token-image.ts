@@ -9,7 +9,14 @@ export interface GenerateTokenImageOptions {
   actorSlug: string;
   actorDescription?: string | null;
   customPrompt?: string | null;
+  imageCategory?: "actor" | "item";
 }
+
+const GENERATED_IMAGE_ROOT = "handy-dandy/generated-images";
+const IMAGE_CATEGORY_DIRECTORY: Record<NonNullable<GenerateTokenImageOptions["imageCategory"]>, string> = {
+  actor: "Actor",
+  item: "Item",
+};
 
 function sanitizeFilename(value: string): string {
   return value
@@ -18,6 +25,14 @@ function sanitizeFilename(value: string): string {
     .replace(/[^a-z0-9-]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 64) || "generated-token";
+}
+
+function buildUniqueFilename(base: string): string {
+  const safeBase = sanitizeFilename(base);
+  const suffix = Date.now().toString(36);
+  const maxBaseLength = Math.max(1, 63 - suffix.length);
+  const truncatedBase = safeBase.slice(0, maxBaseLength);
+  return `${truncatedBase}-${suffix}`;
 }
 
 function base64ToBlob(base64: string, mimeType: string): Blob {
@@ -66,9 +81,15 @@ async function ensureDataDirectory(path: string): Promise<void> {
   }
 }
 
+async function ensureGeneratedImageDirectories(): Promise<void> {
+  await ensureDataDirectory(`${GENERATED_IMAGE_ROOT}/${IMAGE_CATEGORY_DIRECTORY.actor}`);
+  await ensureDataDirectory(`${GENERATED_IMAGE_ROOT}/${IMAGE_CATEGORY_DIRECTORY.item}`);
+}
+
 async function uploadImage(
   image: GeneratedImageResult,
   fileName: string,
+  targetDir: string,
 ): Promise<string | null> {
   const picker = (globalThis as { FilePicker?: unknown }).FilePicker as {
     upload?: (
@@ -84,8 +105,7 @@ async function uploadImage(
     return null;
   }
 
-  const targetDir = "handy-dandy/generated-tokens";
-  await ensureDataDirectory(targetDir);
+  await ensureGeneratedImageDirectories();
 
   const blob = base64ToBlob(image.base64, image.mimeType);
   const extension = image.mimeType === "image/webp" ? "webp" : "png";
@@ -139,10 +159,18 @@ export async function generateTransparentTokenImage(
     quality: "high",
   });
 
-  const fileName = sanitizeFilename(`${options.actorSlug || options.actorName}-token`);
-  const uploadedPath = await uploadImage(image, fileName);
-  if (uploadedPath) {
-    return uploadedPath;
+  const fileName = buildUniqueFilename(`${options.actorSlug || options.actorName}-token`);
+  const category = options.imageCategory ?? "actor";
+  const categoryDir = IMAGE_CATEGORY_DIRECTORY[category] ?? IMAGE_CATEGORY_DIRECTORY.actor;
+  const targetDir = `${GENERATED_IMAGE_ROOT}/${categoryDir}`;
+
+  try {
+    const uploadedPath = await uploadImage(image, fileName, targetDir);
+    if (uploadedPath) {
+      return uploadedPath;
+    }
+  } catch (error) {
+    console.warn("Handy Dandy | Could not upload generated image, using inline data URI fallback.", error);
   }
 
   return `data:${image.mimeType};base64,${image.base64}`;
