@@ -89,6 +89,7 @@ const DETAIL_HEADERS = [
 
 const HTML_TAG_PATTERN =
   /<\/?(?:p|ul|ol|li|hr|strong|em|span|br|code|blockquote|h[1-6]|table|thead|tbody|tr|td|th)\b/i;
+const INLINE_MACRO_PATTERN = /@(?:UUID|Compendium|Check|Damage|Template)\[[^\]]+\](?:\{[^}]*\})?/gi;
 
 function escapeHtml(value: string): string {
   const utils = (globalThis as { foundry?: { utils?: { escapeHTML?: (input: string) => string } } }).foundry?.utils;
@@ -114,6 +115,15 @@ function normalizeText(value: string): string {
 
 function isLikelyHtml(value: string): boolean {
   return HTML_TAG_PATTERN.test(value);
+}
+
+function normalizeInlineMacroCasing(value: string): string {
+  return value
+    .replace(/@uuid\[/gi, "@UUID[")
+    .replace(/@compendium\[/gi, "@Compendium[")
+    .replace(/@check\[/gi, "@Check[")
+    .replace(/@damage\[/gi, "@Damage[")
+    .replace(/@template\[/gi, "@Template[");
 }
 
 function applyActionGlyphs(value: string): string {
@@ -187,25 +197,27 @@ function applyInlineTemplates(value: string): string {
 }
 
 function applyConditionLinks(value: string): string {
-  if (
-    value.includes("@UUID[Compendium.pf2e.conditionitems") ||
-    value.includes("@Compendium[pf2e.conditionitems")
-  ) {
-    return value;
-  }
+  const macros: string[] = [];
+  const masked = value.replace(INLINE_MACRO_PATTERN, (macro) => {
+    const id = macros.push(macro) - 1;
+    return `@@HD_MACRO_${id}@@`;
+  });
 
-  let next = value;
+  let next = masked;
   const keys = Object.keys(CONDITION_LINK_TARGETS).sort((a, b) => b.length - a.length);
   for (const key of keys) {
     const target = CONDITION_LINK_TARGETS[key];
     const pattern = new RegExp(`\\b${key.replace(/-/g, "[-\\s]")}\\b(?:\\s+(\\d+))?`, "gi");
-    next = next.replace(pattern, (match, stage: string | undefined) => {
+    next = next.replace(pattern, (_match, stage: string | undefined) => {
       const label = stage ? `${target} ${stage}` : target;
       return `@UUID[Compendium.pf2e.conditionitems.Item.${target}]{${label}}`;
     });
   }
 
-  return next;
+  return next.replace(/@@HD_MACRO_(\d+)@@/g, (_placeholder, index: string) => {
+    const macro = macros[Number(index)];
+    return typeof macro === "string" ? macro : "";
+  });
 }
 
 function formatDetailHeaderLine(value: string): string {
@@ -243,7 +255,8 @@ function formatDetailHeaderLine(value: string): string {
 }
 
 function formatInline(value: string): string {
-  const escaped = escapeHtml(value);
+  const macroNormalized = normalizeInlineMacroCasing(value);
+  const escaped = escapeHtml(macroNormalized);
   const withGlyphs = applyActionGlyphs(escaped);
   const withMarkdown = applyInlineMarkdown(withGlyphs);
   const withChecks = applyInlineChecks(withMarkdown);
@@ -251,6 +264,11 @@ function formatInline(value: string): string {
   const withTemplates = applyInlineTemplates(withDamage);
   const withConditions = applyConditionLinks(withTemplates);
   return formatDetailHeaderLine(withConditions);
+}
+
+function normalizeExistingHtmlRichText(value: string): string {
+  const withMacros = normalizeInlineMacroCasing(value);
+  return applyConditionLinks(withMacros);
 }
 
 function buildParagraph(lines: string[]): string {
@@ -274,7 +292,7 @@ export function toPf2eRichText(value: string | null | undefined): string {
 
   const normalized = normalizeText(raw);
   if (isLikelyHtml(normalized)) {
-    return normalized;
+    return normalizeExistingHtmlRichText(normalized);
   }
 
   const lines = normalized.split(/\r?\n/);
