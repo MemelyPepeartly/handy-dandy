@@ -37,6 +37,10 @@ function canGenerateImages(
   return typeof client.generateImage === "function";
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
 export const DEFAULT_GENERATION_SEED = 1337;
 
 const ACTION_SCHEMA_DEFINITION: JsonSchemaDefinition = {
@@ -147,6 +151,17 @@ export async function generateActor(
   }
 
   const foundry = await toFoundryActorDataWithCompendium(canonical);
+
+  if (input.generateTokenImage && canonical.img?.trim()) {
+    const generatedImage = canonical.img.trim();
+    foundry.img = generatedImage;
+
+    const prototypeToken = isRecord(foundry.prototypeToken) ? foundry.prototypeToken : {};
+    const texture = isRecord(prototypeToken.texture) ? prototypeToken.texture : {};
+    texture.src = generatedImage;
+    prototypeToken.texture = texture;
+    foundry.prototypeToken = prototypeToken;
+  }
 
   return {
     schema_version: canonical.schema_version,
