@@ -51,15 +51,17 @@ function isAlreadyExistsError(error: unknown): boolean {
 }
 
 async function ensureDataDirectory(path: string): Promise<void> {
-  const picker = (globalThis as { FilePicker?: unknown }).FilePicker as {
+  const picker = (globalThis as { FilePicker?: unknown }).FilePicker as
+    | {
     createDirectory?: (
       source: string,
       target: string,
       options?: Record<string, unknown>,
     ) => Promise<unknown>;
-  };
+  }
+    | undefined;
 
-  if (typeof picker.createDirectory !== "function") {
+  if (!picker || typeof picker.createDirectory !== "function") {
     return;
   }
 
@@ -91,7 +93,8 @@ async function uploadImage(
   fileName: string,
   targetDir: string,
 ): Promise<string | null> {
-  const picker = (globalThis as { FilePicker?: unknown }).FilePicker as {
+  const picker = (globalThis as { FilePicker?: unknown }).FilePicker as
+    | {
     upload?: (
       source: string,
       target: string,
@@ -99,9 +102,10 @@ async function uploadImage(
       body?: Record<string, unknown>,
       options?: Record<string, unknown>,
     ) => Promise<{ path?: string; files?: string[] }>;
-  };
+  }
+    | undefined;
 
-  if (typeof picker.upload !== "function") {
+  if (!picker || typeof picker.upload !== "function") {
     return null;
   }
 
