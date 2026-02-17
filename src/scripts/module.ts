@@ -13,6 +13,7 @@ import { createDevNamespace, canUseDeveloperTools, type DevNamespace } from "./d
 import { ToolOverview } from "./ui/tool-overview";
 import { registerNpcRemixButton } from "./ui/npc-remix-button";
 import { registerNpcPortraitRegenerateButton } from "./ui/npc-portrait-regenerate-button";
+import { registerNpcRemixSectionButtons } from "./ui/npc-remix-section-buttons";
 import {
   DEFAULT_GENERATION_SEED,
   generateAction,
@@ -56,6 +57,7 @@ type BoundGenerateActor = (
 
 registerNpcRemixButton();
 registerNpcPortraitRegenerateButton();
+registerNpcRemixSectionButtons();
 
 function bindGenerator<TInput, TResult>(
   fn: GeneratorFunction<TInput, TResult>,
