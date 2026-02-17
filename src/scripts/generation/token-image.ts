@@ -12,6 +12,13 @@ export interface GenerateTokenImageOptions {
   imageCategory?: "actor" | "item";
 }
 
+export interface GenerateItemImageOptions {
+  itemName: string;
+  itemSlug: string;
+  itemDescription?: string | null;
+  customPrompt?: string | null;
+}
+
 const GENERATED_IMAGE_ROOT = "handy-dandy/generated-images";
 const IMAGE_CATEGORY_DIRECTORY: Record<NonNullable<GenerateTokenImageOptions["imageCategory"]>, string> = {
   actor: "Actor",
@@ -151,20 +158,34 @@ function buildTokenPrompt(options: GenerateTokenImageOptions): string {
   return parts.join("\n");
 }
 
-export async function generateTransparentTokenImage(
-  generator: TokenImageGenerator,
-  options: GenerateTokenImageOptions,
-): Promise<string> {
-  const prompt = buildTokenPrompt(options);
-  const image = await generator.generateImage(prompt, {
-    background: "transparent",
-    size: "1024x1024",
-    format: "png",
-    quality: "high",
-  });
+function buildItemPrompt(options: GenerateItemImageOptions): string {
+  const parts: string[] = [
+    `Create Pathfinder-style item icon art for "${options.itemName}".`,
+    "Transparent background only.",
+    "Single centered subject with crisp silhouette and no frame.",
+    "No text, no labels, no logos, no watermark.",
+    "Use clean high-contrast fantasy icon styling suitable for Foundry VTT item sheets.",
+  ];
 
-  const fileName = buildUniqueFilename(`${options.actorSlug || options.actorName}-token`);
-  const category = options.imageCategory ?? "actor";
+  const description = options.itemDescription?.trim();
+  if (description) {
+    parts.push(`Item details: ${description}`);
+  }
+
+  const custom = options.customPrompt?.trim();
+  if (custom) {
+    parts.push(`Additional direction: ${custom}`);
+  }
+
+  return parts.join("\n");
+}
+
+async function storeGeneratedImage(
+  image: GeneratedImageResult,
+  fileNameBase: string,
+  category: NonNullable<GenerateTokenImageOptions["imageCategory"]>,
+): Promise<string> {
+  const fileName = buildUniqueFilename(fileNameBase);
   const categoryDir = IMAGE_CATEGORY_DIRECTORY[category] ?? IMAGE_CATEGORY_DIRECTORY.actor;
   const targetDir = `${GENERATED_IMAGE_ROOT}/${categoryDir}`;
 
@@ -178,4 +199,42 @@ export async function generateTransparentTokenImage(
   }
 
   return `data:${image.mimeType};base64,${image.base64}`;
+}
+
+export async function generateTransparentTokenImage(
+  generator: TokenImageGenerator,
+  options: GenerateTokenImageOptions,
+): Promise<string> {
+  const prompt = buildTokenPrompt(options);
+  const image = await generator.generateImage(prompt, {
+    background: "transparent",
+    size: "1024x1024",
+    format: "png",
+    quality: "high",
+  });
+
+  return storeGeneratedImage(
+    image,
+    `${options.actorSlug || options.actorName}-token`,
+    options.imageCategory ?? "actor",
+  );
+}
+
+export async function generateItemImage(
+  generator: TokenImageGenerator,
+  options: GenerateItemImageOptions,
+): Promise<string> {
+  const prompt = buildItemPrompt(options);
+  const image = await generator.generateImage(prompt, {
+    background: "transparent",
+    size: "1024x1024",
+    format: "png",
+    quality: "high",
+  });
+
+  return storeGeneratedImage(
+    image,
+    `${options.itemSlug || options.itemName}-item`,
+    "item",
+  );
 }
