@@ -1,4 +1,4 @@
-/** Handy-Dandy – custom settings namespace **/
+/** Handy-Dandy - custom settings namespace **/
 export {};
 
 declare module "fvtt-types/configuration" {
@@ -10,9 +10,10 @@ declare module "fvtt-types/configuration" {
     "handy-dandy.GPTApiKey": string;
     "handy-dandy.GPTOrganization": string;
     "handy-dandy.GPTModel": HandyDandyGPTModel;
+    "handy-dandy.GPTImageModel": string;
     "handy-dandy.GPTTemperature": number;
     "handy-dandy.GPTTopP": number;
-    "handy-dandy.GPTSeed": number | null;
+    "handy-dandy.GPTSeed": number;
     "handy-dandy.developerDumpInvalidJson": boolean;
     "handy-dandy.developerDumpAjvErrors": boolean;
   }

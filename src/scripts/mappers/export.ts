@@ -22,6 +22,7 @@ const DEFAULT_SYSTEM_ID = "pf2e" as const;
 
 type ActorSpellcastingEntry = NonNullable<ActorSchemaData["spellcasting"]>[number];
 type ActorSpellList = ActorSpellcastingEntry["spells"];
+type ActorInventoryList = NonNullable<ActorSchemaData["inventory"]>;
 
 const ACTION_TYPE_MAP: Record<string, ActionExecution> = {
   one: "one-action",
@@ -632,6 +633,50 @@ function extractActorSpellcasting(items: unknown): ActorSpellcastingEntry[] {
   });
 }
 
+function extractActorInventory(items: unknown): ActorInventoryList {
+  if (!Array.isArray(items)) {
+    return [];
+  }
+
+  return items
+    .filter((item): item is { type?: string; name?: string; system?: Record<string, unknown>; img?: string } => {
+      if (!item || typeof item !== "object") return false;
+      const type = (item as { type?: string }).type ?? "";
+      return !["melee", "action", "spellcastingEntry", "spell"].includes(type);
+    })
+    .map((item) => {
+      const system = (item.system ?? {}) as Record<string, unknown>;
+      const levelRaw = extractValueProperty<unknown>(system.level) ?? system.level;
+      const level = coerceInteger(levelRaw, 0);
+      const quantity = coerceInteger(system.quantity, 1);
+      const slug = normalizeString((system.slug as string | undefined) ?? "");
+      const description = normalizeHtml(extractValueProperty<string>(system.description) ?? system.description);
+
+      const entry: ActorInventoryList[number] = {
+        name: item.name ?? "Unnamed Item",
+        itemType: resolveItemType(item.type),
+      };
+
+      if (slug) {
+        entry.slug = slug;
+      }
+      if (level >= 0) {
+        entry.level = level;
+      }
+      if (quantity > 0) {
+        entry.quantity = quantity;
+      }
+      if (description) {
+        entry.description = description;
+      }
+      if (typeof item.img === "string" && item.img.trim()) {
+        entry.img = item.img.trim();
+      }
+
+      return entry;
+    });
+}
+
 function extractSpellList(value: unknown): ActorSpellList {
   if (!value || typeof value !== "object") {
     return [];
@@ -1086,6 +1131,7 @@ export function fromFoundryActor(doc: FoundryActor): ActorSchemaData {
     strikes: extractActorStrikes(doc.items),
     actions: extractActorActions(doc.items),
     spellcasting: extractActorSpellcasting(doc.items),
+    inventory: extractActorInventory(doc.items),
     description: normalizeHtml(doc.system?.details?.publicNotes),
     recallKnowledge: normalizeHtml(doc.system?.details?.privateNotes),
     img,
@@ -1095,6 +1141,10 @@ export function fromFoundryActor(doc: FoundryActor): ActorSchemaData {
 
   if (!result.spellcasting?.length) {
     delete result.spellcasting;
+  }
+
+  if (!result.inventory?.length) {
+    delete result.inventory;
   }
 
   return result;

@@ -61,6 +61,8 @@ type WorkbenchFormResponse = {
   readonly folderId: string;
   readonly includeSpellcasting: string | null;
   readonly includeInventory: string | null;
+  readonly generateTokenImage: string | null;
+  readonly tokenPrompt: string;
 };
 
 const workbenchHistory: WorkbenchHistoryEntry[] = [];
@@ -477,7 +479,9 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
             <div class="form-fields">
               <label><input type="checkbox" name="includeSpellcasting" /> Spellcasting?</label>
               <label><input type="checkbox" name="includeInventory" /> Inventory?</label>
+              <label><input type="checkbox" name="generateTokenImage" /> Generate Transparent Token?</label>
             </div>
+            <label>Token Prompt Override <input type="text" name="tokenPrompt" placeholder="Optional art direction" /></label>
             <p class="notes">Use these options to guide actor prompts.</p>
           </fieldset>
           <fieldset class="form-group">
@@ -560,6 +564,8 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
                 folderId: String(formData.get("folderId") ?? ""),
                 includeSpellcasting: formData.get("includeSpellcasting") as string | null,
                 includeInventory: formData.get("includeInventory") as string | null,
+                generateTokenImage: formData.get("generateTokenImage") as string | null,
+                tokenPrompt: String(formData.get("tokenPrompt") ?? ""),
               });
             },
           },
@@ -650,6 +656,8 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
     img,
     includeSpellcasting: response.includeSpellcasting ? true : undefined,
     includeInventory: response.includeInventory ? true : undefined,
+    generateTokenImage: response.generateTokenImage ? true : undefined,
+    tokenPrompt: response.tokenPrompt.trim() || undefined,
   } satisfies PromptWorkbenchRequest<EntityType>;
 }
 
@@ -1213,7 +1221,7 @@ function buildEntryDetailMarkup(entry: WorkbenchHistoryEntry): string {
     <header class="handy-dandy-workbench-header">
       <div class="handy-dandy-workbench-heading">
         <h2 class="handy-dandy-workbench-name">${name}</h2>
-        <p class="handy-dandy-workbench-meta">${typeLabel}${systemLabel ? ` • ${systemLabel}` : ""} • ${timestamp}</p>
+        <p class="handy-dandy-workbench-meta">${typeLabel}${systemLabel ? ` - ${systemLabel}` : ""} - ${timestamp}</p>
       </div>
       <div class="handy-dandy-workbench-actions">
         <button type="button" class="handy-dandy-workbench-action" data-action="copy" data-entry-id="${entry.id}">
@@ -1239,7 +1247,7 @@ function formatHistoryMeta(entry: WorkbenchHistoryEntry): string {
   const type = formatTypeLabel(entry.result.type);
   const system = formatSystemLabel(entry.result.input.systemId);
   const time = formatTimestamp(entry.timestamp);
-  return [type, system, time].filter(Boolean).join(" • ");
+  return [type, system, time].filter(Boolean).join(" - ");
 }
 
 function formatTypeLabel(type: EntityType): string {

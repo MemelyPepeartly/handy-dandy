@@ -84,6 +84,7 @@ function normalizeRequiredProperties(node: unknown): JsonValue {
 
 export interface GPTClientConfig {
   model: string;
+  imageModel: string;
   temperature: number;
   top_p: number;
   seed?: number;
@@ -97,12 +98,14 @@ const sanitizeNumber = (value: unknown): number | undefined => {
 export const readGPTSettings = (): GPTClientConfig => {
   const settings = game.settings;
   const model = settings?.get(CONSTANTS.MODULE_ID, "GPTModel") as string | undefined;
+  const imageModel = settings?.get(CONSTANTS.MODULE_ID, "GPTImageModel");
   const temperature = settings?.get(CONSTANTS.MODULE_ID, "GPTTemperature");
   const top_p = settings?.get(CONSTANTS.MODULE_ID, "GPTTopP");
   const seedSetting = settings?.get(CONSTANTS.MODULE_ID, "GPTSeed");
 
   const config: GPTClientConfig = {
     model: isValidGPTModel(model) ? model : DEFAULT_GPT_MODEL,
+    imageModel: typeof imageModel === "string" && imageModel.trim() ? imageModel.trim() : "gpt-image-1",
     temperature: sanitizeNumber(temperature) ?? 0,
     top_p: sanitizeNumber(top_p) ?? 1,
   };
@@ -117,6 +120,20 @@ export const readGPTSettings = (): GPTClientConfig => {
 
 export interface GenerateWithSchemaOptions {
   seed?: number;
+}
+
+export interface GenerateImageOptions {
+  model?: string;
+  size?: "1024x1024" | "1536x1024" | "1024x1536";
+  background?: "transparent" | "opaque";
+  quality?: "low" | "medium" | "high";
+  format?: "png" | "webp";
+}
+
+export interface GeneratedImageResult {
+  base64: string;
+  mimeType: string;
+  revisedPrompt?: string;
 }
 
 const performanceNow = typeof performance !== "undefined" && typeof performance.now === "function"
@@ -188,6 +205,60 @@ export class GPTClient {
         async () => this.#generateWithTool<T>(prompt, schema, options),
       );
     }
+  }
+
+  async generateImage(
+    prompt: string,
+    options: GenerateImageOptions = {},
+  ): Promise<GeneratedImageResult> {
+    const model = options.model ?? this.#config.imageModel;
+    const format = options.format ?? "png";
+
+    const request: Record<string, unknown> = {
+      model,
+      prompt,
+      size: options.size ?? "1024x1024",
+      background: options.background ?? "transparent",
+      quality: options.quality ?? "high",
+      output_format: format,
+      response_format: "b64_json",
+    };
+
+    const response = await (this.#openai.images as unknown as {
+      generate: (input: unknown) => Promise<unknown>;
+    }).generate(request);
+
+    const payload = response as {
+      data?: Array<{
+        b64_json?: unknown;
+        b64Json?: unknown;
+        revised_prompt?: unknown;
+        revisedPrompt?: unknown;
+      }>;
+    };
+
+    const first = Array.isArray(payload.data) ? payload.data[0] : undefined;
+    const base64 = typeof first?.b64_json === "string"
+      ? first.b64_json
+      : typeof first?.b64Json === "string"
+        ? first.b64Json
+        : null;
+
+    if (!base64) {
+      throw new Error("OpenAI image generation did not return base64 image data.");
+    }
+
+    const revisedPrompt = typeof first?.revised_prompt === "string"
+      ? first.revised_prompt
+      : typeof first?.revisedPrompt === "string"
+        ? first.revisedPrompt
+        : undefined;
+
+    return {
+      base64,
+      mimeType: format === "webp" ? "image/webp" : "image/png",
+      revisedPrompt,
+    };
   }
 
   async #generateStructured<T>(

@@ -410,6 +410,13 @@ function coerceActor(value: Record<string, unknown>): void {
   } else {
     delete value.spellcasting;
   }
+
+  const inventory = normalizeActorInventory(value.inventory);
+  if (inventory.length) {
+    value.inventory = inventory;
+  } else {
+    delete value.inventory;
+  }
 }
 
 function normalizeActorAttributes(raw: unknown): ActorSchemaData["attributes"] {
@@ -776,6 +783,59 @@ function normalizeSpellList(raw: unknown): ActorSpellList {
       tradition: normalizeNullableString(source.tradition),
     });
   }
+  return result;
+}
+
+function normalizeActorInventory(raw: unknown): NonNullable<ActorSchemaData["inventory"]> {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+
+  const result: NonNullable<ActorSchemaData["inventory"]> = [];
+  for (const entry of raw) {
+    const source = isRecord(entry) ? entry : {};
+    const name = normalizeTitle(source.name ?? source.item ?? source.label);
+    if (!name) {
+      continue;
+    }
+
+    const itemType = coerceEnum(source.itemType ?? source.type, ITEM_TYPE_LOOKUP);
+    const normalizedEntry: NonNullable<ActorSchemaData["inventory"]>[number] = {
+      name,
+    };
+
+    if (itemType) {
+      normalizedEntry.itemType = itemType as NonNullable<ActorSchemaData["inventory"]>[number]["itemType"];
+    }
+
+    const slug = normalizeNullableString(source.slug);
+    if (slug) {
+      normalizedEntry.slug = slug;
+    }
+
+    const quantity = normalizeOptionalInteger(source.quantity);
+    if (quantity !== null && quantity > 0) {
+      normalizedEntry.quantity = quantity;
+    }
+
+    const level = normalizeOptionalInteger(source.level);
+    if (level !== null && level >= 0) {
+      normalizedEntry.level = level;
+    }
+
+    const description = normalizeNullableString(source.description ?? source.details);
+    if (description) {
+      normalizedEntry.description = description;
+    }
+
+    const img = normalizeNullableString(source.img ?? source.image);
+    if (img) {
+      normalizedEntry.img = img;
+    }
+
+    result.push(normalizedEntry);
+  }
+
   return result;
 }
 

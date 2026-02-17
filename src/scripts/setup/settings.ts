@@ -38,6 +38,18 @@ export function registerSettings(): void {
     },
   });
 
+  settings.register(CONSTANTS.MODULE_ID, "GPTImageModel", {
+    name: "GPT Image Model",
+    hint: "The OpenAI image model used for generated token art.",
+    scope: "world",
+    config: true,
+    type: String,
+    default: "gpt-image-1",
+    onChange: () => {
+      updateGPTClientFromSettings();
+    },
+  });
+
   settings.register(CONSTANTS.MODULE_ID, "GPTTemperature", {
     name: "GPT Temperature",
     hint: "Sampling temperature for OpenAI responses (0-2).",
@@ -68,7 +80,7 @@ export function registerSettings(): void {
     scope: "world",
     config: true,
     type: Number,
-    default: null,
+    default: Number.NaN,
     onChange: () => {
       updateGPTClientFromSettings();
     },

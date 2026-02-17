@@ -68,6 +68,8 @@ export interface PromptWorkbenchRequest<T extends EntityType> extends ImporterOp
   readonly publication?: PublicationData;
   readonly includeSpellcasting?: boolean;
   readonly includeInventory?: boolean;
+  readonly generateTokenImage?: boolean;
+  readonly tokenPrompt?: string;
 }
 
 export interface PromptWorkbenchResult<T extends EntityType> {
@@ -187,6 +189,8 @@ export async function generateWorkbenchEntry<T extends EntityType>(
     publication,
     includeSpellcasting,
     includeInventory,
+    generateTokenImage,
+    tokenPrompt,
   } = request;
 
   const generator = resolveGenerator(type, dependencies.generators);
@@ -202,6 +206,8 @@ export async function generateWorkbenchEntry<T extends EntityType>(
     level,
     includeSpellcasting,
     includeInventory,
+    generateTokenImage,
+    tokenPrompt,
   });
 
   const data = await generator(input, { seed, maxAttempts });
@@ -235,6 +241,8 @@ function buildPromptInput<T extends EntityType>(
     level?: number;
     includeSpellcasting?: boolean;
     includeInventory?: boolean;
+    generateTokenImage?: boolean;
+    tokenPrompt?: string;
   },
 ): PromptInputMap[T] {
   const {
@@ -246,6 +254,8 @@ function buildPromptInput<T extends EntityType>(
     level,
     includeSpellcasting,
     includeInventory,
+    generateTokenImage,
+    tokenPrompt,
   } = context;
   const img = context.img?.trim() || DEFAULT_IMAGE_PATH;
   const publication = normalizePublicationInput(context.publication);
@@ -280,6 +290,8 @@ function buildPromptInput<T extends EntityType>(
         level,
         includeSpellcasting,
         includeInventory,
+        generateTokenImage,
+        tokenPrompt,
       } satisfies ActorPromptInput as PromptInputMap[T];
     default:
       throw new Error(`Unsupported entity type: ${type satisfies never}`);

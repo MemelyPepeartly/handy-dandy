@@ -9,6 +9,13 @@ import type {
 import { PUBLICATION_DEFAULT } from "../schemas";
 import { getDefaultItemImage } from "../data/item-images";
 import { validate, formatError } from "../helpers/validation";
+import {
+  resolveOfficialItem,
+  stripEmbeddedDocumentMetadata,
+  type OfficialItemLookup,
+  type OfficialItemMatch,
+} from "../pf2e/compendium-resolver";
+import { toPf2eRichText } from "../text/pf2e-rich-text";
 
 const DEFAULT_ACTION_IMAGE = "systems/pf2e/icons/default-icons/action.svg" as const;
 const DEFAULT_ACTOR_IMAGE = "systems/pf2e/icons/default-icons/npc.svg" as const;
@@ -76,6 +83,7 @@ function getPf2eActionTraits(): Set<string> {
 }
 
 type ActorSpellcastingEntry = NonNullable<ActorSchemaData["spellcasting"]>[number];
+type ActorInventoryEntry = NonNullable<ActorSchemaData["inventory"]>[number];
 
 const ACTION_TYPE_MAP: Record<ActionSchemaData["actionType"], { value: string; count: number | null }> = {
   "one-action": { value: "one", count: 1 },
@@ -83,15 +91,6 @@ const ACTION_TYPE_MAP: Record<ActionSchemaData["actionType"], { value: string; c
   "three-actions": { value: "three", count: 3 },
   free: { value: "free", count: null },
   reaction: { value: "reaction", count: null }
-};
-
-const GLYPH_MAP: Record<string, string> = {
-  "one-action": "1",
-  "two-actions": "2",
-  "three-actions": "3",
-  reaction: "r",
-  "free-action": "f",
-  free: "f"
 };
 
 function generateId(): string {
@@ -135,6 +134,7 @@ interface PackIndexEntry {
 export type ImportOptions = {
   packId?: string;
   folderId?: string;
+  actorId?: string;
 };
 
 type ItemCompendium = CompendiumCollection<CompendiumCollection.Metadata & { type: "Item" }>;
@@ -350,11 +350,25 @@ type FoundryActorSpellSource = {
   flags: Record<string, unknown>;
 };
 
+type FoundryActorGenericItemSource = {
+  _id: string;
+  name: string;
+  type: string;
+  img: string;
+  system: Record<string, unknown>;
+  effects: unknown[];
+  folder: null;
+  sort: number;
+  flags: Record<string, unknown>;
+  _stats?: Record<string, unknown>;
+};
+
 type FoundryActorItemSource =
   | FoundryActorStrikeSource
   | FoundryActorActionSource
   | FoundryActorSpellcastingEntrySource
-  | FoundryActorSpellSource;
+  | FoundryActorSpellSource
+  | FoundryActorGenericItemSource;
 
 type FoundrySense = {
   type: string;
@@ -551,7 +565,7 @@ function normalizeSenseEntry(sense: unknown): FoundrySense | null {
 
   text = text
     .replace(
-      /(\d+(?:\.\d+)?)\s*(?:-|–)?\s*(foot|feet|ft|meter|metre|meters|metres|mile|miles|yard|yards)\b/gi,
+      /(\d+(?:\.\d+)?)\s*(?:-|\u2013)?\s*(foot|feet|ft|meter|metre|meters|metres|mile|miles|yard|yards)\b/gi,
       " ",
     )
     .replace(/\d+(?:\.\d+)?/g, " ")
@@ -676,88 +690,8 @@ function assertSystemCompatibility(expected: SystemId): void {
   }
 }
 
-function applyInlineFormatting(text: string): string {
-  const glyphPattern = /\[(one-action|two-actions|three-actions|reaction|free-action|free)\]/gi;
-  const boldPattern = /\*\*(.+?)\*\*/g;
-  const italicPattern = /(^|[^*])\*(?!\s)([^*]+?)\*/g;
-  const codePattern = /`([^`]+?)`/g;
-
-  let formatted = text;
-  formatted = formatted.replace(glyphPattern, (_match, group: string) => {
-    const token = group.toLowerCase();
-    const glyph = GLYPH_MAP[token];
-    return glyph ? `<span class="pf2-icon">${glyph}</span>` : _match;
-  });
-
-  formatted = formatted.replace(boldPattern, "<strong>$1</strong>");
-  formatted = formatted.replace(italicPattern, (_match, prefix: string, content: string) => `${prefix}<em>${content}</em>`);
-  formatted = formatted.replace(codePattern, "<code>$1</code>");
-
-  return formatted;
-}
-
-function buildParagraph(lines: string[]): string {
-  const content = lines.map((line) => applyInlineFormatting(line)).join("<br />");
-  return `<p>${content}</p>`;
-}
-
-function buildList(items: string[]): string {
-  const entries = items.map((item) => `<li>${applyInlineFormatting(item)}</li>`).join("");
-  return `<ul>${entries}</ul>`;
-}
-
 function toRichText(text: string | null | undefined): string {
-  const value = text?.trim();
-  if (!value) {
-    return "";
-  }
-
-  const lines = value.split(/\r?\n/);
-  const blocks: string[] = [];
-  let paragraph: string[] = [];
-  let listItems: string[] = [];
-
-  const flushParagraph = () => {
-    if (!paragraph.length) {
-      return;
-    }
-
-    blocks.push(buildParagraph(paragraph));
-    paragraph = [];
-  };
-
-  const flushList = () => {
-    if (!listItems.length) {
-      return;
-    }
-
-    blocks.push(buildList(listItems));
-    listItems = [];
-  };
-
-  for (const rawLine of lines) {
-    const line = rawLine.trim();
-    if (!line) {
-      flushParagraph();
-      flushList();
-      continue;
-    }
-
-    const bulletMatch = line.match(/^(?:[-*•]\s+)(.+)$/);
-    if (bulletMatch) {
-      flushParagraph();
-      listItems.push(bulletMatch[1].trim());
-      continue;
-    }
-
-    flushList();
-    paragraph.push(line);
-  }
-
-  flushParagraph();
-  flushList();
-
-  return blocks.join("");
+  return toPf2eRichText(text);
 }
 
 function priceToCoins(price: number | null | undefined): Record<string, number> {
@@ -1073,6 +1007,245 @@ function findWorldActor(slug: string): Actor | undefined {
   return undefined;
 }
 
+function normalizeLookupKey(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/['"`\u2019]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function getEmbeddedItemSlug(item: FoundryActorItemSource): string | null {
+  const system = (item as { system?: unknown }).system;
+  if (!isRecord(system)) {
+    return null;
+  }
+  const slug = system.slug;
+  if (typeof slug !== "string") {
+    return null;
+  }
+  const trimmed = slug.trim();
+  return trimmed ? trimmed : null;
+}
+
+function getEmbeddedItemName(item: FoundryActorItemSource): string | null {
+  const name = (item as { name?: unknown }).name;
+  if (typeof name !== "string") {
+    return null;
+  }
+  const trimmed = name.trim();
+  return trimmed ? trimmed : null;
+}
+
+function getEmbeddedSpellLevel(item: FoundryActorItemSource): number | null {
+  const system = (item as { system?: unknown }).system;
+  if (!isRecord(system)) {
+    return null;
+  }
+  const level = system.level;
+  if (isRecord(level)) {
+    const value = level.value;
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return value;
+    }
+  } else if (typeof level === "number" && Number.isFinite(level)) {
+    return level;
+  }
+  return null;
+}
+
+function buildOfficialLookup(item: FoundryActorItemSource): OfficialItemLookup | null {
+  const slug = getEmbeddedItemSlug(item);
+  const name = getEmbeddedItemName(item);
+  const itemType = (item as { type?: string }).type;
+
+  if (itemType === "spell") {
+    return {
+      kind: "spell",
+      slug,
+      name,
+      level: getEmbeddedSpellLevel(item),
+    };
+  }
+
+  if (itemType === "action") {
+    return {
+      kind: "action",
+      slug,
+      name,
+    };
+  }
+
+  if (itemType === "effect") {
+    return {
+      kind: "effect",
+      slug,
+      name,
+    };
+  }
+
+  if (itemType === "condition") {
+    return {
+      kind: "condition",
+      slug,
+      name,
+    };
+  }
+
+  if (itemType === "melee" || itemType === "spellcastingEntry") {
+    return null;
+  }
+
+  return {
+    kind: "item",
+    slug,
+    name,
+    itemType,
+  };
+}
+
+function setNestedProperty(
+  target: Record<string, unknown>,
+  path: readonly string[],
+  value: unknown,
+): void {
+  let cursor: Record<string, unknown> = target;
+  for (let index = 0; index < path.length - 1; index += 1) {
+    const key = path[index];
+    const next = cursor[key];
+    if (!isRecord(next)) {
+      cursor[key] = {};
+    }
+    cursor = cursor[key] as Record<string, unknown>;
+  }
+  cursor[path[path.length - 1]] = value;
+}
+
+function getNestedProperty(source: Record<string, unknown>, path: readonly string[]): unknown {
+  let cursor: unknown = source;
+  for (const key of path) {
+    if (!isRecord(cursor)) {
+      return undefined;
+    }
+    cursor = cursor[key];
+  }
+  return cursor;
+}
+
+function mergeCompendiumActorItem(
+  original: FoundryActorItemSource,
+  match: OfficialItemMatch,
+): FoundryActorItemSource {
+  const base = stripEmbeddedDocumentMetadata(match.source) as Record<string, unknown>;
+  const merged = clone(base);
+
+  const originalId = (original as { _id?: unknown })._id;
+  if (typeof originalId === "string" && originalId) {
+    merged._id = originalId;
+  } else if (typeof merged._id !== "string") {
+    merged._id = generateId();
+  }
+
+  const originalSort = (original as { sort?: unknown }).sort;
+  if (typeof originalSort === "number" && Number.isFinite(originalSort)) {
+    merged.sort = originalSort;
+  } else if (typeof merged.sort !== "number") {
+    merged.sort = 0;
+  }
+
+  merged.folder = null;
+
+  const originalFlags = (original as { flags?: unknown }).flags;
+  const mergedFlags = isRecord(merged.flags) ? merged.flags : {};
+  if (isRecord(originalFlags)) {
+    merged.flags = { ...mergedFlags, ...clone(originalFlags) };
+  } else if (!isRecord(merged.flags)) {
+    merged.flags = {};
+  }
+
+  const originalName = getEmbeddedItemName(original);
+  const mergedName = typeof merged.name === "string" ? merged.name : "";
+  if (originalName && normalizeLookupKey(originalName) !== normalizeLookupKey(mergedName)) {
+    merged.name = originalName;
+  }
+
+  const originalType = (original as { type?: unknown }).type;
+  if (typeof originalType === "string" && originalType) {
+    merged.type = originalType;
+  }
+
+  const originalSystem = isRecord((original as { system?: unknown }).system)
+    ? ((original as { system: Record<string, unknown> }).system)
+    : null;
+  const mergedSystem = isRecord(merged.system) ? merged.system : {};
+  merged.system = mergedSystem;
+
+  if (originalType === "spell" && originalSystem) {
+    const originalLocation = getNestedProperty(originalSystem, ["location"]);
+    if (originalLocation !== undefined) {
+      setNestedProperty(mergedSystem, ["location"], clone(originalLocation));
+    }
+  }
+
+  if (originalType === "action" && originalSystem) {
+    const originalDescription = getNestedProperty(originalSystem, ["description", "value"]);
+    const mergedDescription = getNestedProperty(mergedSystem, ["description", "value"]);
+    if (
+      typeof originalDescription === "string" &&
+      originalDescription.trim().length > 0 &&
+      (typeof mergedDescription !== "string" || mergedDescription.trim().length === 0)
+    ) {
+      setNestedProperty(mergedSystem, ["description", "value"], originalDescription);
+    }
+
+    const originalFrequency = getNestedProperty(originalSystem, ["frequency"]);
+    const mergedFrequency = getNestedProperty(mergedSystem, ["frequency"]);
+    if (originalFrequency !== undefined && mergedFrequency === undefined) {
+      setNestedProperty(mergedSystem, ["frequency"], clone(originalFrequency));
+    }
+  }
+
+  if (!Array.isArray((merged as { effects?: unknown }).effects)) {
+    merged.effects = [];
+  }
+
+  return merged as FoundryActorItemSource;
+}
+
+async function resolveItemFromCompendium(
+  item: FoundryActorItemSource,
+): Promise<FoundryActorItemSource> {
+  const lookup = buildOfficialLookup(item);
+  if (!lookup) {
+    return item;
+  }
+
+  const resolved = await resolveOfficialItem(lookup);
+  if (!resolved) {
+    return item;
+  }
+
+  return mergeCompendiumActorItem(item, resolved);
+}
+
+async function resolveActorItems(items: FoundryActorItemSource[]): Promise<FoundryActorItemSource[]> {
+  if (!items.length) {
+    return items;
+  }
+
+  const resolved: FoundryActorItemSource[] = [];
+  for (const item of items) {
+    resolved.push(await resolveItemFromCompendium(item));
+  }
+
+  return resolved;
+}
+
 function prepareActionSource(action: ActionSchemaData): FoundryActionSource {
   const actionType = ACTION_TYPE_MAP[action.actionType];
   const traits = trimArray(action.traits);
@@ -1215,10 +1388,14 @@ function prepareActorSource(actor: ActorSchemaData): FoundryActorSource {
   const actions = actor.actions.map((action, index) => createActionItem(actor, action, index));
   const spellcastingItems =
     actor.spellcasting?.flatMap((entry, index) => createSpellcastingItems(actor, entry, index)) ?? [];
+  const inventoryItems = actor.inventory?.map((entry, index) => createInventoryItem(actor, entry, index)) ?? [];
 
   const items: FoundryActorItemSource[] = [...strikes, ...actions];
   if (spellcastingItems.length) {
     items.push(...spellcastingItems);
+  }
+  if (inventoryItems.length) {
+    items.push(...inventoryItems);
   }
 
   return {
@@ -1618,7 +1795,7 @@ function createSpellcastingItems(
     const grouped = new Map<number, string[]>();
     for (const spell of entry.spells) {
       const list = grouped.get(spell.level) ?? [];
-      list.push(spell.name + (spell.description ? ` — ${spell.description}` : ""));
+      list.push(spell.name + (spell.description ? ` - ${spell.description}` : ""));
       grouped.set(spell.level, list);
     }
     const levels = Array.from(grouped.keys()).sort((a, b) => a - b);
@@ -1737,6 +1914,72 @@ function createSpellItem(
   };
 }
 
+function mapInventoryItemType(value: unknown): ItemSchemaData["itemType"] {
+  if (typeof value !== "string") {
+    return "equipment";
+  }
+
+  const normalized = value.trim().toLowerCase();
+  switch (normalized) {
+    case "armor":
+    case "weapon":
+    case "equipment":
+    case "consumable":
+    case "feat":
+    case "spell":
+    case "wand":
+    case "staff":
+    case "other":
+      return normalized;
+    default:
+      return "equipment";
+  }
+}
+
+function createInventoryItem(
+  actor: ActorSchemaData,
+  entry: ActorInventoryEntry,
+  index: number,
+): FoundryActorGenericItemSource {
+  const itemType = mapInventoryItemType(entry.itemType);
+  const slug = entry.slug?.trim() || toSlug(entry.name) || toSlug(generateId());
+  const source = prepareItemSource({
+    schema_version: actor.schema_version,
+    systemId: actor.systemId,
+    type: "item",
+    slug,
+    name: entry.name,
+    itemType,
+    rarity: "common",
+    level: entry.level ?? 0,
+    price: null,
+    traits: [],
+    description: entry.description ?? "",
+    img: entry.img ?? null,
+    source: actor.source,
+    publication: actor.publication,
+  });
+
+  const system = clone(source.system) as Record<string, unknown>;
+  const quantity = typeof entry.quantity === "number" && Number.isFinite(entry.quantity) && entry.quantity > 0
+    ? Math.floor(entry.quantity)
+    : 1;
+  system.quantity = quantity;
+
+  return {
+    _id: generateStableId(`inventory:${actor.slug || actor.name}:${index}`),
+    name: source.name,
+    type: source.type,
+    img: source.img,
+    system,
+    effects: [],
+    folder: null,
+    sort: 2_000_000 + index * 10_000,
+    flags: clone(source.flags),
+    _stats: clone(source._stats),
+  };
+}
+
 function buildSkillMap(
   skills: ActorSchemaData["skills"],
 ): FoundryActorSource["system"]["skills"] {
@@ -1852,16 +2095,31 @@ export function toFoundryActorData(actor: ActorSchemaData): FoundryActorSource {
   return prepareActorSource(actor);
 }
 
+export async function toFoundryActorDataWithCompendium(actor: ActorSchemaData): Promise<FoundryActorSource> {
+  const source = prepareActorSource(actor);
+  source.items = await resolveActorItems(source.items);
+  return source;
+}
+
 export async function importActor(
   json: ActorGenerationResult,
   options: ImportOptions = {},
 ): Promise<Actor> {
   assertSystemCompatibility(json.systemId);
   const source = prepareGeneratedActorSource(json);
-  const { packId, folderId } = options;
+  source.items = await resolveActorItems(source.items);
+  const { packId, folderId, actorId } = options;
 
   if (folderId) {
     source.folder = folderId;
+  }
+
+  if (actorId) {
+    const targeted = (game.actors as Collection<Actor> | undefined)?.get(actorId);
+    if (targeted) {
+      await updateActorDocument(targeted, source, folderId);
+      return targeted;
+    }
   }
 
   if (packId) {
@@ -2119,3 +2377,4 @@ function clone<T>(value: T): T {
     return value;
   }
 }
+

@@ -24,6 +24,8 @@ export interface ActorPromptInput {
   readonly level?: number;
   readonly includeSpellcasting?: boolean;
   readonly includeInventory?: boolean;
+  readonly generateTokenImage?: boolean;
+  readonly tokenPrompt?: string;
 }
 
 function buildActorSchemaSection(): string {
@@ -69,11 +71,15 @@ function buildActorSchemaSection(): string {
     "- strikes: array of attacks { name, type (melee|ranged), attackBonus, traits, damage[], effects, description } with each damage entry { formula, damageType, notes } and traits using valid PF2e slugs.",
     "- actions: array of special abilities { name, actionCost (one-action|two-actions|three-actions|free|reaction|passive), traits, requirements, trigger, frequency, description } with traits limited to valid PF2e slugs.",
     "- spellcasting: optional array of entries { name, tradition, castingType (prepared|spontaneous|innate|focus|ritual), attackBonus, saveDC, notes, spells[] } where spells are { level, name, description, tradition }.",
+    "- inventory: optional array of carried items { name, itemType, slug, quantity, level, description, img } used for gear import.",
+    "- When actions or spells correspond to official PF2e compendium entries, preserve canonical names/slugs so import can link to existing records instead of fabricating replacements.",
     "- description: optional string; defaults to null.",
     "- recallKnowledge: optional string; defaults to null.",
     `- img: string or null containing an image URL or Foundry asset path; defaults to ${imgDefault}.`,
     `- source: string; defaults to "${sourceDefault}".`,
-    `- publication: object { title, authors, license, remaster }; defaults to ${publicationDefault}.`
+    `- publication: object { title, authors, license, remaster }; defaults to ${publicationDefault}.`,
+    "- Description formatting rules (PF2E wiki style): use <p> paragraphs, <hr /> between setup text and outcome blocks, use @Check for saves/checks, @Damage for damage rolls, @Template for area links, and @UUID condition links where conditions are referenced.",
+    "- Follow official PF2E NPC source structures for embedded actions/spell entries so imports remain immediately usable on sheet."
   ].join("\n");
 }
 
@@ -113,6 +119,14 @@ function buildActorRequest(input: ActorPromptInput): string {
 
   if (input.includeInventory) {
     parts.push("List an inventory section covering notable gear, treasure, and equipment carried.");
+  }
+
+  if (input.generateTokenImage) {
+    parts.push("Describe the creature visually in enough detail to support transparent token image generation.");
+  }
+
+  if (input.tokenPrompt?.trim()) {
+    parts.push(`Token image direction: ${input.tokenPrompt.trim()}`);
   }
 
   return parts.join("\n\n");

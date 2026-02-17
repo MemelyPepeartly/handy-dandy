@@ -239,6 +239,16 @@ export interface ActorSpellcastingEntryData {
   spells: ActorSpellData[];
 }
 
+export interface ActorInventoryEntryData {
+  name: string;
+  itemType?: ItemCategory | null;
+  slug?: string | null;
+  quantity?: number | null;
+  level?: number | null;
+  description?: string | null;
+  img?: string | null;
+}
+
 export interface ActorAttributeBlock {
   hp: ActorHitPointsData;
   ac: ActorArmorClassData;
@@ -264,6 +274,7 @@ export interface ActorSchemaData extends BaseEntity<"actor"> {
   strikes: ActorStrikeData[];
   actions: ActorActionData[];
   spellcasting?: ActorSpellcastingEntryData[] | null;
+  inventory?: ActorInventoryEntryData[] | null;
   description?: string | null;
   recallKnowledge?: string | null;
   img: string | null;
@@ -716,6 +727,25 @@ export const actorSchema = {
           }
         }
       }
+    },
+    inventory: {
+      type: "array",
+      nullable: true,
+      default: [] as const,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["name"],
+        properties: {
+          name: { type: "string", minLength: 1 },
+          itemType: { type: "string", enum: ITEM_CATEGORIES, nullable: true, default: null },
+          slug: { type: "string", nullable: true, default: null },
+          quantity: { type: "integer", minimum: 1, nullable: true, default: 1 },
+          level: { type: "integer", minimum: 0, nullable: true, default: null },
+          description: { type: "string", nullable: true, default: null },
+          img: { type: "string", nullable: true, default: null },
+        },
+      },
     },
     description: { type: "string", nullable: true, default: null },
     recallKnowledge: { type: "string", nullable: true, default: null },

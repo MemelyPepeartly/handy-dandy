@@ -45,12 +45,15 @@ function buildActionSchemaSection(): string {
     "- name: non-empty string.",
     `- actionType: string enum value (choose from: ${enumExecutions}).`,
     "- description: non-empty string containing the full action rules.",
+    "- Format descriptions with PF2E inline syntax: @Check for checks/saves, @Damage for damage, @Template for templates, and @UUID condition links where relevant.",
+    "- Use <hr /> between setup text and outcome sections (Critical Success/Success/Failure/Critical Failure) when outcomes are present.",
     `- traits: optional array of lowercase PF2e trait slugs drawn from the active system; defaults to ${traitsDefault}.`,
     `- requirements: optional string; defaults to "${requirementsDefault}".`,
     `- img: optional string containing an image URL or Foundry asset path; defaults to ${imgDefault}.`,
     `- rarity: optional string enum (${rarities}); defaults to "${rarityDefault}".`,
     `- source: optional string; defaults to "${sourceDefault}".`,
-    `- publication: object { title, authors, license, remaster }; defaults to ${publicationDefault}.`
+    `- publication: object { title, authors, license, remaster }; defaults to ${publicationDefault}.`,
+    "- If this action maps to official PF2E content, keep canonical name/slug to support compendium-linked import."
   ].join("\n");
 }
 

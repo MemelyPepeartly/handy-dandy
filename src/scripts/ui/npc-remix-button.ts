@@ -1,9 +1,9 @@
-import { CONSTANTS } from "../constants";
+import { runNpcRemixFlow } from "../flows/npc-remix";
 
 const BUTTON_CLASS = "handy-dandy-npc-remix-button" as const;
 const BUTTON_ICON_CLASS = "fas fa-random" as const;
 const BUTTON_LABEL = "Remix Prompt" as const;
-const BUTTON_TITLE = "Open the Handy Dandy prompt remix placeholder" as const;
+const BUTTON_TITLE = "Open Handy Dandy NPC remix" as const;
 
 export function registerNpcRemixButton(): void {
   Hooks.on("renderActorSheetPF2e", (app: ActorSheet, html: JQuery<HTMLElement>) => {
@@ -38,25 +38,7 @@ export function registerNpcRemixButton(): void {
 
     button.on("click", event => {
       event.preventDefault();
-      openPlaceholderDialog(actor.name ?? CONSTANTS.MODULE_NAME);
+      void runNpcRemixFlow(actor);
     });
   });
-}
-
-function openPlaceholderDialog(actorName: string): void {
-  const dialog = new Dialog({
-    title: `${actorName} Prompt Remix`,
-    content:
-      "<p>This placeholder dialogue will host the upcoming prompt remix experience.</p>" +
-      "<p>No actions are available yet, but stay tuned!</p>",
-    buttons: {
-      close: {
-        icon: "<i class=\"fas fa-times\"></i>",
-        label: "Close",
-      },
-    },
-    default: "close",
-  });
-
-  dialog.render(true);
 }

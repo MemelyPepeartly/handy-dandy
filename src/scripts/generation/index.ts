@@ -7,8 +7,9 @@ import {
   type ItemPromptInput,
 } from "../prompts";
 import { ensureValid } from "../validation/ensure-valid";
-import { toFoundryActorData } from "../mappers/import";
+import { toFoundryActorDataWithCompendium } from "../mappers/import";
 import { getDefaultItemImage } from "../data/item-images";
+import { generateTransparentTokenImage } from "./token-image";
 import {
   actionSchema,
   actorSchema,
@@ -25,8 +26,15 @@ import type {
 } from "../gpt/client";
 
 export interface GenerateOptions extends GenerateWithSchemaOptions {
-  gptClient: Pick<GPTClient, "generateWithSchema">;
+  gptClient: Pick<GPTClient, "generateWithSchema"> &
+    Partial<Pick<GPTClient, "generateImage">>;
   maxAttempts?: number;
+}
+
+function canGenerateImages(
+  client: GenerateOptions["gptClient"],
+): client is GenerateOptions["gptClient"] & Pick<GPTClient, "generateImage"> {
+  return typeof client.generateImage === "function";
 }
 
 export const DEFAULT_GENERATION_SEED = 1337;
@@ -123,7 +131,21 @@ export async function generateActor(
     schema: ACTOR_SCHEMA_DEFINITION,
   });
 
-  const foundry = toFoundryActorData(canonical);
+  if (input.generateTokenImage && canGenerateImages(gptClient)) {
+    try {
+      const generatedToken = await generateTransparentTokenImage(gptClient, {
+        actorName: canonical.name,
+        actorSlug: canonical.slug,
+        actorDescription: canonical.description ?? input.referenceText,
+        customPrompt: input.tokenPrompt,
+      });
+      canonical.img = generatedToken;
+    } catch (error) {
+      console.warn("Handy Dandy | Token image generation failed; using fallback actor image", error);
+    }
+  }
+
+  const foundry = await toFoundryActorDataWithCompendium(canonical);
 
   return {
     schema_version: canonical.schema_version,
