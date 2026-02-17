@@ -1217,20 +1217,70 @@ function mergeCompendiumActorItem(
   return merged as FoundryActorItemSource;
 }
 
+function mapEmbeddedItemTypeToCategory(itemType: string): ItemSchemaData["itemType"] {
+  switch (itemType) {
+    case "armor":
+    case "weapon":
+    case "equipment":
+    case "consumable":
+    case "feat":
+    case "spell":
+    case "wand":
+    case "staff":
+      return itemType;
+    case "shield":
+      return "armor";
+    default:
+      return "other";
+  }
+}
+
+function resolveEmbeddedItemFallbackImage(item: FoundryActorItemSource): string {
+  const itemType = (item as { type?: unknown }).type;
+  if (typeof itemType === "string") {
+    switch (itemType) {
+      case "melee":
+        return DEFAULT_STRIKE_IMAGE;
+      case "action":
+        return DEFAULT_ACTION_IMAGE;
+      case "spell":
+        return DEFAULT_SPELL_IMAGE;
+      case "spellcastingEntry":
+        return DEFAULT_SPELLCASTING_IMAGE;
+      default:
+        return getDefaultItemImage(mapEmbeddedItemTypeToCategory(itemType));
+    }
+  }
+
+  return getDefaultItemImage("other");
+}
+
+function ensureEmbeddedItemImage(item: FoundryActorItemSource): FoundryActorItemSource {
+  const currentImg = typeof item.img === "string" ? item.img.trim() : "";
+  if (currentImg.length > 0) {
+    return item;
+  }
+
+  return {
+    ...item,
+    img: resolveEmbeddedItemFallbackImage(item),
+  };
+}
+
 async function resolveItemFromCompendium(
   item: FoundryActorItemSource,
 ): Promise<FoundryActorItemSource> {
   const lookup = buildOfficialLookup(item);
   if (!lookup) {
-    return item;
+    return ensureEmbeddedItemImage(item);
   }
 
   const resolved = await resolveOfficialItem(lookup);
   if (!resolved) {
-    return item;
+    return ensureEmbeddedItemImage(item);
   }
 
-  return mergeCompendiumActorItem(item, resolved);
+  return ensureEmbeddedItemImage(mergeCompendiumActorItem(item, resolved));
 }
 
 async function resolveActorItems(items: FoundryActorItemSource[]): Promise<FoundryActorItemSource[]> {
@@ -1687,6 +1737,44 @@ function parseActionFrequency(raw: unknown): FoundryFrequencySource | null {
 const HTML_TAG_DETECTION_PATTERN = /<\/?[a-z][^>]*>/i;
 const INLINE_MACRO_PATTERN = /@[A-Za-z]+\[/;
 const SLUG_EFFECT_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/i;
+const LINKABLE_CONDITION_EFFECTS = new Set([
+  "blinded",
+  "clumsy",
+  "concealed",
+  "confused",
+  "controlled",
+  "dazzled",
+  "deafened",
+  "doomed",
+  "drained",
+  "enfeebled",
+  "fascinated",
+  "fatigued",
+  "fleeing",
+  "frightened",
+  "grabbed",
+  "hidden",
+  "immobilized",
+  "invisible",
+  "off-guard",
+  "paralyzed",
+  "petrified",
+  "prone",
+  "quickened",
+  "restrained",
+  "sickened",
+  "slowed",
+  "stunned",
+  "stupefied",
+  "unconscious",
+  "wounded",
+  "flat-footed",
+]);
+
+function isLinkableConditionEffect(value: string): boolean {
+  const normalized = normalizeLookupKey(value);
+  return LINKABLE_CONDITION_EFFECTS.has(normalized);
+}
 
 function splitStrikeEffects(
   effects: readonly string[],
@@ -1710,6 +1798,10 @@ function splitStrikeEffects(
     if (HTML_TAG_DETECTION_PATTERN.test(effect) || INLINE_MACRO_PATTERN.test(effect)) {
       descriptionAdditions.push(effect);
       continue;
+    }
+
+    if (isLinkableConditionEffect(effect)) {
+      descriptionAdditions.push(effect);
     }
 
     attackEffects.push(SLUG_EFFECT_PATTERN.test(effect) ? effect.toLowerCase() : effect);
