@@ -7,7 +7,7 @@ import {
   generateItem,
 } from "../src/scripts/generation";
 import { toFoundryActorData } from "../src/scripts/mappers/import";
-import type { JsonSchemaDefinition } from "../src/scripts/gpt/client";
+import type { GeneratedImageResult, JsonSchemaDefinition } from "../src/scripts/gpt/client";
 import type {
   ActionSchemaData,
   ActorSchemaData,
@@ -85,6 +85,15 @@ class FixtureGPTClient {
       default:
         throw new Error(`Unsupported schema: ${name}`);
     }
+  }
+}
+
+class FixtureImageGPTClient extends FixtureGPTClient {
+  async generateImage(_prompt: string): Promise<GeneratedImageResult> {
+    return {
+      base64: "iVBORw0KGgo=",
+      mimeType: "image/png",
+    };
   }
 }
 
@@ -170,4 +179,26 @@ test("generateActor respects custom seeds for deterministic behaviour", async ()
   assert.ok(!("actorType" in first), "generated actors should not expose actorType");
   assert.equal(client.calls.length, 2);
   assert.ok(client.calls.every((call) => call.seed === 7));
+});
+
+test("generateActor keeps generated token art as actor and token image", async () => {
+  const client = new FixtureImageGPTClient({ Action: actionFixture, Item: itemFixture, Actor: actorFixture });
+  const priorFilePicker = (globalThis as { FilePicker?: unknown }).FilePicker;
+  (globalThis as { FilePicker?: unknown }).FilePicker = undefined;
+
+  try {
+    const generated = await generateActor(
+      {
+        ...baseActorInput,
+        generateTokenImage: true,
+      },
+      { gptClient: client },
+    );
+
+    assert.ok(generated.img.startsWith("data:image/png;base64,"));
+    const tokenSrc = ((generated.prototypeToken as { texture?: { src?: unknown } })?.texture?.src ?? "") as string;
+    assert.equal(tokenSrc, generated.img);
+  } finally {
+    (globalThis as { FilePicker?: unknown }).FilePicker = priorFilePicker;
+  }
 });

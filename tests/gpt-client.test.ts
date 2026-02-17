@@ -25,8 +25,29 @@ class StubResponses {
   }
 }
 
+class StubImages {
+  public calls: ResponsesCall[] = [];
+  private readonly queue: Array<() => Promise<unknown>> = [];
+
+  enqueue(response: unknown | Error): void {
+    if (response instanceof Error) {
+      this.queue.push(() => Promise.reject(response));
+    } else {
+      this.queue.push(() => Promise.resolve(response));
+    }
+  }
+
+  async generate(input: ResponsesCall): Promise<unknown> {
+    this.calls.push(input);
+    const task = this.queue.shift();
+    if (!task) throw new Error("No stubbed image response available");
+    return task();
+  }
+}
+
 class StubOpenAI {
   public responses = new StubResponses();
+  public images = new StubImages();
 }
 
 const schema = {
@@ -208,4 +229,20 @@ test("generateWithSchema falls back to tool calls when response_format unsupport
   const [, fallbackCall] = stub.responses.calls;
   assert.equal(Array.isArray(fallbackCall.tools), true);
   assert.equal(fallbackCall.tool_choice?.name, schema.name);
+});
+
+test("generateImage requests output_format without deprecated response_format", async () => {
+  const stub = new StubOpenAI();
+  stub.images.enqueue({
+    data: [{ b64_json: "Zm9v" }],
+  });
+
+  const client = GPTClient.fromSettings(stub as unknown as OpenAI);
+  const result = await client.generateImage("Create token art", { format: "png" });
+
+  assert.equal(result.base64, "Zm9v");
+  assert.equal(result.mimeType, "image/png");
+  assert.equal(stub.images.calls.length, 1);
+  assert.equal(stub.images.calls[0]?.output_format, "png");
+  assert.equal(Object.hasOwn(stub.images.calls[0] ?? {}, "response_format"), false);
 });
