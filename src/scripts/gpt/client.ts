@@ -141,6 +141,35 @@ export interface GeneratedImageResult {
   revisedPrompt?: string;
 }
 
+function bytesToBase64(bytes: Uint8Array): string {
+  const globalBuffer = (globalThis as {
+    Buffer?: { from: (input: Uint8Array) => { toString: (encoding: string) => string } };
+  }).Buffer;
+  if (globalBuffer?.from) {
+    return globalBuffer.from(bytes).toString("base64");
+  }
+
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    const chunk = bytes.subarray(index, index + chunkSize);
+    binary += String.fromCharCode(...chunk);
+  }
+  return btoa(binary);
+}
+
+async function fetchImageAsBase64(url: string): Promise<{ base64: string; mimeType: string | null }> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch generated image from URL (${response.status} ${response.statusText}).`);
+  }
+
+  const buffer = await response.arrayBuffer();
+  const base64 = bytesToBase64(new Uint8Array(buffer));
+  const mimeType = response.headers.get("content-type");
+  return { base64, mimeType };
+}
+
 const performanceNow = typeof performance !== "undefined" && typeof performance.now === "function"
   ? () => performance.now()
   : () => Date.now();
@@ -226,7 +255,6 @@ export class GPTClient {
       background: options.background ?? "transparent",
       quality: options.quality ?? "high",
       output_format: format,
-      response_format: "b64_json",
     };
 
     const response = await (this.#openai.images as unknown as {
@@ -237,17 +265,39 @@ export class GPTClient {
       data?: Array<{
         b64_json?: unknown;
         b64Json?: unknown;
+        url?: unknown;
         revised_prompt?: unknown;
         revisedPrompt?: unknown;
+        mime_type?: unknown;
+        mimeType?: unknown;
       }>;
     };
 
     const first = Array.isArray(payload.data) ? payload.data[0] : undefined;
-    const base64 = typeof first?.b64_json === "string"
+    let base64 = typeof first?.b64_json === "string"
       ? first.b64_json
       : typeof first?.b64Json === "string"
         ? first.b64Json
         : null;
+
+    let mimeType = format === "webp" ? "image/webp" : "image/png";
+    const modelMimeType = typeof first?.mime_type === "string"
+      ? first.mime_type
+      : typeof first?.mimeType === "string"
+        ? first.mimeType
+        : null;
+    if (modelMimeType?.startsWith("image/")) {
+      mimeType = modelMimeType;
+    }
+
+    const url = typeof first?.url === "string" ? first.url.trim() : "";
+    if (!base64 && url) {
+      const fetched = await fetchImageAsBase64(url);
+      base64 = fetched.base64;
+      if (fetched.mimeType?.startsWith("image/")) {
+        mimeType = fetched.mimeType;
+      }
+    }
 
     if (!base64) {
       throw new Error("OpenAI image generation did not return base64 image data.");
@@ -261,7 +311,7 @@ export class GPTClient {
 
     return {
       base64,
-      mimeType: format === "webp" ? "image/webp" : "image/png",
+      mimeType,
       revisedPrompt,
     };
   }
