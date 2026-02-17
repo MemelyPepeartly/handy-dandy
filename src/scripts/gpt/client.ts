@@ -2,7 +2,12 @@ import type { OpenAI } from "openai";
 import { CONSTANTS } from "../constants";
 import { getDeveloperConsole } from "../dev/state";
 import type { GPTUsageMetrics } from "../dev/developer-console";
-import { DEFAULT_GPT_MODEL, isValidGPTModel } from "./models";
+import {
+  DEFAULT_GPT_IMAGE_MODEL,
+  DEFAULT_GPT_MODEL,
+  isValidGPTImageModel,
+  isValidGPTModel,
+} from "./models";
 
 export interface JsonSchemaDefinition {
   name: string;
@@ -98,14 +103,14 @@ const sanitizeNumber = (value: unknown): number | undefined => {
 export const readGPTSettings = (): GPTClientConfig => {
   const settings = game.settings;
   const model = settings?.get(CONSTANTS.MODULE_ID, "GPTModel") as string | undefined;
-  const imageModel = settings?.get(CONSTANTS.MODULE_ID, "GPTImageModel");
+  const imageModel = settings?.get(CONSTANTS.MODULE_ID, "GPTImageModel") as string | undefined;
   const temperature = settings?.get(CONSTANTS.MODULE_ID, "GPTTemperature");
   const top_p = settings?.get(CONSTANTS.MODULE_ID, "GPTTopP");
   const seedSetting = settings?.get(CONSTANTS.MODULE_ID, "GPTSeed");
 
   const config: GPTClientConfig = {
     model: isValidGPTModel(model) ? model : DEFAULT_GPT_MODEL,
-    imageModel: typeof imageModel === "string" && imageModel.trim() ? imageModel.trim() : "gpt-image-1",
+    imageModel: isValidGPTImageModel(imageModel) ? imageModel : DEFAULT_GPT_IMAGE_MODEL,
     temperature: sanitizeNumber(temperature) ?? 0,
     top_p: sanitizeNumber(top_p) ?? 1,
   };

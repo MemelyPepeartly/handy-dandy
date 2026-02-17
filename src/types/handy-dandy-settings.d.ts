@@ -3,6 +3,7 @@ export {};
 
 declare module "fvtt-types/configuration" {
   type HandyDandyGPTModel = import("../scripts/gpt/models").GPTModelId;
+  type HandyDandyGPTImageModel = import("../scripts/gpt/models").GPTImageModelId;
   interface SettingConfig {
     /**
      * Settings owned by the Handy-Dandy module
@@ -10,7 +11,7 @@ declare module "fvtt-types/configuration" {
     "handy-dandy.GPTApiKey": string;
     "handy-dandy.GPTOrganization": string;
     "handy-dandy.GPTModel": HandyDandyGPTModel;
-    "handy-dandy.GPTImageModel": string;
+    "handy-dandy.GPTImageModel": HandyDandyGPTImageModel;
     "handy-dandy.GPTTemperature": number;
     "handy-dandy.GPTTopP": number;
     "handy-dandy.GPTSeed": number;

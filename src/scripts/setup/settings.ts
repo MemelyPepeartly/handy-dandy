@@ -1,7 +1,12 @@
 // scripts/settings.ts
 import { CONSTANTS } from "../constants";
 import { ToolOverview } from "../ui/tool-overview";
-import { DEFAULT_GPT_MODEL, GPT_MODEL_CHOICES } from "../gpt/models";
+import {
+  DEFAULT_GPT_IMAGE_MODEL,
+  DEFAULT_GPT_MODEL,
+  GPT_IMAGE_MODEL_CHOICES,
+  GPT_MODEL_CHOICES,
+} from "../gpt/models";
 import { updateGPTClientFromSettings } from "../gpt/client";
 
 export function registerSettings(): void {
@@ -27,7 +32,7 @@ export function registerSettings(): void {
 
   settings.register(CONSTANTS.MODULE_ID, "GPTModel", {
     name: "GPT Model",
-    hint: "The OpenAI model identifier that should be used for Handy-Dandy prompts.",
+    hint: "The OpenAI text model used for generation prompts and validation repair.",
     scope: "world",
     config: true,
     type: String,
@@ -40,11 +45,12 @@ export function registerSettings(): void {
 
   settings.register(CONSTANTS.MODULE_ID, "GPTImageModel", {
     name: "GPT Image Model",
-    hint: "The OpenAI image model used for generated token art.",
+    hint: "The OpenAI image model used for transparent token generation.",
     scope: "world",
     config: true,
     type: String,
-    default: "gpt-image-1",
+    choices: GPT_IMAGE_MODEL_CHOICES,
+    default: DEFAULT_GPT_IMAGE_MODEL,
     onChange: () => {
       updateGPTClientFromSettings();
     },

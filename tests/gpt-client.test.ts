@@ -70,6 +70,32 @@ test("readGPTSettings pulls module settings with sane defaults", () => {
   });
 });
 
+test("readGPTSettings falls back to defaults for unknown model ids", () => {
+  globalThis.game = {
+    settings: {
+      get(moduleId: string, key: string) {
+        if (moduleId !== "handy-dandy") throw new Error("Unknown module");
+        const values: Record<string, unknown> = {
+          GPTModel: "not-a-real-model",
+          GPTImageModel: "not-a-real-image-model",
+          GPTTemperature: 0.25,
+          GPTTopP: 0.5,
+          GPTSeed: Number.NaN,
+        };
+        return values[key] ?? null;
+      },
+    },
+  } as any;
+
+  const config = readGPTSettings();
+  assert.deepEqual(config, {
+    model: "gpt-5-mini",
+    imageModel: "gpt-image-1.5",
+    temperature: 0.25,
+    top_p: 0.5,
+  });
+});
+
 test("generateWithSchema returns parsed JSON from structured outputs", async () => {
   const stub = new StubOpenAI();
   stub.responses.enqueue({

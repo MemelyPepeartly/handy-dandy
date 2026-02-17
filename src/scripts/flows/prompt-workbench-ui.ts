@@ -54,6 +54,8 @@ type WorkbenchFormResponse = {
   readonly publicationLicense: string;
   readonly publicationRemaster: string | null;
   readonly img: string;
+  readonly actorImagePath: string;
+  readonly actorArtMode: string;
   readonly referenceText: string;
   readonly seed: string;
   readonly maxAttempts: string;
@@ -61,7 +63,6 @@ type WorkbenchFormResponse = {
   readonly folderId: string;
   readonly includeSpellcasting: string | null;
   readonly includeInventory: string | null;
-  readonly generateTokenImage: string | null;
   readonly tokenPrompt: string;
 };
 
@@ -169,7 +170,7 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
         display: flex;
         flex-direction: column;
         gap: 0.75rem;
-        min-width: 720px;
+        min-width: 760px;
       }
 
       .handy-dandy-workbench-tabs {
@@ -213,6 +214,12 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
         gap: 1rem;
       }
 
+      .handy-dandy-workbench-form .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+      }
+
       .handy-dandy-workbench-grid {
         display: grid;
         gap: 1rem;
@@ -228,6 +235,9 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
 
       .handy-dandy-workbench-form fieldset > legend {
         font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        font-size: 0.78rem;
         padding: 0 0.25rem;
       }
 
@@ -248,6 +258,10 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
         gap: 0.5rem;
         grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
         align-items: center;
+      }
+
+      .handy-dandy-workbench-form [data-actor-art-mode] {
+        margin-top: 0.5rem;
       }
 
       .handy-dandy-workbench-inline {
@@ -428,7 +442,7 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
       <section class="handy-dandy-workbench-panel active" data-panel="prompt">
         <form class="handy-dandy-workbench-form">
           <fieldset class="form-group">
-            <legend>Type</legend>
+            <legend>Entry Setup</legend>
             <div class="form-fields">
               <div>
                 <label for="handy-dandy-workbench-entity-type">Entity Type</label>
@@ -452,37 +466,72 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
                 </select>
                 <p class="notes">Match the Foundry item category for the generated entry.</p>
               </div>
+              <div>
+                <label for="handy-dandy-workbench-title">Title</label>
+                <input id="handy-dandy-workbench-title" type="text" name="entryName" required />
+              </div>
+              <div>
+                <label for="handy-dandy-workbench-slug">Slug (optional)</label>
+                <input id="handy-dandy-workbench-slug" type="text" name="slug" />
+              </div>
+              <div data-entity-scope="actor">
+                <label for="handy-dandy-workbench-level">Actor Level (optional)</label>
+                <input id="handy-dandy-workbench-level" type="number" name="level" min="0" />
+              </div>
             </div>
+            <p class="notes">Define what to generate before supplying the prompt text.</p>
           </fieldset>
-          <div class="form-group">
-            <label for="handy-dandy-workbench-title">Title</label>
-            <input id="handy-dandy-workbench-title" type="text" name="entryName" required />
-            <p class="notes">Use the actor name, action title, or item name you want in Foundry.</p>
-          </div>
-          <div class="form-group">
+
+          <fieldset class="form-group">
+            <legend>Prompt Source</legend>
+            <label for="handy-dandy-workbench-prompt">Reference Text / Prompt</label>
+            <textarea id="handy-dandy-workbench-prompt" name="referenceText" required></textarea>
+            <p class="notes">Paste stat blocks, raw notes, or structured direction for generation.</p>
+          </fieldset>
+
+          <fieldset class="form-group" data-entity-scope="action item">
+            <legend>Art</legend>
             <label for="handy-dandy-workbench-image">Image Path</label>
             <input id="handy-dandy-workbench-image" type="text" name="img" value="${DEFAULT_IMAGE_PATH}" />
-            <p class="notes">Provide a Foundry asset path or URL for the generated image.</p>
-          </div>
-          <div class="form-group">
-            <label for="handy-dandy-workbench-prompt">Prompt</label>
-            <textarea id="handy-dandy-workbench-prompt" name="referenceText" required></textarea>
-            <p class="notes">Paste rules text, stat blocks, or a creative prompt for the generator to follow.</p>
-            <div class="handy-dandy-workbench-inline">
-              <label for="handy-dandy-workbench-level">What level?</label>
-              <input id="handy-dandy-workbench-level" type="number" name="level" min="0" />
+            <p class="notes">Used as the generated action or item image path.</p>
+          </fieldset>
+
+          <fieldset class="form-group" data-entity-scope="actor">
+            <legend>Actor Art</legend>
+            <div class="form-fields">
+              <label><input type="radio" name="actorArtMode" value="path" checked /> Use image path</label>
+              <label><input type="radio" name="actorArtMode" value="token" /> Generate transparent token</label>
             </div>
-            <p class="notes">Provide a level for actors; leave blank for other entries.</p>
-          </div>
+            <div class="form-group" data-actor-art-mode="path">
+              <label for="handy-dandy-workbench-actor-image">Actor Image Path</label>
+              <input
+                id="handy-dandy-workbench-actor-image"
+                type="text"
+                name="actorImagePath"
+                value="${DEFAULT_IMAGE_PATH}"
+              />
+              <p class="notes">Used when image-path mode is selected.</p>
+            </div>
+            <div class="form-group" data-actor-art-mode="token">
+              <label for="handy-dandy-workbench-token-prompt">Token Prompt Override (optional)</label>
+              <input
+                id="handy-dandy-workbench-token-prompt"
+                type="text"
+                name="tokenPrompt"
+                placeholder="Optional art direction for the generated transparent token"
+              />
+              <p class="notes">Leave blank to derive token style from the actor description.</p>
+            </div>
+            <p class="notes">Choose one art mode for actors to avoid conflicting image instructions.</p>
+          </fieldset>
+
           <fieldset class="form-group" data-entity-scope="actor">
             <legend>Actor Content</legend>
             <div class="form-fields">
               <label><input type="checkbox" name="includeSpellcasting" /> Spellcasting?</label>
               <label><input type="checkbox" name="includeInventory" /> Inventory?</label>
-              <label><input type="checkbox" name="generateTokenImage" /> Generate Transparent Token?</label>
             </div>
-            <label>Token Prompt Override <input type="text" name="tokenPrompt" placeholder="Optional art direction" /></label>
-            <p class="notes">Use these options to guide actor prompts.</p>
+            <p class="notes">Enable extra actor sections in the generated sheet data.</p>
           </fieldset>
           <fieldset class="form-group">
             <legend>Publication Details</legend>
@@ -557,6 +606,8 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
                 publicationLicense: String(formData.get("publicationLicense") ?? ""),
                 publicationRemaster: formData.get("publicationRemaster") as string | null,
                 img: String(formData.get("img") ?? ""),
+                actorImagePath: String(formData.get("actorImagePath") ?? ""),
+                actorArtMode: String(formData.get("actorArtMode") ?? ""),
                 referenceText: String(formData.get("referenceText") ?? ""),
                 seed: String(formData.get("seed") ?? ""),
                 maxAttempts: String(formData.get("maxAttempts") ?? ""),
@@ -564,7 +615,6 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
                 folderId: String(formData.get("folderId") ?? ""),
                 includeSpellcasting: formData.get("includeSpellcasting") as string | null,
                 includeInventory: formData.get("includeInventory") as string | null,
-                generateTokenImage: formData.get("generateTokenImage") as string | null,
                 tokenPrompt: String(formData.get("tokenPrompt") ?? ""),
               });
             },
@@ -638,7 +688,18 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
     remaster: Boolean(response.publicationRemaster),
   };
 
-  const img = response.img.trim() || DEFAULT_IMAGE_PATH;
+  const actorArtMode = type === "actor" ? sanitizeActorArtMode(response.actorArtMode) : "path";
+  if (type === "actor" && !actorArtMode) {
+    ui.notifications?.error(`${CONSTANTS.MODULE_NAME} | Invalid actor art mode.`);
+    return null;
+  }
+
+  const generateTokenImage = type === "actor" && actorArtMode === "token";
+  const actorImagePath = response.actorImagePath.trim() || DEFAULT_IMAGE_PATH;
+  const img = type === "actor"
+    ? (generateTokenImage ? undefined : actorImagePath)
+    : (response.img.trim() || DEFAULT_IMAGE_PATH);
+  const tokenPrompt = generateTokenImage ? response.tokenPrompt.trim() || undefined : undefined;
 
   return {
     type,
@@ -654,10 +715,10 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
     folderId: response.folderId.trim() || undefined,
     publication,
     img,
-    includeSpellcasting: response.includeSpellcasting ? true : undefined,
-    includeInventory: response.includeInventory ? true : undefined,
-    generateTokenImage: response.generateTokenImage ? true : undefined,
-    tokenPrompt: response.tokenPrompt.trim() || undefined,
+    includeSpellcasting: type === "actor" && response.includeSpellcasting ? true : undefined,
+    includeInventory: type === "actor" && response.includeInventory ? true : undefined,
+    generateTokenImage: generateTokenImage ? true : undefined,
+    tokenPrompt,
   } satisfies PromptWorkbenchRequest<EntityType>;
 }
 
@@ -692,6 +753,16 @@ function sanitizeEntityType(value: string): EntityType | null {
 function sanitizeSystemId(value: string): SystemId | null {
   const normalised = value.trim().toLowerCase();
   return SYSTEM_IDS.includes(normalised as SystemId) ? (normalised as SystemId) : null;
+}
+
+function sanitizeActorArtMode(value: string): "path" | "token" | null {
+  switch (value.trim().toLowerCase()) {
+    case "path":
+    case "token":
+      return value.trim().toLowerCase() as "path" | "token";
+    default:
+      return null;
+  }
 }
 
 function formatItemTypeLabel(value: ItemCategory): string {
@@ -1297,6 +1368,35 @@ function setupWorkbenchRequestDialog(html: JQuery): void {
 
   const entityTypeField = container.querySelector<HTMLSelectElement>("#handy-dandy-workbench-entity-type");
   const scopedFields = Array.from(container.querySelectorAll<HTMLElement>("[data-entity-scope]"));
+  const actorArtModeInputs = Array.from(
+    container.querySelectorAll<HTMLInputElement>("input[name=\"actorArtMode\"]"),
+  );
+  const actorArtModeSections = Array.from(
+    container.querySelectorAll<HTMLElement>("[data-actor-art-mode]"),
+  );
+  const actorImagePathField = container.querySelector<HTMLInputElement>("input[name=\"actorImagePath\"]");
+  const tokenPromptField = container.querySelector<HTMLInputElement>("input[name=\"tokenPrompt\"]");
+
+  const updateActorArtModeVisibility = (): void => {
+    const currentType = entityTypeField?.value ?? "";
+    const isActor = currentType === "actor";
+    const selectedMode = actorArtModeInputs.find((input) => input.checked)?.value ?? "path";
+
+    for (const section of actorArtModeSections) {
+      const shouldShow = isActor && section.dataset.actorArtMode === selectedMode;
+      section.style.display = shouldShow ? "" : "none";
+      section.setAttribute("aria-hidden", shouldShow ? "false" : "true");
+    }
+
+    if (actorImagePathField) {
+      actorImagePathField.required = isActor && selectedMode === "path";
+      actorImagePathField.disabled = !isActor || selectedMode !== "path";
+    }
+
+    if (tokenPromptField) {
+      tokenPromptField.disabled = !isActor || selectedMode !== "token";
+    }
+  };
 
   const updateScopedFieldVisibility = (): void => {
     const currentType = entityTypeField?.value ?? "";
@@ -1316,6 +1416,8 @@ function setupWorkbenchRequestDialog(html: JQuery): void {
         }
       }
     }
+
+    updateActorArtModeVisibility();
   };
 
   const historyList = container.querySelector<HTMLElement>("[data-history-list]");
@@ -1334,6 +1436,9 @@ function setupWorkbenchRequestDialog(html: JQuery): void {
   updateDialogButtonsVisibility();
   updateScopedFieldVisibility();
   entityTypeField?.addEventListener("change", updateScopedFieldVisibility);
+  for (const input of actorArtModeInputs) {
+    input.addEventListener("change", updateActorArtModeVisibility);
+  }
 
   container.addEventListener("click", (event) => {
     const target = event.target;

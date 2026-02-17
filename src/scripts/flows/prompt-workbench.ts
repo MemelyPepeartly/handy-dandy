@@ -257,7 +257,9 @@ function buildPromptInput<T extends EntityType>(
     generateTokenImage,
     tokenPrompt,
   } = context;
-  const img = context.img?.trim() || DEFAULT_IMAGE_PATH;
+  const trimmedImg = context.img?.trim();
+  const defaultedImg = trimmedImg || DEFAULT_IMAGE_PATH;
+  const actorImg = generateTokenImage ? undefined : defaultedImg;
   const publication = normalizePublicationInput(context.publication);
   switch (type) {
     case "action":
@@ -266,7 +268,7 @@ function buildPromptInput<T extends EntityType>(
         title: entryName,
         referenceText,
         slug,
-        img,
+        img: defaultedImg,
         publication,
       } satisfies ActionPromptInput as PromptInputMap[T];
     case "item":
@@ -276,7 +278,7 @@ function buildPromptInput<T extends EntityType>(
         referenceText,
         slug,
         itemType,
-        img,
+        img: defaultedImg,
         publication,
       } satisfies ItemPromptInput as PromptInputMap[T];
     case "actor":
@@ -285,7 +287,7 @@ function buildPromptInput<T extends EntityType>(
         name: entryName,
         referenceText,
         slug,
-        img,
+        img: actorImg,
         publication,
         level,
         includeSpellcasting,
