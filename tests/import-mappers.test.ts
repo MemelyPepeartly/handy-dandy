@@ -208,6 +208,35 @@ test("toFoundryActorData filters action traits and normalizes frequency", () => 
   assert.deepEqual(actionItem!.system.frequency, { value: 1, max: 1, per: "PT1M" });
 });
 
+test("toFoundryActorData routes strike HTML and UUID effect text into description", () => {
+  const actor = createActor();
+  actor.strikes = [
+    {
+      name: "Spark Lash",
+      type: "melee",
+      attackBonus: 12,
+      traits: ["agile", "magical"],
+      damage: [{ formula: "2d8+6", damageType: "electricity", notes: null }],
+      effects: [
+        "(plus on a hit, target must attempt a reflex save or be dazzled 1)",
+        "@UUID[Compendium.pf2e.conditionitems.Item.Dazzled]{Dazzled}",
+        "<p>The creature lashes with crackling static.</p>",
+      ],
+      description: "<p>Primary strike description.</p>",
+    },
+  ];
+
+  const result = toFoundryActorData(actor);
+  const strike = result.items.find((item) => item.type === "melee" && item.name === "Spark Lash");
+
+  assert.ok(strike, "expected generated strike item");
+  assert.deepEqual(strike!.system.attackEffects.value, ["(plus on a hit, target must attempt a reflex save or be dazzled 1)"]);
+  assert.equal(
+    strike!.system.description.value,
+    "<p>Primary strike description.</p><p>@UUID[Compendium.pf2e.conditionitems.Item.Dazzled]{Dazzled}</p><p>The creature lashes with crackling static.</p>",
+  );
+});
+
 test("importAction rejects payloads for the wrong system", async () => {
   (game as Game).system = { id: "sf2e" } as any;
   await assert.rejects(() => importAction(createAction()), /System ID mismatch/);

@@ -124,7 +124,11 @@ test("ensureValid filters traits to the PF2e dictionary", async () => {
         attackBonus: 10,
         traits: ["agile", "unknown-strike"],
         damage: [{ formula: "1d6+4", damageType: "slashing", notes: "" }],
-        effects: [],
+        effects: [
+          "Grab",
+          "@UUID[Compendium.pf2e.conditionitems.Item.Dazzled]{Dazzled}",
+          "grab",
+        ],
         description: "A vicious swipe.",
       },
     ],
@@ -145,6 +149,10 @@ test("ensureValid filters traits to the PF2e dictionary", async () => {
   assert.deepEqual(result.traits, ["brute"]);
   assert.equal(result.languages.length, 1);
   assert.deepEqual(result.strikes[0]?.traits, ["agile"]);
+  assert.deepEqual(result.strikes[0]?.effects, [
+    "Grab",
+    "@UUID[Compendium.pf2e.conditionitems.Item.Dazzled]{Dazzled}",
+  ]);
   assert.deepEqual(result.actions[0]?.traits, ["auditory"]);
 });
 
