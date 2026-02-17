@@ -14,6 +14,7 @@ import { ToolOverview } from "./ui/tool-overview";
 import { registerNpcRemixButton } from "./ui/npc-remix-button";
 import { registerNpcPortraitRegenerateButton } from "./ui/npc-portrait-regenerate-button";
 import { registerNpcRemixSectionButtons } from "./ui/npc-remix-section-buttons";
+import { registerItemImageGenerateButton } from "./ui/item-image-generate-button";
 import {
   DEFAULT_GENERATION_SEED,
   generateAction,
@@ -58,6 +59,7 @@ type BoundGenerateActor = (
 registerNpcRemixButton();
 registerNpcPortraitRegenerateButton();
 registerNpcRemixSectionButtons();
+registerItemImageGenerateButton();
 
 function bindGenerator<TInput, TResult>(
   fn: GeneratorFunction<TInput, TResult>,
