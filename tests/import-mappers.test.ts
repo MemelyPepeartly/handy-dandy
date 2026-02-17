@@ -127,7 +127,7 @@ test("toFoundryActionData converts canonical JSON into PF2e action data", () => 
   assert.equal(data.system.actions.value, 2);
   assert.match(
     data.system.description.value,
-    /<p>Deliver a crushing blow\.<\/p><ul><li>On a success, <span class="pf2-icon">r<\/span> is triggered\.<\/li><li>On a critical success, the target is knocked prone\.<\/li><\/ul>/,
+    /<p>Deliver a crushing blow\.<\/p><ul><li>On a success, <span class="pf2-icon">r<\/span> is triggered\.<\/li><li>On a critical success, the target is knocked @UUID\[Compendium\.pf2e\.conditionitems\.Item\.Prone\]\{Prone\}\.<\/li><\/ul>/,
   );
   assert.equal(data.system.requirements.value, "<p>Wield a melee weapon.<\/p>");
   assert.equal(data.system.source.value, "Pathfinder Core Rulebook");

@@ -5,9 +5,12 @@
   "slug": "stunning-strike",
   "name": "Stunning Strike",
   "actionType": "two-actions",
-  "traits": ["fighter", "press"],
+  "traits": [
+    "fighter",
+    "press"
+  ],
   "requirements": "Wield a melee weapon.",
-  "description": "Deliver a crushing blow.\n\n• On a success, r is triggered.\n• On a critical success, the target is knocked prone.",
+  "description": "Deliver a crushing blow.\n\n• On a success, r is triggered.\n• On a critical success, the target is knocked @UUID[Compendium.pf2e.conditionitems.Item.Prone]{Prone}.",
   "rarity": "uncommon",
   "img": "icons/actions/stunning-strike.webp",
   "source": "Pathfinder Core Rulebook",
