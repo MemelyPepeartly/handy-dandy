@@ -47,7 +47,7 @@ beforeEach(() => {
       get(moduleId: string, key: string) {
         if (moduleId !== "handy-dandy") throw new Error("Unknown module");
         const values: Record<string, unknown> = {
-          GPTModel: "gpt-4o",
+          GPTModel: "gpt-5-mini",
           GPTImageModel: "gpt-image-1",
           GPTTemperature: 0.5,
           GPTTopP: 0.75,
@@ -62,7 +62,7 @@ beforeEach(() => {
 test("readGPTSettings pulls module settings with sane defaults", () => {
   const config = readGPTSettings();
   assert.deepEqual(config, {
-    model: "gpt-4o",
+    model: "gpt-5-mini",
     imageModel: "gpt-image-1",
     temperature: 0.5,
     top_p: 0.75,

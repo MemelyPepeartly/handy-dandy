@@ -6,11 +6,6 @@ export const GPT_MODEL_CHOICES = {
   "gpt-5": "GPT-5",
   "gpt-5-mini": "GPT-5 Mini",
   "gpt-5-nano": "GPT-5 Nano",
-  "gpt-4.1": "GPT-4.1",
-  "gpt-4.1-mini": "GPT-4.1 Mini",
-  "gpt-4.1-nano": "GPT-4.1 Nano",
-  "gpt-4o": "GPT-4o",
-  "gpt-4o-mini": "GPT-4o Mini",
 } as const satisfies Record<string, string>;
 
 export type GPTModelId = keyof typeof GPT_MODEL_CHOICES;

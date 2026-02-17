@@ -198,6 +198,56 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
         color: var(--color-text-bright, #f0f0f0);
       }
 
+      .handy-dandy-workbench-quickstart {
+        border: 1px solid var(--color-border-dark, #333);
+        border-radius: 6px;
+        padding: 0.6rem 0.75rem;
+        background: linear-gradient(
+          140deg,
+          rgba(255, 255, 255, 0.06),
+          rgba(255, 255, 255, 0.02)
+        );
+      }
+
+      .handy-dandy-workbench-quickstart-title {
+        margin: 0 0 0.45rem;
+        font-size: 0.78rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--color-text-light-6, #bbb);
+      }
+
+      .handy-dandy-workbench-steps {
+        display: grid;
+        gap: 0.45rem;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .handy-dandy-workbench-step {
+        display: flex;
+        gap: 0.45rem;
+        align-items: flex-start;
+      }
+
+      .handy-dandy-workbench-step-index {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.2rem;
+        height: 1.2rem;
+        border-radius: 999px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        background: rgba(255, 255, 255, 0.14);
+        color: var(--color-text-bright, #f0f0f0);
+      }
+
+      .handy-dandy-workbench-step-text {
+        font-size: 0.84rem;
+        color: var(--color-text-light-6, #bbb);
+        line-height: 1.25;
+      }
+
       .handy-dandy-workbench-panel {
         display: none;
         flex-direction: column;
@@ -248,7 +298,7 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
       }
 
       .handy-dandy-workbench-form textarea {
-        min-height: 12rem;
+        min-height: 13rem;
         resize: vertical;
         width: 100%;
       }
@@ -262,6 +312,40 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
 
       .handy-dandy-workbench-form [data-actor-art-mode] {
         margin-top: 0.5rem;
+      }
+
+      .handy-dandy-workbench-art-mode {
+        display: grid;
+        gap: 0.45rem;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      }
+
+      .handy-dandy-workbench-art-choice {
+        position: relative;
+        display: block;
+      }
+
+      .handy-dandy-workbench-art-choice input {
+        position: absolute;
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .handy-dandy-workbench-art-choice span {
+        display: block;
+        border: 1px solid var(--color-border-dark, #333);
+        border-radius: 6px;
+        padding: 0.5rem 0.65rem;
+        background: rgba(255, 255, 255, 0.03);
+        font-size: 0.88rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: border-color 0.2s ease, background 0.2s ease;
+      }
+
+      .handy-dandy-workbench-art-choice input:checked + span {
+        border-color: var(--color-border-highlight, #ff8c00);
+        background: rgba(255, 140, 0, 0.18);
       }
 
       .handy-dandy-workbench-inline {
@@ -433,13 +517,36 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
         font-size: 0.9rem;
         margin: 0;
       }
+
+      @media (max-width: 900px) {
+        .handy-dandy-workbench-steps {
+          grid-template-columns: 1fr;
+        }
+      }
     </style>
     <div class="handy-dandy-workbench-request">
       <nav class="handy-dandy-workbench-tabs">
-        <button type="button" class="handy-dandy-workbench-tab active" data-tab="prompt">Prompt</button>
+        <button type="button" class="handy-dandy-workbench-tab active" data-tab="prompt">Create</button>
         <button type="button" class="handy-dandy-workbench-tab" data-tab="history">History</button>
       </nav>
       <section class="handy-dandy-workbench-panel active" data-panel="prompt">
+        <div class="handy-dandy-workbench-quickstart">
+          <p class="handy-dandy-workbench-quickstart-title">Workflow</p>
+          <div class="handy-dandy-workbench-steps">
+            <div class="handy-dandy-workbench-step">
+              <span class="handy-dandy-workbench-step-index">1</span>
+              <span class="handy-dandy-workbench-step-text">Select entity type, system, and title.</span>
+            </div>
+            <div class="handy-dandy-workbench-step">
+              <span class="handy-dandy-workbench-step-index">2</span>
+              <span class="handy-dandy-workbench-step-text">Paste source text and choose art mode.</span>
+            </div>
+            <div class="handy-dandy-workbench-step">
+              <span class="handy-dandy-workbench-step-index">3</span>
+              <span class="handy-dandy-workbench-step-text">Generate, review JSON, then import.</span>
+            </div>
+          </div>
+        </div>
         <form class="handy-dandy-workbench-form">
           <fieldset class="form-group">
             <legend>Entry Setup</legend>
@@ -468,7 +575,13 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
               </div>
               <div>
                 <label for="handy-dandy-workbench-title">Title</label>
-                <input id="handy-dandy-workbench-title" type="text" name="entryName" required />
+                <input
+                  id="handy-dandy-workbench-title"
+                  type="text"
+                  name="entryName"
+                  placeholder="e.g. Clockwork Exarch"
+                  required
+                />
               </div>
               <div>
                 <label for="handy-dandy-workbench-slug">Slug (optional)</label>
@@ -483,7 +596,7 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
           </fieldset>
 
           <fieldset class="form-group">
-            <legend>Prompt Source</legend>
+            <legend>Source Material</legend>
             <label for="handy-dandy-workbench-prompt">Reference Text / Prompt</label>
             <textarea id="handy-dandy-workbench-prompt" name="referenceText" required></textarea>
             <p class="notes">Paste stat blocks, raw notes, or structured direction for generation.</p>
@@ -498,9 +611,15 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
 
           <fieldset class="form-group" data-entity-scope="actor">
             <legend>Actor Art</legend>
-            <div class="form-fields">
-              <label><input type="radio" name="actorArtMode" value="path" checked /> Use image path</label>
-              <label><input type="radio" name="actorArtMode" value="token" /> Generate transparent token</label>
+            <div class="handy-dandy-workbench-art-mode">
+              <label class="handy-dandy-workbench-art-choice">
+                <input type="radio" name="actorArtMode" value="path" checked />
+                <span>Use image path</span>
+              </label>
+              <label class="handy-dandy-workbench-art-choice">
+                <input type="radio" name="actorArtMode" value="token" />
+                <span>Generate transparent token</span>
+              </label>
             </div>
             <div class="form-group" data-actor-art-mode="path">
               <label for="handy-dandy-workbench-actor-image">Actor Image Path</label>
@@ -542,10 +661,6 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
               <label><input type="checkbox" name="publicationRemaster" /> Remaster</label>
             </div>
           </fieldset>
-          <div class="form-group">
-            <label for="handy-dandy-workbench-slug">Slug (optional)</label>
-            <input id="handy-dandy-workbench-slug" type="text" name="slug" />
-          </div>
           <details class="handy-dandy-workbench-advanced">
             <summary>Advanced Options</summary>
             <div class="handy-dandy-workbench-advanced-fields">
