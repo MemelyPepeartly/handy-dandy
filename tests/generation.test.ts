@@ -89,7 +89,10 @@ class FixtureGPTClient {
 }
 
 class FixtureImageGPTClient extends FixtureGPTClient {
-  async generateImage(_prompt: string): Promise<GeneratedImageResult> {
+  public imagePrompts: string[] = [];
+
+  async generateImage(prompt: string): Promise<GeneratedImageResult> {
+    this.imagePrompts.push(prompt);
     return {
       base64: "iVBORw0KGgo=",
       mimeType: "image/png",
@@ -198,6 +201,29 @@ test("generateActor keeps generated token art as actor and token image", async (
     assert.ok(generated.img.startsWith("data:image/png;base64,"));
     const tokenSrc = ((generated.prototypeToken as { texture?: { src?: unknown } })?.texture?.src ?? "") as string;
     assert.equal(tokenSrc, generated.img);
+  } finally {
+    (globalThis as { FilePicker?: unknown }).FilePicker = priorFilePicker;
+  }
+});
+
+test("generateItem can generate transparent icon art when enabled", async () => {
+  const client = new FixtureImageGPTClient({ Action: actionFixture, Item: itemFixture, Actor: actorFixture });
+  const priorFilePicker = (globalThis as { FilePicker?: unknown }).FilePicker;
+  (globalThis as { FilePicker?: unknown }).FilePicker = undefined;
+
+  try {
+    const generated = await generateItem(
+      {
+        ...baseItemInput,
+        generateItemImage: true,
+        itemImagePrompt: "ornate silver filigree",
+      },
+      { gptClient: client },
+    );
+
+    assert.ok(generated.img?.startsWith("data:image/png;base64,"));
+    assert.equal(client.imagePrompts.length, 1);
+    assert.match(client.imagePrompts[0], /Mirror Shield/);
   } finally {
     (globalThis as { FilePicker?: unknown }).FilePicker = priorFilePicker;
   }

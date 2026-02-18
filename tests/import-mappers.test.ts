@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { beforeEach, test } from "node:test";
-import { importAction, importActor, toFoundryActionData, toFoundryActorData } from "../src/scripts/mappers/import";
-import type { ActionSchemaData, ActorGenerationResult, ActorSchemaData } from "../src/scripts/schemas";
+import { importAction, importActor, importItem, toFoundryActionData, toFoundryActorData, toFoundryItemData } from "../src/scripts/mappers/import";
+import type { ActionSchemaData, ActorGenerationResult, ActorSchemaData, ItemSchemaData } from "../src/scripts/schemas";
 import { cloneFixture, loadFixture } from "./helpers/fixtures";
 
 class MockItem {
@@ -126,6 +126,8 @@ class MockActor {
 
 const actionFixture = loadFixture<ActionSchemaData>("action.json");
 const createAction = (): ActionSchemaData => cloneFixture(actionFixture);
+const itemFixture = loadFixture<ItemSchemaData>("item.json");
+const createItem = (): ItemSchemaData => cloneFixture(itemFixture);
 const actorFixture = loadFixture<ActorSchemaData>("actor.json");
 const createActor = (): ActorSchemaData => cloneFixture(actorFixture);
 
@@ -255,6 +257,42 @@ test("importAction creates a new world item when no match is found", async () =>
   const result = await importAction(createAction());
   assert.equal(result.name, "Stunning Strike");
   assert.equal(MockItem.created.length, 1);
+});
+
+test("toFoundryItemData always includes normalized quantity, usage, bulk, size, and price values", () => {
+  const item = createItem();
+  item.itemType = "equipment";
+  item.price = 12.34;
+
+  const source = toFoundryItemData(item);
+
+  assert.equal(source.system.quantity, 1);
+  assert.deepEqual(source.system.usage, { value: "held-in-one-hand" });
+  assert.deepEqual(source.system.bulk, { value: 0 });
+  assert.equal(source.system.size, "med");
+  assert.deepEqual(source.system.price.value, { pp: 1, gp: 2, sp: 3, cp: 4 });
+});
+
+test("importItem can target and update a specific world item by itemId", async () => {
+  const existing = new MockItem({
+    name: "Old Item",
+    type: "equipment",
+    img: "old.png",
+    system: { slug: "old-item", description: { value: "<p>Old</p>" }, traits: { value: [], rarity: "common" } },
+  });
+  (game.items as MockCollection<MockItem>).set(existing.id, existing);
+
+  const payload = {
+    ...createItem(),
+    slug: "new-generated-item",
+    name: "Remixed Item",
+  } satisfies ItemSchemaData;
+
+  const result = await importItem(payload, { itemId: existing.id });
+
+  assert.strictEqual(result, existing);
+  assert.equal(existing.name, "Remixed Item");
+  assert.equal(existing.system.slug, "new-generated-item");
 });
 
 test("toFoundryActorData filters action traits and normalizes frequency", () => {
