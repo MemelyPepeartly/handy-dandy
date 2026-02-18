@@ -230,10 +230,10 @@ test("toFoundryActorData routes strike HTML and UUID effect text into descriptio
   const strike = result.items.find((item) => item.type === "melee" && item.name === "Spark Lash");
 
   assert.ok(strike, "expected generated strike item");
-  assert.deepEqual(strike!.system.attackEffects.value, ["(plus on a hit, target must attempt a reflex save or be dazzled 1)"]);
+  assert.deepEqual(strike!.system.attackEffects.value, []);
   assert.equal(
     strike!.system.description.value,
-    "<p>Primary strike description.</p><p>@UUID[Compendium.pf2e.conditionitems.Item.TkIyaNPgTZFBCCuh]{Dazzled}</p><p>The creature lashes with crackling static.</p>",
+    "<p>Primary strike description.</p><p>(plus on a hit, target must attempt a reflex save or be @UUID[Compendium.pf2e.conditionitems.Item.TkIyaNPgTZFBCCuh]{Dazzled 1})</p><p>@UUID[Compendium.pf2e.conditionitems.Item.TkIyaNPgTZFBCCuh]{Dazzled}</p><p>The creature lashes with crackling static.</p>",
   );
 });
 
@@ -330,9 +330,31 @@ test("toFoundryActorData links condition-style strike effects in descriptions", 
   const strike = result.items.find((item) => item.type === "melee" && item.name === "Grasping Tendril");
 
   assert.ok(strike, "expected generated strike item");
-  assert.deepEqual(strike!.system.attackEffects.value, ["off-guard", "dazzled"]);
+  assert.deepEqual(strike!.system.attackEffects.value, []);
   assert.match(strike!.system.description.value, /@UUID\[Compendium\.pf2e\.conditionitems\.Item\.AJh5ex99aV6VTggg\]\{Off-Guard\}/);
   assert.match(strike!.system.description.value, /@UUID\[Compendium\.pf2e\.conditionitems\.Item\.TkIyaNPgTZFBCCuh\]\{Dazzled\}/);
+});
+
+test("toFoundryActorData keeps only PF2E-known strike attack effect slugs as attack effects", () => {
+  const actor = createActor();
+  actor.strikes = [
+    {
+      name: "Crusher Tail",
+      type: "melee",
+      attackBonus: 15,
+      traits: ["magical"],
+      damage: [{ formula: "2d12+8", damageType: "bludgeoning", notes: null }],
+      effects: ["grab", "homebrew-stagger"],
+      description: null,
+    },
+  ];
+
+  const result = toFoundryActorData(actor);
+  const strike = result.items.find((item) => item.type === "melee" && item.name === "Crusher Tail");
+
+  assert.ok(strike, "expected generated strike item");
+  assert.deepEqual(strike!.system.attackEffects.value, ["grab"]);
+  assert.match(strike!.system.description.value, /<p>homebrew-stagger<\/p>/);
 });
 
 test("toFoundryActorData links staged condition effects in strike descriptions without unknown attack effects", () => {
