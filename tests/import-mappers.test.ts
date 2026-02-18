@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { beforeEach, test } from "node:test";
-import { importAction, toFoundryActionData, toFoundryActorData } from "../src/scripts/mappers/import";
-import type { ActionSchemaData, ActorSchemaData } from "../src/scripts/schemas";
+import { importAction, importActor, toFoundryActionData, toFoundryActorData } from "../src/scripts/mappers/import";
+import type { ActionSchemaData, ActorGenerationResult, ActorSchemaData } from "../src/scripts/schemas";
 import { cloneFixture, loadFixture } from "./helpers/fixtures";
 
 class MockItem {
@@ -77,6 +77,53 @@ class MockCollection<T extends { id: string }> extends Map<string, T> {
   }
 }
 
+class MockActor {
+  public static nextId = 1;
+  public static created: MockActor[] = [];
+
+  public id: string;
+  public name: string;
+  public type: string;
+  public img: string;
+  public system: any;
+  public prototypeToken: any;
+  public items: any[];
+  public effects: unknown[];
+  public folder: string | null;
+  public flags: Record<string, unknown>;
+
+  constructor(source: any) {
+    this.id = source._id ?? `MockActor.${MockActor.nextId++}`;
+    this.name = source.name;
+    this.type = source.type;
+    this.img = source.img;
+    this.system = JSON.parse(JSON.stringify(source.system ?? {}));
+    this.prototypeToken = JSON.parse(JSON.stringify(source.prototypeToken ?? {}));
+    this.items = JSON.parse(JSON.stringify(source.items ?? []));
+    this.effects = JSON.parse(JSON.stringify(source.effects ?? []));
+    this.folder = source.folder ?? null;
+    this.flags = JSON.parse(JSON.stringify(source.flags ?? {}));
+    MockActor.created.push(this);
+  }
+
+  static async create(source: any, _options?: any): Promise<MockActor> {
+    return new MockActor(source);
+  }
+
+  async update(changes: any): Promise<this> {
+    if (changes.name) this.name = changes.name;
+    if (changes.type) this.type = changes.type;
+    if (changes.img) this.img = changes.img;
+    if (changes.folder !== undefined) this.folder = changes.folder;
+    if (changes.system) this.system = JSON.parse(JSON.stringify(changes.system));
+    if (changes.prototypeToken) this.prototypeToken = JSON.parse(JSON.stringify(changes.prototypeToken));
+    if (Array.isArray(changes.effects)) this.effects = JSON.parse(JSON.stringify(changes.effects));
+    if (Array.isArray(changes.items)) this.items = JSON.parse(JSON.stringify(changes.items));
+    if (changes.flags) this.flags = JSON.parse(JSON.stringify(changes.flags));
+    return this;
+  }
+}
+
 const actionFixture = loadFixture<ActionSchemaData>("action.json");
 const createAction = (): ActionSchemaData => cloneFixture(actionFixture);
 const actorFixture = loadFixture<ActorSchemaData>("actor.json");
@@ -85,12 +132,16 @@ const createActor = (): ActorSchemaData => cloneFixture(actorFixture);
 beforeEach(() => {
   MockItem.nextId = 1;
   MockItem.created = [];
+  MockActor.nextId = 1;
+  MockActor.created = [];
   const packs = new Map<string, MockPack>();
   const items = new MockCollection<MockItem>();
+  const actors = new MockCollection<MockActor>();
 
   (globalThis as any).game = {
     packs,
     items,
+    actors,
     user: { isGM: true },
     system: { id: "pf2e" }
   } satisfies Partial<Game>;
@@ -107,6 +158,11 @@ beforeEach(() => {
   Object.defineProperty(globalThis, "Item", {
     configurable: true,
     value: MockItem
+  });
+
+  Object.defineProperty(globalThis, "Actor", {
+    configurable: true,
+    value: MockActor
   });
 });
 
@@ -441,6 +497,62 @@ test("toFoundryActorData maps staff inventory entries to weapon item documents",
   assert.ok(staff, "expected custom staff inventory item");
   assert.equal(staff!.type, "weapon");
   assert.equal(staff!.img, "systems/pf2e/icons/default-icons/staff.svg");
+});
+
+test("importActor sanitizes malformed melee attack effects in generated actor payloads", async () => {
+  const actor = createActor();
+  actor.slug = "malformed-effects-test";
+  actor.name = "Malformed Effects Test";
+  actor.strikes = [
+    {
+      name: "Corrupting Swipe",
+      type: "melee",
+      attackBonus: 13,
+      traits: ["agile"],
+      damage: [{ formula: "2d8+5", damageType: "negative", notes: null }],
+      effects: ["grab"],
+      description: "<p>A warped strike with unstable aftereffects.</p>",
+    },
+  ];
+  actor.actions = [];
+  actor.spellcasting = null;
+  actor.inventory = null;
+
+  const foundry = toFoundryActorData(actor);
+  const strike = foundry.items.find((item) => item.type === "melee" && item.name === "Corrupting Swipe");
+  assert.ok(strike, "expected generated strike item");
+
+  (strike!.system.attackEffects as { value: unknown[] }).value = [
+    null,
+    "grab",
+    { label: "Frightened 1" },
+    "homebrew-stagger",
+  ];
+
+  const generated: ActorGenerationResult = {
+    schema_version: actor.schema_version,
+    systemId: actor.systemId,
+    slug: actor.slug,
+    name: foundry.name,
+    type: foundry.type as ActorGenerationResult["type"],
+    img: foundry.img,
+    system: foundry.system as Record<string, unknown>,
+    prototypeToken: foundry.prototypeToken as Record<string, unknown>,
+    items: foundry.items as Record<string, unknown>[],
+    effects: foundry.effects,
+    folder: foundry.folder ?? null,
+    flags: foundry.flags ?? {},
+  };
+
+  const imported = await importActor(generated);
+  const importedStrike = (imported as unknown as MockActor).items.find(
+    (item: any) => item.type === "melee" && item.name === "Corrupting Swipe",
+  );
+
+  assert.ok(importedStrike, "expected imported strike item");
+  assert.deepEqual(importedStrike.system.attackEffects.value, ["grab"]);
+  assert.match(importedStrike.system.description.value, /Frightened 1/);
+  assert.match(importedStrike.system.description.value, /homebrew-stagger/);
 });
 
 test("importAction rejects payloads for the wrong system", async () => {

@@ -1574,6 +1574,7 @@ function prepareActorSource(actor: ActorSchemaData): FoundryActorSource {
 }
 
 function prepareGeneratedActorSource(actor: ActorGenerationResult): FoundryActorSource {
+  const sanitizedItems = sanitizeGeneratedActorItemsForImport(actor.items);
   const system = clone((actor.system ?? {}) as FoundryActorSource["system"]);
   system.slug = actor.slug;
 
@@ -1583,13 +1584,92 @@ function prepareGeneratedActorSource(actor: ActorGenerationResult): FoundryActor
     img: actor.img?.trim() || DEFAULT_ACTOR_IMAGE,
     system,
     prototypeToken: clone(actor.prototypeToken ?? {}),
-    items: Array.isArray(actor.items)
-      ? (clone(actor.items) as FoundryActorItemSource[])
-      : [],
+    items: sanitizedItems,
     effects: Array.isArray(actor.effects) ? clone(actor.effects) : [],
     folder: actor.folder ?? null,
     flags: clone((actor.flags ?? {}) as Record<string, unknown>),
   };
+}
+
+function normalizeGeneratedStrikeEffectValue(value: unknown): string | null {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const candidates: unknown[] = [
+    value.slug,
+    value.label,
+    value.name,
+    value.value,
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === "string") {
+      const trimmed = candidate.trim();
+      if (trimmed.length > 0) {
+        return trimmed;
+      }
+    }
+  }
+
+  return null;
+}
+
+function sanitizeGeneratedMeleeItemForImport(item: FoundryActorItemSource): FoundryActorItemSource {
+  if (item.type !== "melee" || !isRecord(item.system)) {
+    return item;
+  }
+
+  const system = clone(item.system) as Record<string, unknown>;
+  const attackEffectsSource = isRecord(system.attackEffects) && Array.isArray(system.attackEffects.value)
+    ? system.attackEffects.value
+    : Array.isArray(system.attackEffects)
+      ? system.attackEffects
+      : [];
+
+  const normalizedEffects = attackEffectsSource
+    .map((effect) => normalizeGeneratedStrikeEffectValue(effect))
+    .filter((effect): effect is string => typeof effect === "string");
+
+  const { attackEffects, descriptionAdditions } = splitStrikeEffects(normalizedEffects);
+  const existingDescription = isRecord(system.description)
+    ? (typeof system.description.value === "string" ? system.description.value : "")
+    : (typeof system.description === "string" ? system.description : "");
+  const existingDescriptionGm = isRecord(system.description)
+    ? (typeof system.description.gm === "string" ? system.description.gm : "")
+    : "";
+
+  system.attackEffects = { value: attackEffects };
+  if (descriptionAdditions.length > 0) {
+    system.description = {
+      value: formatStrikeDescription(existingDescription, descriptionAdditions),
+      gm: existingDescriptionGm,
+    };
+  } else if (!isRecord(system.description)) {
+    system.description = {
+      value: formatStrikeDescription(existingDescription, []),
+      gm: existingDescriptionGm,
+    };
+  }
+
+  return {
+    ...item,
+    system: system as FoundryActorItemSource["system"],
+  };
+}
+
+function sanitizeGeneratedActorItemsForImport(items: unknown): FoundryActorItemSource[] {
+  if (!Array.isArray(items)) {
+    return [];
+  }
+
+  const clonedItems = clone(items) as FoundryActorItemSource[];
+  return clonedItems.map((item) => sanitizeGeneratedMeleeItemForImport(item));
 }
 
 function toSlug(value: string): string {
