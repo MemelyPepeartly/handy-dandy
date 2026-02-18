@@ -16,7 +16,9 @@ import {
   type PublicationData,
   type SystemId,
 } from "../schemas";
-import { importAction, importActor, importItem } from "../mappers/import";
+import { fromFoundryActor, type FoundryActor } from "../mappers/export";
+import { importAction, importActor, importItem, toFoundryActorDataWithCompendium } from "../mappers/import";
+import { ensureValid } from "../validation/ensure-valid";
 
 interface WorkbenchHistoryEntry {
   readonly id: string;
@@ -1085,6 +1087,105 @@ function createHistoryImporter(
   }
 }
 
+function toGeneratedActorResultFromFoundry(
+  source: GeneratedEntityMap["actor"],
+  foundry: Awaited<ReturnType<typeof toFoundryActorDataWithCompendium>>,
+): GeneratedEntityMap["actor"] {
+  return {
+    schema_version: source.schema_version,
+    systemId: source.systemId,
+    slug: source.slug,
+    name: foundry.name,
+    type: foundry.type as GeneratedEntityMap["actor"]["type"],
+    img: foundry.img,
+    system: foundry.system,
+    prototypeToken: foundry.prototypeToken,
+    items: foundry.items,
+    effects: foundry.effects,
+    folder: (foundry.folder ?? null) as GeneratedEntityMap["actor"]["folder"],
+    flags: (foundry.flags ?? {}) as GeneratedEntityMap["actor"]["flags"],
+  } satisfies GeneratedEntityMap["actor"];
+}
+
+async function repairGeneratedData(
+  type: EntityType,
+  data: GeneratedEntityMap[EntityType],
+): Promise<GeneratedEntityMap[EntityType]> {
+  const gptClient = game.handyDandy?.gptClient ?? undefined;
+
+  switch (type) {
+    case "action": {
+      const repaired = await ensureValid({
+        type: "action",
+        payload: data,
+        gptClient,
+      });
+      return repaired as GeneratedEntityMap[EntityType];
+    }
+    case "item": {
+      const repaired = await ensureValid({
+        type: "item",
+        payload: data,
+        gptClient,
+      });
+      return repaired as GeneratedEntityMap[EntityType];
+    }
+    case "actor": {
+      const actorData = data as GeneratedEntityMap["actor"];
+      const canonicalDraft = fromFoundryActor(actorData as unknown as FoundryActor);
+      const canonical = await ensureValid({
+        type: "actor",
+        payload: canonicalDraft,
+        gptClient,
+      });
+      const foundry = await toFoundryActorDataWithCompendium(canonical);
+      return toGeneratedActorResultFromFoundry(actorData, foundry) as GeneratedEntityMap[EntityType];
+    }
+    default:
+      return data;
+  }
+}
+
+function replaceHistoryEntry(
+  updated: WorkbenchHistoryEntry,
+): void {
+  const index = workbenchHistory.findIndex((entry) => entry.id === updated.id);
+  if (index === -1) {
+    workbenchHistory.unshift(updated);
+    if (workbenchHistory.length > WORKBENCH_HISTORY_LIMIT) {
+      workbenchHistory.length = WORKBENCH_HISTORY_LIMIT;
+    }
+  } else {
+    workbenchHistory.splice(index, 1, updated);
+  }
+
+  void persistWorkbenchHistory();
+}
+
+async function repairHistoryEntry(
+  entry: WorkbenchHistoryEntry,
+): Promise<WorkbenchHistoryEntry> {
+  const repairedData = await repairGeneratedData(entry.result.type, entry.result.data);
+  const importer = createHistoryImporter(entry.result.type, repairedData);
+  const resolvedName = repairedData.name?.trim() || entry.result.name;
+
+  const updated: WorkbenchHistoryEntry = {
+    id: entry.id,
+    timestamp: Date.now(),
+    importerAvailable: typeof importer === "function",
+    json: JSON.stringify(repairedData, null, 2),
+    result: {
+      ...entry.result,
+      name: resolvedName,
+      data: repairedData,
+      importer,
+    },
+  };
+
+  replaceHistoryEntry(updated);
+  return updated;
+}
+
 function recordHistoryEntry(
   result: PromptWorkbenchResult<EntityType>,
   json: string,
@@ -1418,6 +1519,10 @@ function buildEntryDetailMarkup(entry: WorkbenchHistoryEntry): string {
           <i class="fas fa-download"></i>
           <span>Download</span>
         </button>
+        <button type="button" class="handy-dandy-workbench-action" data-action="repair" data-entry-id="${entry.id}">
+          <i class="fas fa-tools"></i>
+          <span>Repair JSON</span>
+        </button>
         <button type="button" class="handy-dandy-workbench-action" data-action="import" data-entry-id="${entry.id}"${importDisabled}>
           <i class="fas fa-cloud-upload-alt"></i>
           <span>${importLabel}</span>
@@ -1600,7 +1705,7 @@ function setupWorkbenchRequestDialog(html: JQuery): void {
     if (actionButton?.dataset.action && actionButton.dataset.entryId) {
       const entry = resolveHistoryEntry(actionButton.dataset.entryId);
       if (entry) {
-        void handleWorkbenchAction(actionButton.dataset.action, entry);
+        void handleWorkbenchAction(actionButton.dataset.action, entry, container);
       }
       return;
     }
@@ -1684,7 +1789,7 @@ function setupWorkbenchResultDialog(html: JQuery, currentEntry: WorkbenchHistory
     if (actionButton?.dataset.action && actionButton.dataset.entryId) {
       const entry = resolveHistoryEntry(actionButton.dataset.entryId);
       if (entry) {
-        void handleWorkbenchAction(actionButton.dataset.action, entry);
+        void handleWorkbenchAction(actionButton.dataset.action, entry, container);
       }
       return;
     }
@@ -1763,13 +1868,20 @@ function removeHistoryEntry(
   return { removed, fallback };
 }
 
-async function handleWorkbenchAction(action: string, entry: WorkbenchHistoryEntry): Promise<void> {
+async function handleWorkbenchAction(
+  action: string,
+  entry: WorkbenchHistoryEntry,
+  container?: HTMLElement,
+): Promise<void> {
   switch (action) {
     case "copy":
       await handleCopyAction(entry);
       break;
     case "download":
       handleDownloadAction(entry);
+      break;
+    case "repair":
+      await handleRepairAction(entry, container);
       break;
     case "import":
       await handleImportAction(entry);
@@ -1792,6 +1904,43 @@ async function handleCopyAction(entry: WorkbenchHistoryEntry): Promise<void> {
 function handleDownloadAction(entry: WorkbenchHistoryEntry): void {
   const filename = resolveFilename(entry.result);
   downloadJson(entry.json, filename);
+}
+
+function refreshHistoryViews(container: HTMLElement, preferredEntryId: string): void {
+  const historyList = container.querySelector<HTMLElement>("[data-history-list]");
+  const historyView = container.querySelector<HTMLElement>("[data-history-view]");
+  const latestPanel = container.querySelector<HTMLElement>("[data-panel=\"latest\"]");
+  const activeEntry = resolveHistoryEntry(preferredEntryId) ?? workbenchHistory[0] ?? null;
+  const activeEntryId = activeEntry?.id;
+
+  setCurrentHistoryEntry(container, activeEntryId);
+  if (activeEntryId) {
+    setActiveHistoryItem(container, activeEntryId);
+  }
+
+  if (historyList) {
+    renderHistoryList(historyList, activeEntryId);
+  }
+  if (historyView) {
+    renderHistoryEntry(historyView, activeEntry);
+  }
+  if (latestPanel && activeEntry) {
+    latestPanel.innerHTML = buildEntryDetailMarkup(activeEntry);
+  }
+}
+
+async function handleRepairAction(entry: WorkbenchHistoryEntry, container?: HTMLElement): Promise<void> {
+  try {
+    const repaired = await repairHistoryEntry(entry);
+    ui.notifications?.info(`${CONSTANTS.MODULE_NAME} | Repaired generation JSON for ${repaired.result.name}.`);
+    if (container) {
+      refreshHistoryViews(container, repaired.id);
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    ui.notifications?.error(`${CONSTANTS.MODULE_NAME} | Repair failed: ${message}`);
+    console.error(`${CONSTANTS.MODULE_NAME} | Repair failed`, error);
+  }
 }
 
 async function handleImportAction(entry: WorkbenchHistoryEntry): Promise<void> {

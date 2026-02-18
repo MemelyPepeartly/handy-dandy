@@ -1790,6 +1790,36 @@ const LINKABLE_CONDITION_EFFECTS = new Set([
   "flat-footed",
 ]);
 
+const KNOWN_ATTACK_EFFECT_SLUGS = new Set([
+  "grab",
+  "improved-grab",
+  "constrict",
+  "greater-constrict",
+  "knockdown",
+  "improved-knockdown",
+  "push",
+  "improved-push",
+  "trip",
+]);
+
+function isKnownAttackEffectSlug(value: string): boolean {
+  const slug = value.trim().toLowerCase();
+  if (!slug) {
+    return false;
+  }
+
+  if (KNOWN_ATTACK_EFFECT_SLUGS.has(slug)) {
+    return true;
+  }
+
+  const attackEffects = (globalThis as { CONFIG?: { PF2E?: { attackEffects?: unknown } } }).CONFIG?.PF2E?.attackEffects;
+  if (!attackEffects || typeof attackEffects !== "object") {
+    return false;
+  }
+
+  return Object.prototype.hasOwnProperty.call(attackEffects, slug);
+}
+
 function resolveLinkableConditionEffect(value: string): string | null {
   const normalized = normalizeLookupKey(value).replace(/-\d+$/, "");
   return LINKABLE_CONDITION_EFFECTS.has(normalized) ? normalized : null;
@@ -1826,13 +1856,20 @@ function splitStrikeEffects(
     const linkableCondition = resolveLinkableConditionEffect(effect);
     if (linkableCondition) {
       descriptionAdditions.push(effect);
-      if (normalizeLookupKey(effect) === linkableCondition && SLUG_EFFECT_PATTERN.test(effect)) {
-        attackEffects.push(effect.toLowerCase());
+      continue;
+    }
+
+    if (SLUG_EFFECT_PATTERN.test(effect)) {
+      const slug = effect.toLowerCase();
+      if (isKnownAttackEffectSlug(slug)) {
+        attackEffects.push(slug);
+      } else {
+        descriptionAdditions.push(effect);
       }
       continue;
     }
 
-    attackEffects.push(SLUG_EFFECT_PATTERN.test(effect) ? effect.toLowerCase() : effect);
+    descriptionAdditions.push(effect);
   }
 
   return { attackEffects, descriptionAdditions };
