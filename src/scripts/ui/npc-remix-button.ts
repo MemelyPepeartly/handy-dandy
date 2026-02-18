@@ -2,7 +2,7 @@ import { runNpcRemixFlow } from "../flows/npc-remix";
 
 const BUTTON_CLASS = "handy-dandy-npc-remix-button" as const;
 const BUTTON_ICON_CLASS = "fas fa-random" as const;
-const BUTTON_LABEL = "Remix Prompt" as const;
+const BUTTON_LABEL = "Remix" as const;
 const BUTTON_TITLE = "Open Handy Dandy NPC remix" as const;
 
 export function registerNpcRemixButton(): void {
