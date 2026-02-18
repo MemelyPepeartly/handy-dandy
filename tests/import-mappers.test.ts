@@ -152,6 +152,22 @@ beforeEach(() => {
         fire: "Fire",
         magical: "Magical",
       },
+      immunityTypes: {
+        fire: "Fire",
+        water: "Water",
+        custom: "",
+      },
+      weaknessTypes: {
+        water: "Water",
+        "salt-water": "Salt Water",
+        bludgeoning: "Bludgeoning",
+        custom: "",
+      },
+      resistanceTypes: {
+        bludgeoning: "Bludgeoning",
+        water: "Water",
+        custom: "",
+      },
     },
   } satisfies Partial<typeof CONFIG>;
 
@@ -553,6 +569,57 @@ test("importActor sanitizes malformed melee attack effects in generated actor pa
   assert.deepEqual(importedStrike.system.attackEffects.value, ["grab"]);
   assert.match(importedStrike.system.description.value, /Frightened 1/);
   assert.match(importedStrike.system.description.value, /homebrew-stagger/);
+});
+
+test("importActor sanitizes unknown IWR exception slugs in generated actor payloads", async () => {
+  const actor = createActor();
+  actor.slug = "iwr-sanitization-test";
+  actor.name = "IWR Sanitization Test";
+  actor.attributes.weaknesses = [
+    {
+      type: "water",
+      value: 15,
+      exceptions: ["seawater", "saltwater"],
+      details: "Seawater saps this creature's power.",
+    },
+  ];
+  actor.attributes.immunities = null;
+  actor.attributes.resistances = null;
+  actor.actions = [];
+  actor.spellcasting = null;
+  actor.inventory = null;
+
+  const foundry = toFoundryActorData(actor);
+  const weaknesses = (
+    (foundry.system as { attributes?: { weaknesses?: unknown[] } }).attributes?.weaknesses ?? []
+  ) as Array<Record<string, unknown>>;
+  assert.ok(weaknesses.length > 0, "expected weakness entry");
+
+  weaknesses[0].exceptions = ["seawater", "saltwater", null];
+
+  const generated: ActorGenerationResult = {
+    schema_version: actor.schema_version,
+    systemId: actor.systemId,
+    slug: actor.slug,
+    name: foundry.name,
+    type: foundry.type as ActorGenerationResult["type"],
+    img: foundry.img,
+    system: foundry.system as Record<string, unknown>,
+    prototypeToken: foundry.prototypeToken as Record<string, unknown>,
+    items: foundry.items as Record<string, unknown>[],
+    effects: foundry.effects,
+    folder: foundry.folder ?? null,
+    flags: foundry.flags ?? {},
+  };
+
+  const imported = await importActor(generated);
+  const importedWeaknesses = (
+    (imported as unknown as MockActor).system as { attributes?: { weaknesses?: unknown[] } }
+  ).attributes?.weaknesses as Array<Record<string, unknown>>;
+
+  assert.ok(Array.isArray(importedWeaknesses), "expected imported weaknesses array");
+  assert.ok(importedWeaknesses.length > 0, "expected imported weakness");
+  assert.deepEqual(importedWeaknesses[0].exceptions, ["salt-water"]);
 });
 
 test("importAction rejects payloads for the wrong system", async () => {

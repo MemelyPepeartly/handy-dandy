@@ -1035,6 +1035,244 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
+type IwrCategory = "immunities" | "weaknesses" | "resistances";
+
+const IWR_DICTIONARY_KEYS: Record<IwrCategory, "immunityTypes" | "weaknessTypes" | "resistanceTypes"> = {
+  immunities: "immunityTypes",
+  weaknesses: "weaknessTypes",
+  resistances: "resistanceTypes",
+};
+
+function getIwrLookupMap(category: IwrCategory): Map<string, string> | null {
+  const dictionaryKey = IWR_DICTIONARY_KEYS[category];
+  const dictionary = (
+    globalThis as { CONFIG?: { PF2E?: Record<string, unknown> } }
+  ).CONFIG?.PF2E?.[dictionaryKey];
+  if (!dictionary || typeof dictionary !== "object") {
+    return null;
+  }
+
+  const keys = Object.keys(dictionary as Record<string, unknown>);
+  if (keys.length === 0) {
+    return null;
+  }
+
+  const map = new Map<string, string>();
+  for (const rawKey of keys) {
+    const key = rawKey.trim().toLowerCase();
+    if (!key) {
+      continue;
+    }
+
+    const normalized = normalizeLookupKey(key);
+    const collapsed = normalized.replace(/-/g, "");
+    if (!map.has(key)) {
+      map.set(key, key);
+    }
+    if (normalized && !map.has(normalized)) {
+      map.set(normalized, key);
+    }
+    if (collapsed && !map.has(collapsed)) {
+      map.set(collapsed, key);
+    }
+  }
+
+  return map.size > 0 ? map : null;
+}
+
+function resolveIwrKey(value: unknown, category: IwrCategory): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim().toLowerCase();
+  if (!trimmed) {
+    return null;
+  }
+
+  const normalized = normalizeLookupKey(trimmed);
+  if (!normalized) {
+    return null;
+  }
+
+  const lookup = getIwrLookupMap(category);
+  if (!lookup) {
+    return normalized;
+  }
+
+  return (
+    lookup.get(trimmed) ??
+    lookup.get(normalized) ??
+    lookup.get(normalized.replace(/-/g, "")) ??
+    null
+  );
+}
+
+function sanitizeIwrStringList(values: unknown, category: IwrCategory): string[] {
+  if (!Array.isArray(values)) {
+    return [];
+  }
+
+  const sanitized: string[] = [];
+  const seen = new Set<string>();
+
+  for (const value of values) {
+    const candidate =
+      typeof value === "string"
+        ? value
+        : (isRecord(value) && typeof value.type === "string")
+          ? value.type
+          : (isRecord(value) && typeof value.slug === "string")
+            ? value.slug
+            : null;
+    const resolved = resolveIwrKey(candidate, category);
+    if (!resolved || seen.has(resolved)) {
+      continue;
+    }
+
+    seen.add(resolved);
+    sanitized.push(resolved);
+  }
+
+  return sanitized;
+}
+
+function sanitizeCanonicalImmunities(
+  values: ActorSchemaData["attributes"]["immunities"] | null | undefined,
+): Array<{ type: string; exceptions: string[]; notes: string }> {
+  const entries = values ?? [];
+  const sanitized: Array<{ type: string; exceptions: string[]; notes: string }> = [];
+
+  for (const entry of entries) {
+    const type = resolveIwrKey(entry.type, "immunities");
+    if (!type) {
+      continue;
+    }
+
+    sanitized.push({
+      type,
+      exceptions: sanitizeIwrStringList(entry.exceptions, "immunities"),
+      notes: sanitizeText(entry.details),
+    });
+  }
+
+  return sanitized;
+}
+
+function sanitizeCanonicalWeaknesses(
+  values: ActorSchemaData["attributes"]["weaknesses"] | null | undefined,
+): Array<{ type: string; value: number; exceptions: string[]; notes: string }> {
+  const entries = values ?? [];
+  const sanitized: Array<{ type: string; value: number; exceptions: string[]; notes: string }> = [];
+
+  for (const entry of entries) {
+    const type = resolveIwrKey(entry.type, "weaknesses");
+    if (!type) {
+      continue;
+    }
+
+    sanitized.push({
+      type,
+      value: Number.isFinite(entry.value) ? Math.trunc(entry.value) : 0,
+      exceptions: sanitizeIwrStringList(entry.exceptions, "weaknesses"),
+      notes: sanitizeText(entry.details),
+    });
+  }
+
+  return sanitized;
+}
+
+function sanitizeCanonicalResistances(
+  values: ActorSchemaData["attributes"]["resistances"] | null | undefined,
+): Array<{ type: string; value: number; exceptions: string[]; doubleVs: string[]; notes: string }> {
+  const entries = values ?? [];
+  const sanitized: Array<{ type: string; value: number; exceptions: string[]; doubleVs: string[]; notes: string }> = [];
+
+  for (const entry of entries) {
+    const type = resolveIwrKey(entry.type, "resistances");
+    if (!type) {
+      continue;
+    }
+
+    sanitized.push({
+      type,
+      value: Number.isFinite(entry.value) ? Math.trunc(entry.value) : 0,
+      exceptions: sanitizeIwrStringList(entry.exceptions, "resistances"),
+      doubleVs: sanitizeIwrStringList(entry.doubleVs, "resistances"),
+      notes: sanitizeText(entry.details),
+    });
+  }
+
+  return sanitized;
+}
+
+function sanitizeGeneratedIwrEntries(
+  values: unknown,
+  category: IwrCategory,
+): Array<Record<string, unknown>> {
+  const rawEntries = Array.isArray(values)
+    ? values.filter((value): value is Record<string, unknown> => isRecord(value))
+    : [];
+  const sanitized: Array<Record<string, unknown>> = [];
+
+  for (const entry of rawEntries) {
+    const type = resolveIwrKey(entry.type, category);
+    if (!type) {
+      continue;
+    }
+
+    const notes = sanitizeText(
+      typeof entry.notes === "string"
+        ? entry.notes
+        : (typeof entry.details === "string" ? entry.details : ""),
+    );
+    const exceptions = sanitizeIwrStringList(entry.exceptions, category);
+
+    if (category === "immunities") {
+      sanitized.push({
+        type,
+        exceptions,
+        notes,
+      });
+      continue;
+    }
+
+    const numericValue = typeof entry.value === "number" ? entry.value : Number(entry.value);
+    const value = Number.isFinite(numericValue) ? Math.trunc(numericValue) : 0;
+
+    if (category === "weaknesses") {
+      sanitized.push({
+        type,
+        value,
+        exceptions,
+        notes,
+      });
+      continue;
+    }
+
+    sanitized.push({
+      type,
+      value,
+      exceptions,
+      doubleVs: sanitizeIwrStringList(entry.doubleVs, category),
+      notes,
+    });
+  }
+
+  return sanitized;
+}
+
+function sanitizeGeneratedActorIwr(system: FoundryActorSource["system"]): void {
+  if (!isRecord(system.attributes)) {
+    return;
+  }
+
+  const attributes = system.attributes as Record<string, unknown>;
+  attributes.immunities = sanitizeGeneratedIwrEntries(attributes.immunities, "immunities");
+  attributes.weaknesses = sanitizeGeneratedIwrEntries(attributes.weaknesses, "weaknesses");
+  attributes.resistances = sanitizeGeneratedIwrEntries(attributes.resistances, "resistances");
+}
+
 function getEmbeddedItemSlug(item: FoundryActorItemSource): string | null {
   const system = (item as { system?: unknown }).system;
   if (!isRecord(system)) {
@@ -1510,24 +1748,9 @@ function prepareActorSource(actor: ActorSchemaData): FoundryActorSource {
             details: sanitizeText(entry.details),
           })),
         },
-        immunities: (actor.attributes.immunities ?? []).map((entry) => ({
-          type: entry.type,
-          exceptions: trimArray(entry.exceptions).map((value) => value.toLowerCase()),
-          notes: sanitizeText(entry.details),
-        })),
-        weaknesses: (actor.attributes.weaknesses ?? []).map((entry) => ({
-          type: entry.type,
-          value: entry.value,
-          exceptions: trimArray(entry.exceptions).map((value) => value.toLowerCase()),
-          notes: sanitizeText(entry.details),
-        })),
-        resistances: (actor.attributes.resistances ?? []).map((entry) => ({
-          type: entry.type,
-          value: entry.value,
-          exceptions: trimArray(entry.exceptions).map((value) => value.toLowerCase()),
-          doubleVs: trimArray(entry.doubleVs).map((value) => value.toLowerCase()),
-          notes: sanitizeText(entry.details),
-        })),
+        immunities: sanitizeCanonicalImmunities(actor.attributes.immunities),
+        weaknesses: sanitizeCanonicalWeaknesses(actor.attributes.weaknesses),
+        resistances: sanitizeCanonicalResistances(actor.attributes.resistances),
         allSaves: { value: "" },
       },
       resources: {},
@@ -1577,6 +1800,7 @@ function prepareGeneratedActorSource(actor: ActorGenerationResult): FoundryActor
   const sanitizedItems = sanitizeGeneratedActorItemsForImport(actor.items);
   const system = clone((actor.system ?? {}) as FoundryActorSource["system"]);
   system.slug = actor.slug;
+  sanitizeGeneratedActorIwr(system);
 
   return {
     name: actor.name,
