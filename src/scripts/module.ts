@@ -15,11 +15,13 @@ import { registerNpcRemixButton } from "./ui/npc-remix-button";
 import { registerNpcPortraitRegenerateButton } from "./ui/npc-portrait-regenerate-button";
 import { registerNpcRemixSectionButtons } from "./ui/npc-remix-section-buttons";
 import { registerItemImageGenerateButton } from "./ui/item-image-generate-button";
+import { registerItemRemixButton } from "./ui/item-remix-button";
 import {
   DEFAULT_GENERATION_SEED,
   generateAction,
   generateActor,
   generateItem,
+  type GenerationProgressUpdate,
   type GenerateOptions,
 } from "./generation";
 import type { ActionPromptInput, ActorPromptInput, ItemPromptInput } from "./prompts";
@@ -41,6 +43,7 @@ interface BoundGenerationOptions {
   seed?: number;
   maxAttempts?: number;
   gptClient?: Pick<GPTClient, "generateWithSchema">;
+  onProgress?: (update: GenerationProgressUpdate) => void;
 }
 
 type BoundGenerateAction = (
@@ -60,12 +63,13 @@ registerNpcRemixButton();
 registerNpcPortraitRegenerateButton();
 registerNpcRemixSectionButtons();
 registerItemImageGenerateButton();
+registerItemRemixButton();
 
 function bindGenerator<TInput, TResult>(
   fn: GeneratorFunction<TInput, TResult>,
 ): (input: TInput, options?: BoundGenerationOptions) => Promise<TResult> {
   return async (input: TInput, options: BoundGenerationOptions = {}) => {
-    const { gptClient: explicitClient, seed, maxAttempts } = options;
+    const { gptClient: explicitClient, seed, maxAttempts, onProgress } = options;
     const gptClient = explicitClient ?? game.handyDandy?.gptClient;
     if (!gptClient) {
       throw new Error(`${CONSTANTS.MODULE_NAME} | GPT client has not been initialised`);
@@ -75,6 +79,7 @@ function bindGenerator<TInput, TResult>(
       gptClient,
       seed: seed ?? DEFAULT_GENERATION_SEED,
       maxAttempts,
+      onProgress,
     });
   };
 }
