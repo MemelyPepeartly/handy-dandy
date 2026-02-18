@@ -7,6 +7,7 @@ import {
   type PromptWorkbenchRequest,
   type PromptWorkbenchResult,
 } from "./prompt-workbench";
+import type { GenerationProgressUpdate } from "../generation";
 import {
   ITEM_CATEGORIES,
   SYSTEM_IDS,
@@ -58,6 +59,9 @@ type WorkbenchFormResponse = {
   readonly img: string;
   readonly actorImagePath: string;
   readonly actorArtMode: string;
+  readonly itemImagePath: string;
+  readonly itemArtMode: string;
+  readonly itemImagePrompt: string;
   readonly referenceText: string;
   readonly seed: string;
   readonly maxAttempts: string;
@@ -141,19 +145,22 @@ export async function runPromptWorkbenchFlow(): Promise<void> {
     return;
   }
 
-  let waitingDialog: Dialog | null = null;
+  let loading: WorkbenchLoadingController | null = null;
   try {
-    waitingDialog = showGeneratingDialog(request);
-    const result = await generateWorkbenchEntry(request);
-    waitingDialog.close({ force: true });
-    waitingDialog = null;
+    loading = showGeneratingDialog(request);
+    const result = await generateWorkbenchEntry({
+      ...request,
+      onProgress: (update) => loading?.update(update),
+    });
+    loading.close();
+    loading = null;
     await showWorkbenchResult(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     ui.notifications?.error(`${CONSTANTS.MODULE_NAME} | Prompt workbench failed: ${message}`);
     console.error(`${CONSTANTS.MODULE_NAME} | Prompt workbench failed`, error);
   } finally {
-    waitingDialog?.close({ force: true });
+    loading?.close();
   }
 }
 
@@ -604,11 +611,46 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
             <p class="notes">Paste stat blocks, raw notes, or structured direction for generation.</p>
           </fieldset>
 
-          <fieldset class="form-group" data-entity-scope="action item">
-            <legend>Art</legend>
+          <fieldset class="form-group" data-entity-scope="action">
+            <legend>Action Art</legend>
             <label for="handy-dandy-workbench-image">Image Path</label>
             <input id="handy-dandy-workbench-image" type="text" name="img" value="${DEFAULT_IMAGE_PATH}" />
-            <p class="notes">Used as the generated action or item image path.</p>
+            <p class="notes">Used as the generated action image path.</p>
+          </fieldset>
+
+          <fieldset class="form-group" data-entity-scope="item">
+            <legend>Item Art</legend>
+            <div class="handy-dandy-workbench-art-mode">
+              <label class="handy-dandy-workbench-art-choice">
+                <input type="radio" name="itemArtMode" value="path" checked />
+                <span>Use image path</span>
+              </label>
+              <label class="handy-dandy-workbench-art-choice">
+                <input type="radio" name="itemArtMode" value="generate" />
+                <span>Generate transparent item icon</span>
+              </label>
+            </div>
+            <div class="form-group" data-item-art-mode="path">
+              <label for="handy-dandy-workbench-item-image">Item Image Path</label>
+              <input
+                id="handy-dandy-workbench-item-image"
+                type="text"
+                name="itemImagePath"
+                value="${DEFAULT_IMAGE_PATH}"
+              />
+              <p class="notes">Used when image-path mode is selected.</p>
+            </div>
+            <div class="form-group" data-item-art-mode="generate">
+              <label for="handy-dandy-workbench-item-image-prompt">Item Image Prompt Override (optional)</label>
+              <input
+                id="handy-dandy-workbench-item-image-prompt"
+                type="text"
+                name="itemImagePrompt"
+                placeholder="Optional art direction for generated item icon"
+              />
+              <p class="notes">Leave blank to derive icon direction from the generated item description.</p>
+            </div>
+            <p class="notes">Choose one art mode for items to avoid conflicting image instructions.</p>
           </fieldset>
 
           <fieldset class="form-group" data-entity-scope="actor">
@@ -725,6 +767,9 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
                 img: String(formData.get("img") ?? ""),
                 actorImagePath: String(formData.get("actorImagePath") ?? ""),
                 actorArtMode: String(formData.get("actorArtMode") ?? ""),
+                itemImagePath: String(formData.get("itemImagePath") ?? ""),
+                itemArtMode: String(formData.get("itemArtMode") ?? ""),
+                itemImagePrompt: String(formData.get("itemImagePrompt") ?? ""),
                 referenceText: String(formData.get("referenceText") ?? ""),
                 seed: String(formData.get("seed") ?? ""),
                 maxAttempts: String(formData.get("maxAttempts") ?? ""),
@@ -811,12 +856,23 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
     return null;
   }
 
+  const itemArtMode = type === "item" ? sanitizeItemArtMode(response.itemArtMode) : "path";
+  if (type === "item" && !itemArtMode) {
+    ui.notifications?.error(`${CONSTANTS.MODULE_NAME} | Invalid item art mode.`);
+    return null;
+  }
+
   const generateTokenImage = type === "actor" && actorArtMode === "token";
+  const generateItemImage = type === "item" && itemArtMode === "generate";
   const actorImagePath = response.actorImagePath.trim() || DEFAULT_IMAGE_PATH;
+  const itemImagePath = response.itemImagePath.trim() || DEFAULT_IMAGE_PATH;
   const img = type === "actor"
     ? (generateTokenImage ? undefined : actorImagePath)
-    : (response.img.trim() || DEFAULT_IMAGE_PATH);
+    : type === "item"
+      ? (generateItemImage ? undefined : itemImagePath)
+      : (response.img.trim() || DEFAULT_IMAGE_PATH);
   const tokenPrompt = generateTokenImage ? response.tokenPrompt.trim() || undefined : undefined;
+  const itemImagePrompt = generateItemImage ? response.itemImagePrompt.trim() || undefined : undefined;
 
   return {
     type,
@@ -835,7 +891,9 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
     includeSpellcasting: type === "actor" && response.includeSpellcasting ? true : undefined,
     includeInventory: type === "actor" && response.includeInventory ? true : undefined,
     generateTokenImage: generateTokenImage ? true : undefined,
+    generateItemImage: generateItemImage ? true : undefined,
     tokenPrompt,
+    itemImagePrompt,
   } satisfies PromptWorkbenchRequest<EntityType>;
 }
 
@@ -882,6 +940,16 @@ function sanitizeActorArtMode(value: string): "path" | "token" | null {
   }
 }
 
+function sanitizeItemArtMode(value: string): "path" | "generate" | null {
+  switch (value.trim().toLowerCase()) {
+    case "path":
+    case "generate":
+      return value.trim().toLowerCase() as "path" | "generate";
+    default:
+      return null;
+  }
+}
+
 function formatItemTypeLabel(value: ItemCategory): string {
   return value
     .split(/[-_]/)
@@ -889,15 +957,111 @@ function formatItemTypeLabel(value: ItemCategory): string {
     .join(" ");
 }
 
-function showGeneratingDialog(request: PromptWorkbenchRequest<EntityType>): Dialog {
+type LoadingStep = {
+  key: GenerationProgressUpdate["step"];
+  label: string;
+};
+
+interface WorkbenchLoadingController {
+  update: (update: GenerationProgressUpdate) => void;
+  close: () => void;
+}
+
+function buildLoadingSteps(request: PromptWorkbenchRequest<EntityType>): LoadingStep[] {
+  const steps: LoadingStep[] = [
+    { key: "prompt", label: "Preparing prompt" },
+    { key: "model", label: "Generating JSON draft" },
+    { key: "validation", label: "Validating and repairing data" },
+  ];
+
+  if (request.type === "actor") {
+    if (request.generateTokenImage) {
+      steps.push({ key: "image", label: "Generating transparent token image" });
+    }
+    steps.push({ key: "mapping", label: "Resolving PF2E links and finalizing sheet data" });
+  } else if (request.type === "item" && request.generateItemImage) {
+    steps.push({ key: "image", label: "Generating transparent item icon" });
+  }
+
+  return steps;
+}
+
+function applyLoadingProgress(
+  root: HTMLElement,
+  steps: readonly LoadingStep[],
+  update: GenerationProgressUpdate,
+): void {
+  const messageNode = root.querySelector<HTMLElement>("[data-loading-message]");
+  if (messageNode) {
+    messageNode.textContent = update.message;
+  }
+
+  const stepIndex = steps.findIndex((step) => step.key === update.step);
+  const allSteps = Array.from(root.querySelectorAll<HTMLElement>("[data-loading-step]"));
+  for (const element of allSteps) {
+    const index = Number(element.dataset.stepIndex ?? "-1");
+    element.classList.remove("is-active", "is-complete");
+    if (stepIndex >= 0 && index < stepIndex) {
+      element.classList.add("is-complete");
+    } else if (stepIndex >= 0 && index === stepIndex) {
+      element.classList.add("is-active");
+    }
+  }
+}
+
+function showGeneratingDialog(request: PromptWorkbenchRequest<EntityType>): WorkbenchLoadingController {
   const entryName = request.entryName.trim() || "entry";
   const safeEntryName = escapeHtml(entryName);
+  const loadingSteps = buildLoadingSteps(request);
+  const loadingList = loadingSteps
+    .map((step, index) => `<li data-loading-step data-step-index="${index}">${escapeHtml(step.label)}</li>`)
+    .join("");
   const content = `
-    <div class="handy-dandy-workbench-loading">
+    <style>
+      .handy-dandy-workbench-loading-steps {
+        margin: 0.35rem 0 0.5rem 1.25rem;
+        padding: 0;
+        display: grid;
+        gap: 0.15rem;
+      }
+      .handy-dandy-workbench-loading-steps li.is-active {
+        font-weight: 700;
+      }
+      .handy-dandy-workbench-loading-steps li.is-complete {
+        opacity: 0.7;
+      }
+    </style>
+    <div class="handy-dandy-workbench-loading" data-loading-root>
       <p><i class="fas fa-spinner fa-spin"></i> Generating ${safeEntryName}...</p>
-      <p class="notes">This can take a few moments. Feel free to grab a beverage while you wait.</p>
+      <p data-loading-message class="notes">Preparing prompt...</p>
+      <ol class="handy-dandy-workbench-loading-steps">${loadingList}</ol>
+      <p data-loading-elapsed class="notes">Elapsed: 0s</p>
     </div>
   `;
+
+  let root: HTMLElement | null = null;
+  let intervalId: number | null = null;
+  let closed = false;
+  let latestProgress: GenerationProgressUpdate = {
+    step: "prompt",
+    message: "Preparing prompt...",
+    percent: 0,
+  };
+  const startTime = Date.now();
+
+  const refreshElapsed = (): void => {
+    if (!root) return;
+    const elapsedNode = root.querySelector<HTMLElement>("[data-loading-elapsed]");
+    if (!elapsedNode) return;
+    const elapsed = Math.max(0, Math.floor((Date.now() - startTime) / 1000));
+    elapsedNode.textContent = `Elapsed: ${elapsed}s`;
+  };
+
+  const update = (progress: GenerationProgressUpdate): void => {
+    latestProgress = progress;
+    if (!root) return;
+    applyLoadingProgress(root, loadingSteps, latestProgress);
+  };
 
   const dialog = new Dialog({
     title: `${CONSTANTS.MODULE_NAME} | Working`,
@@ -908,8 +1072,37 @@ function showGeneratingDialog(request: PromptWorkbenchRequest<EntityType>): Dial
     },
   }, { jQuery: true });
 
+  const hookId = Hooks.on("renderDialog", (app: Dialog, html: JQuery) => {
+    if (app !== dialog) {
+      return;
+    }
+
+    Hooks.off("renderDialog", hookId);
+    root = html[0]?.querySelector<HTMLElement>("[data-loading-root]") ?? null;
+    if (!root) {
+      return;
+    }
+
+    applyLoadingProgress(root, loadingSteps, latestProgress);
+    refreshElapsed();
+    intervalId = window.setInterval(refreshElapsed, 1000);
+  });
+
   dialog.render(true);
-  return dialog;
+  return {
+    update,
+    close: () => {
+      if (closed) {
+        return;
+      }
+      closed = true;
+      if (intervalId !== null) {
+        window.clearInterval(intervalId);
+        intervalId = null;
+      }
+      dialog.close({ force: true });
+    },
+  };
 }
 
 async function showWorkbenchResult(result: PromptWorkbenchResult<EntityType>): Promise<void> {
@@ -1594,8 +1787,16 @@ function setupWorkbenchRequestDialog(html: JQuery): void {
   const actorArtModeSections = Array.from(
     container.querySelectorAll<HTMLElement>("[data-actor-art-mode]"),
   );
+  const itemArtModeInputs = Array.from(
+    container.querySelectorAll<HTMLInputElement>("input[name=\"itemArtMode\"]"),
+  );
+  const itemArtModeSections = Array.from(
+    container.querySelectorAll<HTMLElement>("[data-item-art-mode]"),
+  );
   const actorImagePathField = container.querySelector<HTMLInputElement>("input[name=\"actorImagePath\"]");
   const tokenPromptField = container.querySelector<HTMLInputElement>("input[name=\"tokenPrompt\"]");
+  const itemImagePathField = container.querySelector<HTMLInputElement>("input[name=\"itemImagePath\"]");
+  const itemImagePromptField = container.querySelector<HTMLInputElement>("input[name=\"itemImagePrompt\"]");
 
   const updateActorArtModeVisibility = (): void => {
     const currentType = entityTypeField?.value ?? "";
@@ -1615,6 +1816,27 @@ function setupWorkbenchRequestDialog(html: JQuery): void {
 
     if (tokenPromptField) {
       tokenPromptField.disabled = !isActor || selectedMode !== "token";
+    }
+  };
+
+  const updateItemArtModeVisibility = (): void => {
+    const currentType = entityTypeField?.value ?? "";
+    const isItem = currentType === "item";
+    const selectedMode = itemArtModeInputs.find((input) => input.checked)?.value ?? "path";
+
+    for (const section of itemArtModeSections) {
+      const shouldShow = isItem && section.dataset.itemArtMode === selectedMode;
+      section.style.display = shouldShow ? "" : "none";
+      section.setAttribute("aria-hidden", shouldShow ? "false" : "true");
+    }
+
+    if (itemImagePathField) {
+      itemImagePathField.required = isItem && selectedMode === "path";
+      itemImagePathField.disabled = !isItem || selectedMode !== "path";
+    }
+
+    if (itemImagePromptField) {
+      itemImagePromptField.disabled = !isItem || selectedMode !== "generate";
     }
   };
 
@@ -1638,6 +1860,7 @@ function setupWorkbenchRequestDialog(html: JQuery): void {
     }
 
     updateActorArtModeVisibility();
+    updateItemArtModeVisibility();
   };
 
   const historyList = container.querySelector<HTMLElement>("[data-history-list]");
@@ -1658,6 +1881,9 @@ function setupWorkbenchRequestDialog(html: JQuery): void {
   entityTypeField?.addEventListener("change", updateScopedFieldVisibility);
   for (const input of actorArtModeInputs) {
     input.addEventListener("change", updateActorArtModeVisibility);
+  }
+  for (const input of itemArtModeInputs) {
+    input.addEventListener("change", updateItemArtModeVisibility);
   }
 
   container.addEventListener("click", (event) => {

@@ -1,5 +1,6 @@
 import { fromFoundryAction, fromFoundryActor, fromFoundryItem } from "../mappers/export";
 import { importAction, importActor, importItem } from "../mappers/import";
+import type { GenerationProgressUpdate } from "../generation";
 import {
   PUBLICATION_DEFAULT,
   type CanonicalEntityMap,
@@ -70,6 +71,9 @@ export interface PromptWorkbenchRequest<T extends EntityType> extends ImporterOp
   readonly includeInventory?: boolean;
   readonly generateTokenImage?: boolean;
   readonly tokenPrompt?: string;
+  readonly generateItemImage?: boolean;
+  readonly itemImagePrompt?: string;
+  readonly onProgress?: (update: GenerationProgressUpdate) => void;
 }
 
 export interface PromptWorkbenchResult<T extends EntityType> {
@@ -109,6 +113,7 @@ const DEFAULT_IMPORTERS: Partial<ImporterMap> = {
 interface BoundGenerationOptions {
   readonly seed?: number;
   readonly maxAttempts?: number;
+  readonly onProgress?: (update: GenerationProgressUpdate) => void;
 }
 
 export function formatBatchSummary(
@@ -191,6 +196,9 @@ export async function generateWorkbenchEntry<T extends EntityType>(
     includeInventory,
     generateTokenImage,
     tokenPrompt,
+    generateItemImage,
+    itemImagePrompt,
+    onProgress,
   } = request;
 
   const generator = resolveGenerator(type, dependencies.generators);
@@ -208,9 +216,11 @@ export async function generateWorkbenchEntry<T extends EntityType>(
     includeInventory,
     generateTokenImage,
     tokenPrompt,
+    generateItemImage,
+    itemImagePrompt,
   });
 
-  const data = await generator(input, { seed, maxAttempts });
+  const data = await generator(input, { seed, maxAttempts, onProgress });
   const resolvedName = data.name.trim() || inferInputName(type, input);
 
   const importerFn = importer
@@ -243,6 +253,8 @@ function buildPromptInput<T extends EntityType>(
     includeInventory?: boolean;
     generateTokenImage?: boolean;
     tokenPrompt?: string;
+    generateItemImage?: boolean;
+    itemImagePrompt?: string;
   },
 ): PromptInputMap[T] {
   const {
@@ -256,10 +268,13 @@ function buildPromptInput<T extends EntityType>(
     includeInventory,
     generateTokenImage,
     tokenPrompt,
+    generateItemImage,
+    itemImagePrompt,
   } = context;
   const trimmedImg = context.img?.trim();
   const defaultedImg = trimmedImg || DEFAULT_IMAGE_PATH;
   const actorImg = generateTokenImage ? undefined : defaultedImg;
+  const itemImg = generateItemImage ? undefined : defaultedImg;
   const publication = normalizePublicationInput(context.publication);
   switch (type) {
     case "action":
@@ -278,7 +293,9 @@ function buildPromptInput<T extends EntityType>(
         referenceText,
         slug,
         itemType,
-        img: defaultedImg,
+        img: itemImg,
+        generateItemImage,
+        itemImagePrompt,
         publication,
       } satisfies ItemPromptInput as PromptInputMap[T];
     case "actor":
