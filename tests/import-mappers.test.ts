@@ -302,6 +302,49 @@ test("toFoundryActorData applies fallback images to custom inventory items", () 
   assert.equal(inventoryItem!.img, "systems/pf2e/icons/default-icons/equipment.svg");
 });
 
+test("toFoundryActorData maps wand inventory entries to consumable item documents", () => {
+  const actor = createActor();
+  actor.inventory = [
+    {
+      name: "Storm Wand",
+      itemType: "wand",
+      quantity: 1,
+      level: 7,
+      description: "Crackling magical wand.",
+      img: null,
+    },
+  ];
+
+  const result = toFoundryActorData(actor);
+  const wand = result.items.find((item) => item.name === "Storm Wand");
+
+  assert.ok(wand, "expected custom wand inventory item");
+  assert.equal(wand!.type, "consumable");
+  assert.equal(wand!.img, "systems/pf2e/icons/default-icons/wand.svg");
+  assert.equal((wand!.system as Record<string, unknown>).category, "wand");
+});
+
+test("toFoundryActorData maps staff inventory entries to weapon item documents", () => {
+  const actor = createActor();
+  actor.inventory = [
+    {
+      name: "Frost Staff",
+      itemType: "staff",
+      quantity: 1,
+      level: 9,
+      description: "A staff suffused with winter magic.",
+      img: null,
+    },
+  ];
+
+  const result = toFoundryActorData(actor);
+  const staff = result.items.find((item) => item.name === "Frost Staff");
+
+  assert.ok(staff, "expected custom staff inventory item");
+  assert.equal(staff!.type, "weapon");
+  assert.equal(staff!.img, "systems/pf2e/icons/default-icons/staff.svg");
+});
+
 test("importAction rejects payloads for the wrong system", async () => {
   (game as Game).system = { id: "sf2e" } as any;
   await assert.rejects(() => importAction(createAction()), /System ID mismatch/);

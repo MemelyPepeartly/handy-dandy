@@ -780,6 +780,21 @@ function resolveItemCarryType(itemType: ItemSchemaData["itemType"]): string {
   return carryType ?? "worn";
 }
 
+type FoundryCreatableItemType = "armor" | "weapon" | "equipment" | "consumable" | "feat" | "spell";
+
+function resolveFoundryItemType(itemType: ItemSchemaData["itemType"]): FoundryCreatableItemType {
+  switch (itemType) {
+    case "wand":
+      return "consumable";
+    case "staff":
+      return "weapon";
+    case "other":
+      return "equipment";
+    default:
+      return itemType;
+  }
+}
+
 function resolveCoreVersion(): string {
   const gameInstance = (globalThis as { game?: Game }).game;
   if (!gameInstance) {
@@ -1331,7 +1346,7 @@ function prepareItemSource(item: ItemSchemaData): FoundryItemSource {
   const carryType = resolveItemCarryType(item.itemType);
   const identification = resolveItemIdentification(item.itemType);
   const img = item.img?.trim() || getDefaultItemImage(item.itemType);
-  const type = item.itemType === "other" ? "equipment" : item.itemType;
+  const type = resolveFoundryItemType(item.itemType);
   const coins = priceToCoins(item.price);
   const coreVersion = resolveCoreVersion();
   const systemVersion = resolveSystemVersion();
@@ -1389,6 +1404,10 @@ function prepareItemSource(item: ItemSchemaData): FoundryItemSource {
     systemData.runes = { potency: 0, striking: 0, property: [] };
     systemData.specific = null;
     systemData.equipped = { ...systemData.equipped, handsHeld: 0 };
+  }
+
+  if (item.itemType === "wand" && type === "consumable") {
+    systemData.category = "wand";
   }
 
   const stats: FoundryItemSource["_stats"] = {
