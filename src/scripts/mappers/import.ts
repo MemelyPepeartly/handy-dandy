@@ -135,6 +135,7 @@ export type ImportOptions = {
   packId?: string;
   folderId?: string;
   actorId?: string;
+  itemId?: string;
 };
 
 type ItemCompendium = CompendiumCollection<CompendiumCollection.Metadata & { type: "Item" }>;
@@ -709,6 +710,50 @@ function priceToCoins(price: number | null | undefined): Record<string, number> 
   const cp = remainder;
 
   return { pp, gp, sp, cp };
+}
+
+const ITEM_SIZE_VALUES = new Set(["tiny", "sm", "med", "lg", "huge", "grg"]);
+
+function sanitizeNonNegativeInteger(value: unknown, fallback: number): number {
+  const candidate = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(candidate)) {
+    return fallback;
+  }
+  return Math.max(0, Math.trunc(candidate));
+}
+
+function sanitizePriceCoins(value: unknown): Record<string, number> {
+  if (!isRecord(value)) {
+    return { pp: 0, gp: 0, sp: 0, cp: 0 };
+  }
+
+  return {
+    pp: sanitizeNonNegativeInteger(value.pp, 0),
+    gp: sanitizeNonNegativeInteger(value.gp, 0),
+    sp: sanitizeNonNegativeInteger(value.sp, 0),
+    cp: sanitizeNonNegativeInteger(value.cp, 0),
+  };
+}
+
+function ensureCoreItemSystemFields(
+  systemData: FoundryItemSource["system"],
+  itemType: ItemSchemaData["itemType"],
+): void {
+  const quantityValue = sanitizeNonNegativeInteger((systemData.quantity as { value?: unknown })?.value ?? systemData.quantity, 1);
+  systemData.quantity = Math.max(1, quantityValue);
+
+  const usageCandidate = (systemData.usage as { value?: unknown })?.value;
+  const usageValue = typeof usageCandidate === "string" ? usageCandidate.trim() : "";
+  systemData.usage = { value: usageValue || resolveItemUsage(itemType) };
+
+  const bulkValue = sanitizeNonNegativeInteger((systemData.bulk as { value?: unknown })?.value, 0);
+  systemData.bulk = { value: bulkValue };
+
+  const size = typeof systemData.size === "string" ? systemData.size.trim().toLowerCase() : "";
+  systemData.size = ITEM_SIZE_VALUES.has(size) ? size : "med";
+
+  const coinRecord = sanitizePriceCoins((systemData.price as { value?: unknown } | undefined)?.value);
+  systemData.price = { value: coinRecord };
 }
 
 const ITEM_MIGRATION_VERSION = 0.946;
@@ -1647,6 +1692,8 @@ function prepareItemSource(item: ItemSchemaData): FoundryItemSource {
   if (item.itemType === "wand" && type === "consumable") {
     systemData.category = "wand";
   }
+
+  ensureCoreItemSystemFields(systemData, item.itemType);
 
   const stats: FoundryItemSource["_stats"] = {
     compendiumSource: null,
@@ -2732,10 +2779,23 @@ export async function importItem(
   assertSystemCompatibility(json.systemId);
   ensureValidItem(json);
   const source = prepareItemSource(json);
-  const { packId, folderId } = options;
+  const { packId, folderId, itemId } = options;
 
   if (folderId) {
     source.folder = folderId;
+  }
+
+  if (itemId) {
+    const targeted = (game.items as Collection<Item> | undefined)?.get(itemId);
+    if (targeted) {
+      const updateData = { ...source } as Record<string, unknown>;
+      if (folderId) {
+        updateData.folder = folderId;
+      }
+
+      await targeted.update(updateData as any);
+      return targeted;
+    }
   }
 
   if (packId) {
