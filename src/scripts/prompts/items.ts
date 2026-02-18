@@ -22,6 +22,8 @@ export interface ItemPromptInput {
   readonly itemType?: ItemCategory;
   readonly correction?: CorrectionContext;
   readonly img?: string;
+  readonly generateItemImage?: boolean;
+  readonly itemImagePrompt?: string;
   readonly publication?: PublicationData;
 }
 
@@ -113,6 +115,14 @@ function buildItemRequest(input: ItemPromptInput): string {
   const imageInstruction = renderImageInstruction(input.img);
   if (imageInstruction) {
     parts.push(imageInstruction);
+  }
+
+  if (input.generateItemImage) {
+    parts.push("Item icon generation is enabled. Keep description details vivid and icon-friendly.");
+  }
+
+  if (input.itemImagePrompt?.trim()) {
+    parts.push(`Item icon direction: ${input.itemImagePrompt.trim()}`);
   }
 
   return parts.join("\n\n");
