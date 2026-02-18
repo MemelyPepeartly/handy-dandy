@@ -127,7 +127,7 @@ test("toFoundryActionData converts canonical JSON into PF2e action data", () => 
   assert.equal(data.system.actions.value, 2);
   assert.match(
     data.system.description.value,
-    /<p>Deliver a crushing blow\.<\/p><ul><li>On a success, <span class="pf2-icon">r<\/span> is triggered\.<\/li><li>On a critical success, the target is knocked @UUID\[Compendium\.pf2e\.conditionitems\.Item\.Prone\]\{Prone\}\.<\/li><\/ul>/,
+    /<p>Deliver a crushing blow\.<\/p><ul><li>On a success, <span class="pf2-icon">r<\/span> is triggered\.<\/li><li>On a critical success, the target is knocked @UUID\[Compendium\.pf2e\.conditionitems\.Item\.j91X7x0XSomq8d60\]\{Prone\}\.<\/li><\/ul>/,
   );
   assert.equal(data.system.requirements.value, "<p>Wield a melee weapon.<\/p>");
   assert.equal(data.system.source.value, "Pathfinder Core Rulebook");
@@ -233,7 +233,7 @@ test("toFoundryActorData routes strike HTML and UUID effect text into descriptio
   assert.deepEqual(strike!.system.attackEffects.value, ["(plus on a hit, target must attempt a reflex save or be dazzled 1)"]);
   assert.equal(
     strike!.system.description.value,
-    "<p>Primary strike description.</p><p>@UUID[Compendium.pf2e.conditionitems.Item.Dazzled]{Dazzled}</p><p>The creature lashes with crackling static.</p>",
+    "<p>Primary strike description.</p><p>@UUID[Compendium.pf2e.conditionitems.Item.TkIyaNPgTZFBCCuh]{Dazzled}</p><p>The creature lashes with crackling static.</p>",
   );
 });
 
@@ -257,6 +257,59 @@ test("toFoundryActorData normalizes lowercase UUID macros inside HTML descriptio
   assert.ok(strike, "expected generated strike item");
   assert.equal(strike!.system.description.value.includes("@uuid["), false);
   assert.equal(strike!.system.description.value.includes("@UUID["), true);
+  assert.equal(
+    strike!.system.description.value.includes("@UUID[Compendium.pf2e.conditionitems.Item.TkIyaNPgTZFBCCuh]{dazzled}"),
+    true,
+  );
+});
+
+test("toFoundryActorData canonicalizes condition UUIDs that use condition names instead of IDs", () => {
+  const actor = createActor();
+  actor.strikes = [
+    {
+      name: "Rattle Fang",
+      type: "melee",
+      attackBonus: 11,
+      traits: ["magical"],
+      damage: [{ formula: "1d10+4", damageType: "piercing", notes: null }],
+      effects: [],
+      description:
+        "<p>On hit, target becomes @UUID[Compendium.pf2e.conditionitems.Item.Frightened]{Frightened 1}.</p>",
+    },
+  ];
+
+  const result = toFoundryActorData(actor);
+  const strike = result.items.find((item) => item.type === "melee" && item.name === "Rattle Fang");
+
+  assert.ok(strike, "expected generated strike item");
+  assert.equal(
+    strike!.system.description.value.includes("@UUID[Compendium.pf2e.conditionitems.Item.TBSHQspnbcqxsmjL]{Frightened 1}"),
+    true,
+  );
+  assert.equal(strike!.system.description.value.includes(".Item.Frightened]"), false);
+});
+
+test("toFoundryActorData converts markdown emphasis inside HTML action descriptions", () => {
+  const actor = createActor();
+  actor.actions = [
+    {
+      name: "Cinematic Rant",
+      actionCost: "one-action",
+      description: "<p>**Requirements** The creature must be heard.</p><p>**Frequency** once per 10 minutes</p>",
+      traits: ["auditory"],
+      requirements: null,
+      trigger: null,
+      frequency: null,
+    },
+  ];
+
+  const result = toFoundryActorData(actor);
+  const action = result.items.find((item) => item.type === "action" && item.name === "Cinematic Rant");
+
+  assert.ok(action, "expected generated action item");
+  assert.equal(action!.system.description.value.includes("**Requirements**"), false);
+  assert.equal(action!.system.description.value.includes("<strong>Requirements</strong>"), true);
+  assert.equal(action!.system.description.value.includes("<strong>Frequency</strong>"), true);
 });
 
 test("toFoundryActorData links condition-style strike effects in descriptions", () => {
@@ -278,8 +331,31 @@ test("toFoundryActorData links condition-style strike effects in descriptions", 
 
   assert.ok(strike, "expected generated strike item");
   assert.deepEqual(strike!.system.attackEffects.value, ["off-guard", "dazzled"]);
-  assert.match(strike!.system.description.value, /@UUID\[Compendium\.pf2e\.conditionitems\.Item\.Off-Guard\]\{Off-Guard\}/);
-  assert.match(strike!.system.description.value, /@UUID\[Compendium\.pf2e\.conditionitems\.Item\.Dazzled\]\{Dazzled\}/);
+  assert.match(strike!.system.description.value, /@UUID\[Compendium\.pf2e\.conditionitems\.Item\.AJh5ex99aV6VTggg\]\{Off-Guard\}/);
+  assert.match(strike!.system.description.value, /@UUID\[Compendium\.pf2e\.conditionitems\.Item\.TkIyaNPgTZFBCCuh\]\{Dazzled\}/);
+});
+
+test("toFoundryActorData links staged condition effects in strike descriptions without unknown attack effects", () => {
+  const actor = createActor();
+  actor.strikes = [
+    {
+      name: "Mind Spike",
+      type: "melee",
+      attackBonus: 14,
+      traits: ["magical"],
+      damage: [{ formula: "2d8+5", damageType: "mental", notes: null }],
+      effects: ["frightened 1", "stupefied 2"],
+      description: null,
+    },
+  ];
+
+  const result = toFoundryActorData(actor);
+  const strike = result.items.find((item) => item.type === "melee" && item.name === "Mind Spike");
+
+  assert.ok(strike, "expected generated strike item");
+  assert.deepEqual(strike!.system.attackEffects.value, []);
+  assert.match(strike!.system.description.value, /@UUID\[Compendium\.pf2e\.conditionitems\.Item\.TBSHQspnbcqxsmjL\]\{Frightened 1\}/);
+  assert.match(strike!.system.description.value, /@UUID\[Compendium\.pf2e\.conditionitems\.Item\.e1XGnhKNSQIm5IXg\]\{Stupefied 2\}/);
 });
 
 test("toFoundryActorData applies fallback images to custom inventory items", () => {

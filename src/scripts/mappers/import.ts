@@ -1790,9 +1790,13 @@ const LINKABLE_CONDITION_EFFECTS = new Set([
   "flat-footed",
 ]);
 
+function resolveLinkableConditionEffect(value: string): string | null {
+  const normalized = normalizeLookupKey(value).replace(/-\d+$/, "");
+  return LINKABLE_CONDITION_EFFECTS.has(normalized) ? normalized : null;
+}
+
 function isLinkableConditionEffect(value: string): boolean {
-  const normalized = normalizeLookupKey(value);
-  return LINKABLE_CONDITION_EFFECTS.has(normalized);
+  return resolveLinkableConditionEffect(value) !== null;
 }
 
 function splitStrikeEffects(
@@ -1819,8 +1823,13 @@ function splitStrikeEffects(
       continue;
     }
 
-    if (isLinkableConditionEffect(effect)) {
+    const linkableCondition = resolveLinkableConditionEffect(effect);
+    if (linkableCondition) {
       descriptionAdditions.push(effect);
+      if (normalizeLookupKey(effect) === linkableCondition && SLUG_EFFECT_PATTERN.test(effect)) {
+        attackEffects.push(effect.toLowerCase());
+      }
+      continue;
     }
 
     attackEffects.push(SLUG_EFFECT_PATTERN.test(effect) ? effect.toLowerCase() : effect);

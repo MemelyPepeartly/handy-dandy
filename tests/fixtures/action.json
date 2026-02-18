@@ -10,7 +10,7 @@
     "press"
   ],
   "requirements": "Wield a melee weapon.",
-  "description": "Deliver a crushing blow.\n\n• On a success, r is triggered.\n• On a critical success, the target is knocked @UUID[Compendium.pf2e.conditionitems.Item.Prone]{Prone}.",
+  "description": "Deliver a crushing blow.\n\n• On a success, r is triggered.\n• On a critical success, the target is knocked @UUID[Compendium.pf2e.conditionitems.Item.j91X7x0XSomq8d60]{Prone}.",
   "rarity": "uncommon",
   "img": "icons/actions/stunning-strike.webp",
   "source": "Pathfinder Core Rulebook",

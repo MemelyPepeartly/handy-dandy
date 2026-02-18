@@ -39,39 +39,55 @@ const OUTCOME_HEADERS = [
   "Critical Failure",
 ] as const;
 
-const CONDITION_LINK_TARGETS: Record<string, string> = {
-  blinded: "Blinded",
-  clumsy: "Clumsy",
-  concealed: "Concealed",
-  confused: "Confused",
-  controlled: "Controlled",
-  dazzled: "Dazzled",
-  deafened: "Deafened",
-  doomed: "Doomed",
-  drained: "Drained",
-  enfeebled: "Enfeebled",
-  fascinated: "Fascinated",
-  fatigued: "Fatigued",
-  fleeing: "Fleeing",
-  frightened: "Frightened",
-  grabbed: "Grabbed",
-  hidden: "Hidden",
-  immobilized: "Immobilized",
-  invisible: "Invisible",
-  "off-guard": "Off-Guard",
-  paralyzed: "Paralyzed",
-  petrified: "Petrified",
-  prone: "Prone",
-  quickened: "Quickened",
-  restrained: "Restrained",
-  sickened: "Sickened",
-  slowed: "Slowed",
-  stunned: "Stunned",
-  stupefied: "Stupefied",
-  unconscious: "Unconscious",
-  wounded: "Wounded",
-  "flat-footed": "Off-Guard",
+const CONDITION_DEFINITIONS = {
+  blinded: { label: "Blinded", id: "XgEqL1kFApUbl5Z2" },
+  clumsy: { label: "Clumsy", id: "i3OJZU2nk64Df3xm" },
+  concealed: { label: "Concealed", id: "DmAIPqOBomZ7H95W" },
+  confused: { label: "Confused", id: "yblD8fOR1J8rDwEQ" },
+  controlled: { label: "Controlled", id: "9qGBRpbX9NEwtAAr" },
+  dazzled: { label: "Dazzled", id: "TkIyaNPgTZFBCCuh" },
+  deafened: { label: "Deafened", id: "9PR9y0bi4JPKnHPR" },
+  doomed: { label: "Doomed", id: "3uh1r86TzbQvosxv" },
+  drained: { label: "Drained", id: "4D2KBtexWXa6oUMR" },
+  enfeebled: { label: "Enfeebled", id: "MIRkyAjyBeXivMa7" },
+  fascinated: { label: "Fascinated", id: "AdPVz7rbaVSRxHFg" },
+  fatigued: { label: "Fatigued", id: "HL2l2VRSaQHu9lUw" },
+  fleeing: { label: "Fleeing", id: "sDPxOjQ9kx2RZE8D" },
+  frightened: { label: "Frightened", id: "TBSHQspnbcqxsmjL" },
+  grabbed: { label: "Grabbed", id: "kWc1fhmv9LBiTuei" },
+  hidden: { label: "Hidden", id: "iU0fEDdBp3rXpTMC" },
+  immobilized: { label: "Immobilized", id: "eIcWbB5o3pP6OIMe" },
+  invisible: { label: "Invisible", id: "zJxUflt9np0q4yML" },
+  "off-guard": { label: "Off-Guard", id: "AJh5ex99aV6VTggg" },
+  paralyzed: { label: "Paralyzed", id: "6uEgoh53GbXuHpTF" },
+  petrified: { label: "Petrified", id: "dTwPJuKgBQCMxixg" },
+  prone: { label: "Prone", id: "j91X7x0XSomq8d60" },
+  quickened: { label: "Quickened", id: "nlCjDvLMf2EkV2dl" },
+  restrained: { label: "Restrained", id: "VcDeM8A5oI6VqhbM" },
+  sickened: { label: "Sickened", id: "fesd1n5eVhpCSS18" },
+  slowed: { label: "Slowed", id: "xYTAsEpcJE1Ccni3" },
+  stunned: { label: "Stunned", id: "dfCMdR4wnpbYNTix" },
+  stupefied: { label: "Stupefied", id: "e1XGnhKNSQIm5IXg" },
+  unconscious: { label: "Unconscious", id: "fBnFDH2MTzgFijKf" },
+  wounded: { label: "Wounded", id: "Yl48xTdMh3aeQYL2" },
+} as const;
+
+type ConditionSlug = keyof typeof CONDITION_DEFINITIONS;
+
+const CONDITION_ALIASES: Record<string, ConditionSlug> = {
+  "flat-footed": "off-guard",
 };
+
+const CONDITION_LINK_KEYS: string[] = [
+  ...Object.keys(CONDITION_DEFINITIONS),
+  ...Object.keys(CONDITION_ALIASES),
+];
+
+const CONDITION_UUID_PATTERN =
+  /@UUID\[Compendium\.pf2e\.(?:conditionitems|conditions)(?:\.Item)?\.([^\]\}]+)\](?:\{([^}]*)\})?/gi;
+const CONDITION_COMPENDIUM_PATTERN =
+  /@Compendium\[pf2e\.(?:conditionitems|conditions)\.([^\]\}]+)\](?:\{([^}]*)\})?/gi;
+const CONDITION_ID_PATTERN = /^[A-Za-z0-9]{16}$/;
 
 const DETAIL_HEADERS = [
   "Activate",
@@ -196,21 +212,117 @@ function applyInlineTemplates(value: string): string {
   );
 }
 
+function normalizeLookupKey(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/['"`\u2019]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function resolveConditionSlug(value: string | null | undefined): ConditionSlug | null {
+  if (!value) {
+    return null;
+  }
+
+  const normalized = normalizeLookupKey(value);
+  if (!normalized) {
+    return null;
+  }
+
+  const withoutStage = normalized.replace(/-\d+$/, "");
+  if (Object.hasOwn(CONDITION_DEFINITIONS, withoutStage)) {
+    return withoutStage as ConditionSlug;
+  }
+
+  const alias = CONDITION_ALIASES[withoutStage];
+  return alias ?? null;
+}
+
+function resolveConditionSlugFromId(id: string): ConditionSlug | null {
+  for (const [slug, definition] of Object.entries(CONDITION_DEFINITIONS) as Array<[ConditionSlug, { id: string }]>) {
+    if (definition.id === id) {
+      return slug;
+    }
+  }
+  return null;
+}
+
+function resolveConditionLabel(slug: ConditionSlug, fallbackLabel: string | null, sourceText?: string): string {
+  const trimmedFallback = fallbackLabel?.trim();
+  if (trimmedFallback) {
+    return trimmedFallback;
+  }
+
+  const baseLabel = CONDITION_DEFINITIONS[slug].label;
+  const stage = sourceText?.trim().match(/(?:^|\s)(\d+)(?:$|\s)/)?.[1];
+  return stage ? `${baseLabel} ${stage}` : baseLabel;
+}
+
+function buildConditionUuidMacro(slug: ConditionSlug, label: string): string {
+  const conditionId = CONDITION_DEFINITIONS[slug].id;
+  return `@UUID[Compendium.pf2e.conditionitems.Item.${conditionId}]{${label}}`;
+}
+
+function normalizeConditionMacros(value: string): string {
+  let next = value.replace(CONDITION_UUID_PATTERN, (macro, rawTarget: string, rawLabel: string | undefined) => {
+    const target = rawTarget.trim();
+    const label = rawLabel?.trim() || null;
+
+    if (CONDITION_ID_PATTERN.test(target)) {
+      const slug = resolveConditionSlugFromId(target);
+      if (!slug) {
+        return macro;
+      }
+      return buildConditionUuidMacro(slug, resolveConditionLabel(slug, label, label ?? undefined));
+    }
+
+    const slug = resolveConditionSlug(target) ?? resolveConditionSlug(label);
+    if (!slug) {
+      return macro;
+    }
+
+    return buildConditionUuidMacro(slug, resolveConditionLabel(slug, label, `${target} ${label ?? ""}`));
+  });
+
+  next = next.replace(CONDITION_COMPENDIUM_PATTERN, (macro, rawTarget: string, rawLabel: string | undefined) => {
+    const target = rawTarget.trim();
+    const label = rawLabel?.trim() || null;
+    const slug = resolveConditionSlug(target) ?? resolveConditionSlug(label);
+    if (!slug) {
+      return macro;
+    }
+
+    return buildConditionUuidMacro(slug, resolveConditionLabel(slug, label, `${target} ${label ?? ""}`));
+  });
+
+  return next;
+}
+
 function applyConditionLinks(value: string): string {
+  const canonicalMacros = normalizeConditionMacros(value);
   const macros: string[] = [];
-  const masked = value.replace(INLINE_MACRO_PATTERN, (macro) => {
+  const masked = canonicalMacros.replace(INLINE_MACRO_PATTERN, (macro) => {
     const id = macros.push(macro) - 1;
     return `@@HD_MACRO_${id}@@`;
   });
 
   let next = masked;
-  const keys = Object.keys(CONDITION_LINK_TARGETS).sort((a, b) => b.length - a.length);
+  const keys = CONDITION_LINK_KEYS.sort((a, b) => b.length - a.length);
   for (const key of keys) {
-    const target = CONDITION_LINK_TARGETS[key];
-    const pattern = new RegExp(`\\b${key.replace(/-/g, "[-\\s]")}\\b(?:\\s+(\\d+))?`, "gi");
+    const slug = resolveConditionSlug(key);
+    if (!slug) {
+      continue;
+    }
+    const pattern = new RegExp(`\\b${escapeRegExp(key).replace(/-/g, "[-\\s]")}\\b(?:\\s+(\\d+))?`, "gi");
     next = next.replace(pattern, (_match, stage: string | undefined) => {
-      const label = stage ? `${target} ${stage}` : target;
-      return `@UUID[Compendium.pf2e.conditionitems.Item.${target}]{${label}}`;
+      const label = resolveConditionLabel(slug, null, stage);
+      return buildConditionUuidMacro(slug, label);
     });
   }
 
@@ -268,7 +380,8 @@ function formatInline(value: string): string {
 
 function normalizeExistingHtmlRichText(value: string): string {
   const withMacros = normalizeInlineMacroCasing(value);
-  return applyConditionLinks(withMacros);
+  const withMarkdown = applyInlineMarkdown(withMacros);
+  return applyConditionLinks(withMarkdown);
 }
 
 function buildParagraph(lines: string[]): string {
