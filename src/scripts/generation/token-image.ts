@@ -9,6 +9,8 @@ export interface GenerateTokenImageOptions {
   actorSlug: string;
   actorDescription?: string | null;
   customPrompt?: string | null;
+  promptOverride?: string | null;
+  referenceImage?: File | null;
   imageCategory?: "actor" | "item";
 }
 
@@ -136,7 +138,7 @@ async function uploadImage(
   return null;
 }
 
-function buildTokenPrompt(options: GenerateTokenImageOptions): string {
+export function buildTransparentTokenPrompt(options: GenerateTokenImageOptions): string {
   const parts: string[] = [
     `Create a Pathfinder-style monster token portrait for "${options.actorName}".`,
     "Transparent background only.",
@@ -205,12 +207,14 @@ export async function generateTransparentTokenImage(
   generator: TokenImageGenerator,
   options: GenerateTokenImageOptions,
 ): Promise<string> {
-  const prompt = buildTokenPrompt(options);
+  const prompt = options.promptOverride?.trim() || buildTransparentTokenPrompt(options);
+  const referenceImages = options.referenceImage ? [options.referenceImage] : undefined;
   const image = await generator.generateImage(prompt, {
     background: "transparent",
     size: "1024x1024",
     format: "png",
     quality: "high",
+    referenceImages,
   });
 
   return storeGeneratedImage(
