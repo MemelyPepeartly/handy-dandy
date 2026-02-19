@@ -1555,14 +1555,48 @@ function resolveEmbeddedItemFallbackImage(item: FoundryActorItemSource): string 
 
 function ensureEmbeddedItemImage(item: FoundryActorItemSource): FoundryActorItemSource {
   const currentImg = typeof item.img === "string" ? item.img.trim() : "";
-  if (currentImg.length > 0) {
-    return item;
+  const fallback = resolveEmbeddedItemFallbackImage(item);
+
+  if (currentImg.length === 0) {
+    return {
+      ...item,
+      img: fallback,
+    };
   }
 
-  return {
-    ...item,
-    img: resolveEmbeddedItemFallbackImage(item),
-  };
+  if (NON_ITEM_EMBEDDED_IMAGE_PATTERNS.some((pattern) => pattern.test(currentImg))) {
+    return {
+      ...item,
+      img: fallback,
+    };
+  }
+
+  const isPf2eDefaultIcon = /systems\/pf2e\/icons\/default-icons\//i.test(currentImg);
+  if (isPf2eDefaultIcon && currentImg !== fallback) {
+    return {
+      ...item,
+      img: fallback,
+    };
+  }
+
+  return item;
+}
+
+function ensureAllEmbeddedItemImages(items: FoundryActorItemSource[]): FoundryActorItemSource[] {
+  return items.map((item) => ensureEmbeddedItemImage(item));
+}
+
+async function resolveActorItems(items: FoundryActorItemSource[]): Promise<FoundryActorItemSource[]> {
+  if (!items.length) {
+    return items;
+  }
+
+  const resolved: FoundryActorItemSource[] = [];
+  for (const item of items) {
+    resolved.push(await resolveItemFromCompendium(item));
+  }
+
+  return ensureAllEmbeddedItemImages(resolved);
 }
 
 async function resolveItemFromCompendium(
@@ -1579,19 +1613,6 @@ async function resolveItemFromCompendium(
   }
 
   return ensureEmbeddedItemImage(mergeCompendiumActorItem(item, resolved));
-}
-
-async function resolveActorItems(items: FoundryActorItemSource[]): Promise<FoundryActorItemSource[]> {
-  if (!items.length) {
-    return items;
-  }
-
-  const resolved: FoundryActorItemSource[] = [];
-  for (const item of items) {
-    resolved.push(await resolveItemFromCompendium(item));
-  }
-
-  return resolved;
 }
 
 function prepareActionSource(action: ActionSchemaData): FoundryActionSource {
@@ -2473,26 +2494,93 @@ function createSpellItem(
   };
 }
 
-function mapInventoryItemType(value: unknown): ItemSchemaData["itemType"] {
-  if (typeof value !== "string") {
-    return "equipment";
+const NON_ITEM_EMBEDDED_IMAGE_PATTERNS = [
+  /icons\/svg\/mystery-man\.svg$/i,
+  /systems\/pf2e\/icons\/default-icons\/npc\.svg$/i,
+];
+
+const INVENTORY_DEFAULT_IMAGE_OVERRIDE_PATTERNS = [
+  ...NON_ITEM_EMBEDDED_IMAGE_PATTERNS,
+  /icons\/svg\/[^/]+\.svg$/i,
+  /^https?:\/\//i,
+  /^data:image\//i,
+];
+
+function inferInventoryItemTypeFromText(text: string): ItemSchemaData["itemType"] | null {
+  if (!text) {
+    return null;
   }
 
-  const normalized = value.trim().toLowerCase();
-  switch (normalized) {
-    case "armor":
-    case "weapon":
-    case "equipment":
-    case "consumable":
-    case "feat":
-    case "spell":
-    case "wand":
-    case "staff":
-    case "other":
-      return normalized;
-    default:
-      return "equipment";
+  const normalized = text.toLowerCase();
+  if (/\b(wand|magic wand)\b/.test(normalized)) return "wand";
+  if (/\b(staff|stave|quarterstaff)\b/.test(normalized)) return "staff";
+  if (/\b(spell|cantrip|ritual)\b/.test(normalized)) return "spell";
+  if (/\b(feat|ability)\b/.test(normalized)) return "feat";
+  if (/\b(potion|elixir|bomb|poison|talisman|scroll|mutagen|consumable|ammunition|ammo)\b/.test(normalized)) {
+    return "consumable";
   }
+  if (/\b(weapon|sword|axe|bow|crossbow|spear|dagger|mace|hammer|flail|staff sling)\b/.test(normalized)) {
+    return "weapon";
+  }
+  if (/\b(armor|armour|shield|mail|breastplate|plate|helm|gauntlet)\b/.test(normalized)) {
+    return "armor";
+  }
+  if (/\b(tool|kit|gear|equipment)\b/.test(normalized)) return "equipment";
+  return null;
+}
+
+function mapInventoryItemType(
+  value: unknown,
+  fallbackName?: string | null,
+  fallbackDescription?: string | null,
+): ItemSchemaData["itemType"] {
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    switch (normalized) {
+      case "armor":
+      case "weapon":
+      case "equipment":
+      case "consumable":
+      case "feat":
+      case "spell":
+      case "wand":
+      case "staff":
+      case "other":
+        return normalized;
+      default:
+        break;
+    }
+  }
+
+  const inferred = inferInventoryItemTypeFromText(
+    [fallbackName, fallbackDescription]
+      .filter((candidate): candidate is string => typeof candidate === "string" && candidate.trim().length > 0)
+      .join(" "),
+  );
+
+  return inferred ?? "equipment";
+}
+
+function normalizeInventoryEntryImage(
+  img: string | null | undefined,
+  itemType: ItemSchemaData["itemType"],
+): string | null {
+  const trimmed = typeof img === "string" ? img.trim() : "";
+  if (!trimmed) {
+    return null;
+  }
+
+  if (INVENTORY_DEFAULT_IMAGE_OVERRIDE_PATTERNS.some((pattern) => pattern.test(trimmed))) {
+    return getDefaultItemImage(itemType);
+  }
+
+  const expectedDefault = getDefaultItemImage(itemType);
+  const isPf2eDefaultIcon = /systems\/pf2e\/icons\/default-icons\//i.test(trimmed);
+  if (isPf2eDefaultIcon && trimmed !== expectedDefault) {
+    return expectedDefault;
+  }
+
+  return trimmed;
 }
 
 function createInventoryItem(
@@ -2500,8 +2588,9 @@ function createInventoryItem(
   entry: ActorInventoryEntry,
   index: number,
 ): FoundryActorGenericItemSource {
-  const itemType = mapInventoryItemType(entry.itemType);
+  const itemType = mapInventoryItemType(entry.itemType, entry.name, entry.description);
   const slug = entry.slug?.trim() || toSlug(entry.name) || toSlug(generateId());
+  const normalizedImg = normalizeInventoryEntryImage(entry.img ?? null, itemType);
   const source = prepareItemSource({
     schema_version: actor.schema_version,
     systemId: actor.systemId,
@@ -2514,7 +2603,7 @@ function createInventoryItem(
     price: null,
     traits: [],
     description: entry.description ?? "",
-    img: entry.img ?? null,
+    img: normalizedImg,
     source: actor.source,
     publication: actor.publication,
   });
