@@ -21,10 +21,11 @@ export interface GenerateItemImageOptions {
   customPrompt?: string | null;
 }
 
-const GENERATED_IMAGE_ROOT = "handy-dandy/generated-images";
+// Foundry VTT v13 introduces /assets for persistent user-managed files. Avoid module directories for uploads.
+const GENERATED_IMAGE_ROOT = "assets/handy-dandy/generated-images";
 const IMAGE_CATEGORY_DIRECTORY: Record<NonNullable<GenerateTokenImageOptions["imageCategory"]>, string> = {
-  actor: "Actor",
-  item: "Item",
+  actor: "actors",
+  item: "items",
 };
 
 function sanitizeFilename(value: string): string {

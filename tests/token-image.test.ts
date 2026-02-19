@@ -4,7 +4,7 @@ import { generateItemImage, generateTransparentTokenImage } from "../src/scripts
 
 const SAMPLE_BASE64 = Buffer.from([0x89, 0x50, 0x4e, 0x47]).toString("base64");
 
-test("generateTransparentTokenImage uploads actor images into the Actor directory", async () => {
+test("generateTransparentTokenImage uploads actor images into the actors directory", async () => {
   const priorPicker = (globalThis as { FilePicker?: unknown }).FilePicker;
   const createdDirectories: string[] = [];
   let uploadTarget = "";
@@ -31,16 +31,16 @@ test("generateTransparentTokenImage uploads actor images into the Actor director
       },
     );
 
-    assert.equal(uploadTarget, "handy-dandy/generated-images/Actor");
-    assert.ok(createdDirectories.includes("handy-dandy/generated-images/Actor"));
-    assert.ok(result.startsWith("handy-dandy/generated-images/Actor/"));
+    assert.equal(uploadTarget, "assets/handy-dandy/generated-images/actors");
+    assert.ok(createdDirectories.includes("assets/handy-dandy/generated-images/actors"));
+    assert.ok(result.startsWith("assets/handy-dandy/generated-images/actors/"));
     assert.ok(result.endsWith(".png"));
   } finally {
     (globalThis as { FilePicker?: unknown }).FilePicker = priorPicker;
   }
 });
 
-test("generateTransparentTokenImage uploads item images into the Item directory", async () => {
+test("generateTransparentTokenImage uploads item images into the items directory", async () => {
   const priorPicker = (globalThis as { FilePicker?: unknown }).FilePicker;
   let uploadTarget = "";
 
@@ -66,7 +66,7 @@ test("generateTransparentTokenImage uploads item images into the Item directory"
       },
     );
 
-    assert.equal(uploadTarget, "handy-dandy/generated-images/Item");
+    assert.equal(uploadTarget, "assets/handy-dandy/generated-images/items");
   } finally {
     (globalThis as { FilePicker?: unknown }).FilePicker = priorPicker;
   }
@@ -105,7 +105,7 @@ test("generateTransparentTokenImage falls back to a data URI when upload fails",
   }
 });
 
-test("generateItemImage stores generated item art in the Item directory", async () => {
+test("generateItemImage stores generated item art in the items directory", async () => {
   const priorPicker = (globalThis as { FilePicker?: unknown }).FilePicker;
   let uploadTarget = "";
 
@@ -130,8 +130,8 @@ test("generateItemImage stores generated item art in the Item directory", async 
       },
     );
 
-    assert.equal(uploadTarget, "handy-dandy/generated-images/Item");
-    assert.ok(result.startsWith("handy-dandy/generated-images/Item/"));
+    assert.equal(uploadTarget, "assets/handy-dandy/generated-images/items");
+    assert.ok(result.startsWith("assets/handy-dandy/generated-images/items/"));
     assert.ok(result.endsWith(".png"));
   } finally {
     (globalThis as { FilePicker?: unknown }).FilePicker = priorPicker;
