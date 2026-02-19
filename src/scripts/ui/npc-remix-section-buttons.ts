@@ -1,4 +1,4 @@
-import { runNpcRemixFlow } from "../flows/npc-remix";
+import { runNpcInventoryRemixFlow, runNpcSpellRemixFlow } from "../flows/npc-section-remix";
 
 const BUTTON_BASE_CLASS = "handy-dandy-npc-remix-section-button" as const;
 const BUTTON_ROW_CLASS = "handy-dandy-npc-remix-section-controls" as const;
@@ -82,10 +82,7 @@ export function registerNpcRemixSectionButtons(): void {
       "Remix NPC inventory and equipment",
       "fas fa-toolbox",
       () => {
-        void runNpcRemixFlow(actor, {
-          mode: "equipment",
-          title: "Equipment Remix",
-        });
+        void runNpcInventoryRemixFlow(actor);
       },
     );
 
@@ -97,10 +94,7 @@ export function registerNpcRemixSectionButtons(): void {
       "Remix NPC spellcasting entries and spells",
       "fas fa-book-sparkles",
       () => {
-        void runNpcRemixFlow(actor, {
-          mode: "spells",
-          title: "Spellcasting Remix",
-        });
+        void runNpcSpellRemixFlow(actor);
       },
     );
   });
