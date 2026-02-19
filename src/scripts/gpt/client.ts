@@ -133,6 +133,7 @@ export interface GenerateImageOptions {
   background?: "transparent" | "opaque";
   quality?: "low" | "medium" | "high";
   format?: "png" | "webp";
+  referenceImages?: File[];
 }
 
 export interface GeneratedImageResult {
@@ -247,19 +248,42 @@ export class GPTClient {
   ): Promise<GeneratedImageResult> {
     const model = options.model ?? this.#config.imageModel;
     const format = options.format ?? "png";
+    const referenceImages = options.referenceImages?.filter((entry): entry is File => entry instanceof File) ?? [];
 
-    const request: Record<string, unknown> = {
+    if (referenceImages.length > 16) {
+      throw new Error("OpenAI image edits support up to 16 reference images.");
+    }
+
+    const requestBase: Record<string, unknown> = {
       model,
       prompt,
       size: options.size ?? "1024x1024",
       background: options.background ?? "transparent",
       quality: options.quality ?? "high",
-      output_format: format,
     };
 
-    const response = await (this.#openai.images as unknown as {
+    const images = this.#openai.images as unknown as {
       generate: (input: unknown) => Promise<unknown>;
-    }).generate(request);
+      edit?: (input: unknown) => Promise<unknown>;
+    };
+
+    const usesImageEdit = referenceImages.length > 0;
+    const response = usesImageEdit
+      ? await (() => {
+        if (typeof images.edit !== "function") {
+          throw new Error("OpenAI image edit API is unavailable.");
+        }
+
+        const editRequest: Record<string, unknown> = {
+          ...requestBase,
+          image: referenceImages.length === 1 ? referenceImages[0] : referenceImages,
+        };
+        return images.edit(editRequest);
+      })()
+      : await images.generate({
+        ...requestBase,
+        output_format: format,
+      });
 
     const payload = response as {
       data?: Array<{
@@ -280,7 +304,7 @@ export class GPTClient {
         ? first.b64Json
         : null;
 
-    let mimeType = format === "webp" ? "image/webp" : "image/png";
+    let mimeType = usesImageEdit ? "image/png" : format === "webp" ? "image/webp" : "image/png";
     const modelMimeType = typeof first?.mime_type === "string"
       ? first.mime_type
       : typeof first?.mimeType === "string"
