@@ -137,3 +137,32 @@ test("generateItemImage stores generated item art in the Item directory", async 
     (globalThis as { FilePicker?: unknown }).FilePicker = priorPicker;
   }
 });
+
+test("generateTransparentTokenImage supports prompt override and reference images", async () => {
+  const referenceImage = new File([Buffer.from("ref")], "ref.png", { type: "image/png" });
+  let capturedPrompt = "";
+  let capturedOptions: unknown;
+
+  await generateTransparentTokenImage(
+    {
+      generateImage: async (prompt, options) => {
+        capturedPrompt = prompt;
+        capturedOptions = options;
+        return { base64: SAMPLE_BASE64, mimeType: "image/png" };
+      },
+    },
+    {
+      actorName: "Prompt Override Test",
+      actorSlug: "prompt-override-test",
+      promptOverride: "Custom portrait prompt",
+      referenceImage,
+    },
+  );
+
+  assert.equal(capturedPrompt, "Custom portrait prompt");
+  assert.equal((capturedOptions as { referenceImages?: File[] }).referenceImages?.length, 1);
+  assert.equal(
+    (capturedOptions as { referenceImages?: File[] }).referenceImages?.[0],
+    referenceImage,
+  );
+});
