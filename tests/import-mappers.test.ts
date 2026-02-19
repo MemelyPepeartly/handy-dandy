@@ -510,6 +510,47 @@ test("toFoundryActorData applies fallback images to custom inventory items", () 
   assert.equal(inventoryItem!.img, "systems/pf2e/icons/default-icons/equipment.svg");
 });
 
+test("toFoundryActorData normalizes placeholder inventory icons to PF2E category defaults", () => {
+  const actor = createActor();
+  actor.inventory = [
+    {
+      name: "Flash Bomb",
+      itemType: "consumable",
+      quantity: 2,
+      level: 3,
+      description: "A bright explosive bomb.",
+      img: "icons/svg/item-bag.svg",
+    },
+  ];
+
+  const result = toFoundryActorData(actor);
+  const inventoryItem = result.items.find((item) => item.name === "Flash Bomb");
+
+  assert.ok(inventoryItem, "expected custom inventory item");
+  assert.equal(inventoryItem!.img, "systems/pf2e/icons/default-icons/consumable.svg");
+});
+
+test("toFoundryActorData infers inventory item category from text when itemType is missing", () => {
+  const actor = createActor();
+  actor.inventory = [
+    {
+      name: "Rune Longsword",
+      itemType: null,
+      quantity: 1,
+      level: 5,
+      description: "A weapon etched with runes.",
+      img: "https://example.com/rune-longsword.png",
+    },
+  ];
+
+  const result = toFoundryActorData(actor);
+  const inventoryItem = result.items.find((item) => item.name === "Rune Longsword");
+
+  assert.ok(inventoryItem, "expected custom inventory item");
+  assert.equal(inventoryItem!.type, "weapon");
+  assert.equal(inventoryItem!.img, "systems/pf2e/icons/default-icons/weapon.svg");
+});
+
 test("toFoundryActorData maps wand inventory entries to consumable item documents", () => {
   const actor = createActor();
   actor.inventory = [
