@@ -337,3 +337,58 @@ test("generateTransparentTokenImage strips world-relative path prefixes from con
     (globalThis as { game?: unknown }).game = priorGame;
   }
 });
+
+test("generateTransparentTokenImage prefers Foundry namespaced FilePicker implementation", async () => {
+  const priorFoundry = (globalThis as { foundry?: unknown }).foundry;
+  const priorGlobalPickerDescriptor = Object.getOwnPropertyDescriptor(globalThis, "FilePicker");
+  let uploadTarget = "";
+
+  Object.defineProperty(globalThis, "FilePicker", {
+    configurable: true,
+    get: () => {
+      throw new Error("legacy global FilePicker accessed");
+    },
+  });
+
+  (globalThis as { foundry?: unknown }).foundry = {
+    applications: {
+      apps: {
+        FilePicker: {
+          implementation: {
+            createDirectory: async () => {
+              /* no-op */
+            },
+            browse: async () => ({ files: [] }),
+            upload: async (_source: string, target: string, file: File) => {
+              uploadTarget = target;
+              return { path: `${target}/${file.name}` };
+            },
+          },
+        },
+      },
+    },
+  };
+
+  try {
+    const result = await generateTransparentTokenImage(
+      {
+        generateImage: async () => ({ base64: SAMPLE_BASE64, mimeType: "image/png" }),
+      },
+      {
+        actorName: "Namespaced Picker",
+        actorSlug: "namespaced-picker",
+        imageCategory: "actor",
+      },
+    );
+
+    assert.equal(uploadTarget, "assets/handy-dandy/actors/namespaced-picker");
+    assert.ok(result.startsWith("assets/handy-dandy/actors/namespaced-picker/namespaced-picker-"));
+  } finally {
+    (globalThis as { foundry?: unknown }).foundry = priorFoundry;
+    if (priorGlobalPickerDescriptor) {
+      Object.defineProperty(globalThis, "FilePicker", priorGlobalPickerDescriptor);
+    } else {
+      delete (globalThis as { FilePicker?: unknown }).FilePicker;
+    }
+  }
+});

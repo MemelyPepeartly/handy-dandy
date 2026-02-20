@@ -32,6 +32,51 @@ const IMAGE_CATEGORY_DIRECTORY: Record<NonNullable<GenerateTokenImageOptions["im
   item: "items",
 };
 
+interface FilePickerImplementation {
+  createDirectory?: (
+    source: string,
+    target: string,
+    options?: Record<string, unknown>,
+  ) => Promise<unknown>;
+  upload?: (
+    source: string,
+    target: string,
+    file: File,
+    body?: Record<string, unknown>,
+    options?: Record<string, unknown>,
+  ) => Promise<{ path?: string; files?: string[] }>;
+  browse?: (
+    source: string,
+    target: string,
+    options?: Record<string, unknown>,
+  ) => Promise<{ files?: string[] }>;
+}
+
+function getFilePickerImplementation(): FilePickerImplementation | undefined {
+  const namespacedImplementation = (globalThis as {
+    foundry?: {
+      applications?: {
+        apps?: {
+          FilePicker?: {
+            implementation?: unknown;
+          };
+        };
+      };
+    };
+  }).foundry?.applications?.apps?.FilePicker?.implementation as FilePickerImplementation | undefined;
+
+  if (namespacedImplementation) {
+    return namespacedImplementation;
+  }
+
+  // Fallback for older Foundry versions that still expose a global FilePicker.
+  if ("FilePicker" in globalThis) {
+    return (globalThis as { FilePicker?: unknown }).FilePicker as FilePickerImplementation | undefined;
+  }
+
+  return undefined;
+}
+
 function sanitizeFilename(value: string): string {
   return value
     .trim()
@@ -151,15 +196,7 @@ function getConfiguredImageRoot(): string {
 }
 
 async function ensureDataDirectory(path: string): Promise<void> {
-  const picker = (globalThis as { FilePicker?: unknown }).FilePicker as
-    | {
-    createDirectory?: (
-      source: string,
-      target: string,
-      options?: Record<string, unknown>,
-    ) => Promise<unknown>;
-  }
-    | undefined;
+  const picker = getFilePickerImplementation();
 
   if (!picker || typeof picker.createDirectory !== "function") {
     return;
@@ -188,17 +225,7 @@ async function uploadImage(
   fileName: string,
   targetDir: string,
 ): Promise<string | null> {
-  const picker = (globalThis as { FilePicker?: unknown }).FilePicker as
-    | {
-    upload?: (
-      source: string,
-      target: string,
-      file: File,
-      body?: Record<string, unknown>,
-      options?: Record<string, unknown>,
-    ) => Promise<{ path?: string; files?: string[] }>;
-  }
-    | undefined;
+  const picker = getFilePickerImplementation();
 
   if (!picker || typeof picker.upload !== "function") {
     return null;
@@ -225,15 +252,7 @@ async function uploadImage(
 }
 
 async function resolveNextImageIndex(targetDir: string, fileNamePrefix: string): Promise<number> {
-  const picker = (globalThis as { FilePicker?: unknown }).FilePicker as
-    | {
-    browse?: (
-      source: string,
-      target: string,
-      options?: Record<string, unknown>,
-    ) => Promise<{ files?: string[] }>;
-  }
-    | undefined;
+  const picker = getFilePickerImplementation();
 
   if (!picker || typeof picker.browse !== "function") {
     return 1;
