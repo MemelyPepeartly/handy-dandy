@@ -110,6 +110,37 @@ function uniqueNumericSuffix(): number {
   return (Date.now() * 1000) + Math.floor(Math.random() * 1000);
 }
 
+function normalizeComparablePath(path: string): string {
+  return normalizeUploadedPath(path).replace(/\\/g, "/").replace(/^\/+/, "").toLowerCase();
+}
+
+async function verifyUploadedImagePath(uploadedPath: string, targetDir: string): Promise<boolean | undefined> {
+  const picker = getFilePickerImplementation();
+  if (!picker || typeof picker.browse !== "function") {
+    return undefined;
+  }
+
+  try {
+    const result = await picker.browse(GENERATED_IMAGE_SOURCE, targetDir, { wildcard: true });
+    const files = Array.isArray(result?.files) ? result.files : [];
+    const normalizedUploaded = normalizeComparablePath(uploadedPath);
+    const uploadedFileName = extractFileName(normalizedUploaded);
+
+    return files.some((entry) => {
+      if (typeof entry !== "string") return false;
+      const normalizedEntry = normalizeComparablePath(entry);
+      if (normalizedEntry === normalizedUploaded) return true;
+      return extractFileName(normalizedEntry) === uploadedFileName;
+    });
+  } catch (error) {
+    console.warn(
+      `${CONSTANTS.MODULE_NAME} | Could not verify generated image upload in "${targetDir}".`,
+      error,
+    );
+    return undefined;
+  }
+}
+
 function base64ToBlob(base64: string, mimeType: string): Blob {
   const bytes = atob(base64);
   const array = new Uint8Array(bytes.length);
@@ -252,13 +283,40 @@ async function uploadImage(
     { notify: false },
   );
   if (typeof uploaded?.path === "string" && uploaded.path) {
-    return normalizeUploadedPath(uploaded.path);
+    const normalizedPath = normalizeUploadedPath(uploaded.path);
+    const verified = await verifyUploadedImagePath(normalizedPath, targetDir);
+    if (verified === true) {
+      console.info(`${CONSTANTS.MODULE_NAME} | Generated image stored: ${normalizedPath}`);
+    } else if (verified === false) {
+      console.warn(
+        `${CONSTANTS.MODULE_NAME} | Generated image upload returned a path but verification failed: ${normalizedPath}`,
+      );
+    } else {
+      console.info(
+        `${CONSTANTS.MODULE_NAME} | Generated image upload returned path (verification unavailable): ${normalizedPath}`,
+      );
+    }
+    return normalizedPath;
   }
 
   if (Array.isArray(uploaded?.files) && typeof uploaded.files[0] === "string") {
-    return normalizeUploadedPath(uploaded.files[0]);
+    const normalizedPath = normalizeUploadedPath(uploaded.files[0]);
+    const verified = await verifyUploadedImagePath(normalizedPath, targetDir);
+    if (verified === true) {
+      console.info(`${CONSTANTS.MODULE_NAME} | Generated image stored: ${normalizedPath}`);
+    } else if (verified === false) {
+      console.warn(
+        `${CONSTANTS.MODULE_NAME} | Generated image upload returned a file list path but verification failed: ${normalizedPath}`,
+      );
+    } else {
+      console.info(
+        `${CONSTANTS.MODULE_NAME} | Generated image upload returned file list path (verification unavailable): ${normalizedPath}`,
+      );
+    }
+    return normalizedPath;
   }
 
+  console.warn(`${CONSTANTS.MODULE_NAME} | Generated image upload returned no file path.`);
   return null;
 }
 
