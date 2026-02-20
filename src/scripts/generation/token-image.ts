@@ -38,10 +38,23 @@ function sanitizeFilename(value: string): string {
     .slice(0, 64) || "generated-token";
 }
 
+let imageFilenameCounter = 0;
+
+function buildEntropySuffix(): string {
+  imageFilenameCounter = (imageFilenameCounter + 1) % 46_656; // 36^3
+  const timePart = Date.now().toString(36);
+  const counterPart = imageFilenameCounter.toString(36).padStart(3, "0");
+  const randomPart = Math.floor(Math.random() * 36 ** 4)
+    .toString(36)
+    .padStart(4, "0");
+
+  return `${timePart}-${counterPart}-${randomPart}`;
+}
+
 function buildUniqueFilename(base: string): string {
   const safeBase = sanitizeFilename(base);
-  const suffix = Date.now().toString(36);
-  const maxBaseLength = Math.max(1, 63 - suffix.length);
+  const suffix = buildEntropySuffix();
+  const maxBaseLength = Math.max(1, 96 - suffix.length);
   const truncatedBase = safeBase.slice(0, maxBaseLength);
   return `${truncatedBase}-${suffix}`;
 }

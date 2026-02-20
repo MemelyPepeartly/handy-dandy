@@ -178,3 +178,51 @@ test("generateTransparentTokenImage supports prompt override and reference image
     referenceImage,
   );
 });
+
+test("generateTransparentTokenImage stores each regeneration at a unique path", async () => {
+  const priorPicker = (globalThis as { FilePicker?: unknown }).FilePicker;
+  const priorNow = Date.now;
+  const priorRandom = Math.random;
+
+  Date.now = () => 1_700_000_000_000;
+  Math.random = () => 0;
+
+  (globalThis as { FilePicker?: unknown }).FilePicker = {
+    createDirectory: async () => {
+      /* no-op */
+    },
+    upload: async (_source: string, target: string, file: File) => ({ path: `${target}/${file.name}` }),
+  };
+
+  try {
+    const first = await generateTransparentTokenImage(
+      {
+        generateImage: async () => ({ base64: SAMPLE_BASE64, mimeType: "image/png" }),
+      },
+      {
+        actorName: "Collision Test",
+        actorSlug: "collision-test",
+        imageCategory: "actor",
+      },
+    );
+
+    const second = await generateTransparentTokenImage(
+      {
+        generateImage: async () => ({ base64: SAMPLE_BASE64, mimeType: "image/png" }),
+      },
+      {
+        actorName: "Collision Test",
+        actorSlug: "collision-test",
+        imageCategory: "actor",
+      },
+    );
+
+    assert.notEqual(first, second);
+    assert.ok(first.startsWith("assets/handy-dandy/generated-images/actors/"));
+    assert.ok(second.startsWith("assets/handy-dandy/generated-images/actors/"));
+  } finally {
+    Date.now = priorNow;
+    Math.random = priorRandom;
+    (globalThis as { FilePicker?: unknown }).FilePicker = priorPicker;
+  }
+});
