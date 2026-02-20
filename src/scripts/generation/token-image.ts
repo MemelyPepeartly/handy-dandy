@@ -13,6 +13,7 @@ export interface GenerateTokenImageOptions {
   promptOverride?: string | null;
   referenceImage?: File | null;
   imageCategory?: "actor" | "item";
+  existingImagePath?: string | null;
 }
 
 export interface GenerateItemImageOptions {
@@ -127,8 +128,11 @@ async function verifyUploadedImagePath(uploadedPath: string, targetDir: string):
   }
 
   try {
-    const result = await picker.browse(GENERATED_IMAGE_SOURCE, targetDir, { wildcard: true });
+    const result = await picker.browse(GENERATED_IMAGE_SOURCE, targetDir);
     const files = Array.isArray(result?.files) ? result.files : [];
+    if (files.length === 0) {
+      return undefined;
+    }
     const normalizedUploaded = normalizeComparablePath(uploadedPath);
     const uploadedFileName = extractFileName(normalizedUploaded);
 
@@ -334,7 +338,7 @@ async function resolveNextImageIndex(targetDir: string, fileNamePrefix: string):
   }
 
   try {
-    const result = await picker.browse(GENERATED_IMAGE_SOURCE, targetDir, { wildcard: true });
+    const result = await picker.browse(GENERATED_IMAGE_SOURCE, targetDir);
     const files = Array.isArray(result?.files) ? result.files : [];
 
     let max = 0;
@@ -350,6 +354,25 @@ async function resolveNextImageIndex(targetDir: string, fileNamePrefix: string):
   } catch (_error) {
     return uniqueNumericSuffix();
   }
+}
+
+function resolveExistingImageIndex(
+  existingImagePath: string | null | undefined,
+  targetDir: string,
+  fileNamePrefix: string,
+): number | null {
+  if (!existingImagePath || typeof existingImagePath !== "string") {
+    return null;
+  }
+
+  const normalizedExisting = normalizeComparablePath(existingImagePath);
+  const normalizedTargetDir = normalizeComparablePath(targetDir);
+  if (!normalizedExisting.startsWith(`${normalizedTargetDir}/`)) {
+    return null;
+  }
+
+  const existingFileName = extractFileName(normalizedExisting);
+  return parseImageSequenceNumber(existingFileName, fileNamePrefix);
 }
 
 function buildGenerationTargetDir(
@@ -410,12 +433,17 @@ async function storeGeneratedImage(
   image: GeneratedImageResult,
   fileNameBase: string,
   category: NonNullable<GenerateTokenImageOptions["imageCategory"]>,
+  existingImagePath?: string | null,
 ): Promise<string> {
   const targetDir = buildGenerationTargetDir(category, fileNameBase);
   const fileNamePrefix = resolveImageNamePrefix(category, fileNameBase);
 
   try {
     let nextIndex = await resolveNextImageIndex(targetDir, fileNamePrefix);
+    const existingIndex = resolveExistingImageIndex(existingImagePath, targetDir, fileNamePrefix);
+    if (typeof existingIndex === "number") {
+      nextIndex = Math.max(nextIndex, existingIndex + 1);
+    }
     for (let attempt = 0; attempt < 32; attempt += 1) {
       const fileName = `${fileNamePrefix}-${nextIndex}`;
       try {
@@ -457,6 +485,7 @@ export async function generateTransparentTokenImage(
     image,
     `${options.actorSlug || options.actorName}-token`,
     options.imageCategory ?? "actor",
+    options.existingImagePath,
   );
 }
 

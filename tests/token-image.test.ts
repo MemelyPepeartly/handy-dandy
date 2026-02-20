@@ -361,6 +361,47 @@ test("generateTransparentTokenImage increments sequence when browse returns cach
   }
 });
 
+test("generateTransparentTokenImage advances index from existing image path when browse is empty", async () => {
+  const priorPicker = (globalThis as { FilePicker?: unknown }).FilePicker;
+  const priorGame = (globalThis as { game?: unknown }).game;
+  let uploadedPath = "";
+
+  (globalThis as { game?: unknown }).game = undefined;
+  (globalThis as { FilePicker?: unknown }).FilePicker = {
+    createDirectory: async () => {
+      /* no-op */
+    },
+    browse: async () => ({ files: [] }),
+    upload: async (_source: string, target: string, file: File) => {
+      uploadedPath = `${target}/${file.name}`;
+      return { path: uploadedPath };
+    },
+  };
+
+  try {
+    const result = await generateTransparentTokenImage(
+      {
+        generateImage: async () => ({ base64: SAMPLE_BASE64, mimeType: "image/png" }),
+      },
+      {
+        actorName: "Existing Path Test",
+        actorSlug: "existing-path-test",
+        imageCategory: "actor",
+        existingImagePath: "assets/handy-dandy/actors/existing-path-test/existing-path-test-5.png",
+      },
+    );
+
+    assert.equal(
+      uploadedPath,
+      "assets/handy-dandy/actors/existing-path-test/existing-path-test-6.png",
+    );
+    assert.equal(result, uploadedPath);
+  } finally {
+    (globalThis as { FilePicker?: unknown }).FilePicker = priorPicker;
+    (globalThis as { game?: unknown }).game = priorGame;
+  }
+});
+
 test("generateTransparentTokenImage respects configured generated image directory setting", async () => {
   const priorPicker = (globalThis as { FilePicker?: unknown }).FilePicker;
   const priorGame = (globalThis as { game?: unknown }).game;

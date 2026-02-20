@@ -167,6 +167,7 @@ async function regenerateNpcPortrait(actor: Actor, button: JQuery<HTMLElement>):
       promptOverride: prompt,
       referenceImage: request.referenceImage,
       imageCategory: "actor",
+      existingImagePath: actor.img,
     });
 
     const updateData: Record<string, unknown> = { img: imagePath };
