@@ -3,6 +3,7 @@ import { importAction, importActor, importItem } from "../mappers/import";
 import type { GenerationProgressUpdate } from "../generation";
 import {
   PUBLICATION_DEFAULT,
+  type ActorCategory,
   type CanonicalEntityMap,
   type EntityType,
   type GeneratedEntityMap,
@@ -61,6 +62,7 @@ export interface PromptWorkbenchRequest<T extends EntityType> extends ImporterOp
   readonly referenceText: string;
   readonly slug?: string;
   readonly itemType?: ItemCategory;
+  readonly actorType?: ActorCategory;
   readonly level?: number;
   readonly seed?: number;
   readonly maxAttempts?: number;
@@ -184,6 +186,7 @@ export async function generateWorkbenchEntry<T extends EntityType>(
     referenceText,
     slug,
     itemType,
+    actorType,
     level,
     seed,
     maxAttempts,
@@ -209,6 +212,7 @@ export async function generateWorkbenchEntry<T extends EntityType>(
     referenceText,
     slug,
     itemType,
+    actorType,
     img,
     publication,
     level,
@@ -246,6 +250,7 @@ function buildPromptInput<T extends EntityType>(
     referenceText: string;
     slug?: string;
     itemType?: ItemCategory;
+    actorType?: ActorCategory;
     img?: string;
     publication?: PublicationData;
     level?: number;
@@ -263,6 +268,7 @@ function buildPromptInput<T extends EntityType>(
     referenceText,
     slug,
     itemType,
+    actorType,
     level,
     includeSpellcasting,
     includeInventory,
@@ -304,6 +310,7 @@ function buildPromptInput<T extends EntityType>(
         name: entryName,
         referenceText,
         slug,
+        actorType,
         img: actorImg,
         publication,
         level,

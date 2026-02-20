@@ -64,6 +64,7 @@ test("buildActorPrompt includes PF2E structure expectations, inventory support, 
     systemId: "sf2e",
     name: "Android Sentry",
     referenceText: "Guardian of the ancient vault.",
+    actorType: "character",
     includeInventory: true,
     includeSpellcasting: true,
     generateTokenImage: true,
@@ -72,6 +73,8 @@ test("buildActorPrompt includes PF2E structure expectations, inventory support, 
 
   assert.match(prompt, /Generate a Foundry VTT Actor JSON document\./);
   assert.match(prompt, /Use the requested systemId: "sf2e"\./);
+  assert.match(prompt, /Actor type: character\. Set the "actorType" field to this exact value\./);
+  assert.match(prompt, /Character focus:/);
   assert.match(prompt, /inventory: optional array of carried items/i);
   assert.match(prompt, /official PF2E NPC source structures/i);
   assert.match(prompt, /Include spellcasting data/);
@@ -79,4 +82,3 @@ test("buildActorPrompt includes PF2E structure expectations, inventory support, 
   assert.match(prompt, /transparent token image generation/i);
   assert.match(prompt, /Token image direction: glass visor and luminous rune sigils/);
 });
-

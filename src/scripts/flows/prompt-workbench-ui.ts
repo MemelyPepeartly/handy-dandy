@@ -9,8 +9,10 @@ import {
 } from "./prompt-workbench";
 import type { GenerationProgressUpdate } from "../generation";
 import {
+  ACTOR_CATEGORIES,
   ITEM_CATEGORIES,
   SYSTEM_IDS,
+  type ActorCategory,
   type EntityType,
   type GeneratedEntityMap,
   type ItemCategory,
@@ -51,6 +53,7 @@ type WorkbenchFormResponse = {
   readonly entryName: string;
   readonly slug: string;
   readonly itemType: string;
+  readonly actorType: string;
   readonly level: string;
   readonly publicationTitle: string;
   readonly publicationAuthors: string;
@@ -165,9 +168,12 @@ export async function runPromptWorkbenchFlow(): Promise<void> {
 }
 
 async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityType> | null> {
-  const systemOptions = SYSTEM_IDS.map((id) => `<option value="${id}">${id.toUpperCase()}</option>`).join("");
+  const fixedSystemId: SystemId = "pf2e";
   const itemTypeOptions = ITEM_CATEGORIES.map(
     (category) => `<option value="${category}">${formatItemTypeLabel(category)}</option>`
+  ).join("");
+  const actorTypeOptions = resolveAvailableActorCategories().map(
+    (category) => `<option value="${category}"${category === "npc" ? " selected" : ""}>${formatActorTypeLabel(category)}</option>`
   ).join("");
   const initialHistoryId = workbenchHistory[0]?.id;
   const historyListMarkup = buildHistoryListMarkup(initialHistoryId);
@@ -544,7 +550,7 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
           <div class="handy-dandy-workbench-steps">
             <div class="handy-dandy-workbench-step">
               <span class="handy-dandy-workbench-step-index">1</span>
-              <span class="handy-dandy-workbench-step-text">Select entity type, system, and title.</span>
+              <span class="handy-dandy-workbench-step-text">Select entity type, subtype, and title.</span>
             </div>
             <div class="handy-dandy-workbench-step">
               <span class="handy-dandy-workbench-step-index">2</span>
@@ -569,10 +575,10 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
                 </select>
               </div>
               <div>
-                <label for="handy-dandy-workbench-system">Game System</label>
-                <select id="handy-dandy-workbench-system" name="systemId">
-                  ${systemOptions}
-                </select>
+                <label for="handy-dandy-workbench-system-display">Game System</label>
+                <input id="handy-dandy-workbench-system-display" type="text" value="PF2E" disabled />
+                <input type="hidden" name="systemId" value="${fixedSystemId}" />
+                <p class="notes">Locked to PF2E for prompt workbench generation.</p>
               </div>
               <div data-entity-scope="item">
                 <label for="handy-dandy-workbench-item-type">Item Type</label>
@@ -581,6 +587,13 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
                   ${itemTypeOptions}
                 </select>
                 <p class="notes">Match the Foundry item category for the generated entry.</p>
+              </div>
+              <div data-entity-scope="actor">
+                <label for="handy-dandy-workbench-actor-type">Actor Type</label>
+                <select id="handy-dandy-workbench-actor-type" name="actorType">
+                  ${actorTypeOptions}
+                </select>
+                <p class="notes">Select the PF2E actor category the generator should target.</p>
               </div>
               <div>
                 <label for="handy-dandy-workbench-title">Title</label>
@@ -759,6 +772,7 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
                 entryName: String(formData.get("entryName") ?? ""),
                 slug: String(formData.get("slug") ?? ""),
                 itemType: String(formData.get("itemType") ?? ""),
+                actorType: String(formData.get("actorType") ?? ""),
                 level: String(formData.get("level") ?? ""),
                 publicationTitle: String(formData.get("publicationTitle") ?? ""),
                 publicationAuthors: String(formData.get("publicationAuthors") ?? ""),
@@ -837,6 +851,16 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
     itemType = resolved;
   }
 
+  let actorType: ActorCategory | undefined;
+  if (type === "actor") {
+    const resolved = sanitizeActorType(response.actorType);
+    if (!resolved) {
+      ui.notifications?.error(`${CONSTANTS.MODULE_NAME} | Select a valid actor type.`);
+      return null;
+    }
+    actorType = resolved;
+  }
+
   const referenceText = response.referenceText.trim();
   if (!referenceText) {
     ui.notifications?.error(`${CONSTANTS.MODULE_NAME} | Reference text or prompt is required.`);
@@ -881,6 +905,7 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
     referenceText,
     slug: response.slug.trim() || undefined,
     itemType,
+    actorType,
     level: parseOptionalNumber(response.level),
     seed: parseOptionalNumber(response.seed),
     maxAttempts: parseOptionalNumber(response.maxAttempts),
@@ -911,6 +936,13 @@ function sanitizeItemType(value: string): ItemCategory | null {
   const normalized = value.trim().toLowerCase();
   return ITEM_CATEGORIES.includes(normalized as ItemCategory)
     ? (normalized as ItemCategory)
+    : null;
+}
+
+function sanitizeActorType(value: string): ActorCategory | null {
+  const normalized = value.trim().toLowerCase();
+  return ACTOR_CATEGORIES.includes(normalized as ActorCategory)
+    ? (normalized as ActorCategory)
     : null;
 }
 
@@ -955,6 +987,29 @@ function formatItemTypeLabel(value: ItemCategory): string {
     .split(/[-_]/)
     .map((part) => (part ? part[0].toUpperCase() + part.slice(1) : part))
     .join(" ");
+}
+
+function formatActorTypeLabel(value: ActorCategory): string {
+  return value
+    .split(/[-_]/)
+    .map((part) => (part ? part[0].toUpperCase() + part.slice(1) : part))
+    .join(" ");
+}
+
+function resolveAvailableActorCategories(): ActorCategory[] {
+  const actorTypes = (game.system as { documentTypes?: { Actor?: unknown } } | undefined)?.documentTypes?.Actor;
+  if (!Array.isArray(actorTypes)) {
+    return [...ACTOR_CATEGORIES];
+  }
+
+  const supportedTypes = actorTypes
+    .map((value) => (typeof value === "string" ? value.trim().toLowerCase() : ""))
+    .filter((value): value is ActorCategory => ACTOR_CATEGORIES.includes(value as ActorCategory));
+  if (!supportedTypes.length) {
+    return [...ACTOR_CATEGORIES];
+  }
+
+  return Array.from(new Set(supportedTypes));
 }
 
 type LoadingStep = {
@@ -1855,6 +1910,15 @@ function setupWorkbenchRequestDialog(html: JQuery): void {
         const itemSelect = field.querySelector<HTMLSelectElement>("select[name=\"itemType\"]");
         if (itemSelect) {
           itemSelect.required = shouldShow;
+          itemSelect.disabled = !shouldShow;
+        }
+      }
+
+      if (field.dataset.entityScope?.includes("actor")) {
+        const actorSelect = field.querySelector<HTMLSelectElement>("select[name=\"actorType\"]");
+        if (actorSelect) {
+          actorSelect.required = shouldShow;
+          actorSelect.disabled = !shouldShow;
         }
       }
     }

@@ -3,6 +3,7 @@ import {
   ACTOR_SIZES,
   RARITIES,
   actorSchema,
+  type ActorCategory,
   type PublicationData,
   type SystemId,
 } from "../schemas/index";
@@ -18,6 +19,7 @@ export interface ActorPromptInput {
   readonly name: string;
   readonly referenceText: string;
   readonly slug?: string;
+  readonly actorType?: ActorCategory;
   readonly correction?: CorrectionContext;
   readonly img?: string;
   readonly publication?: PublicationData;
@@ -83,6 +85,23 @@ function buildActorSchemaSection(): string {
   ].join("\n");
 }
 
+function buildActorTypeGuidance(actorType: ActorCategory): string {
+  switch (actorType) {
+    case "npc":
+      return "NPC focus: build encounter-ready strikes, actions, spellcasting, and defenses following official PF2E NPC conventions.";
+    case "character":
+      return "Character focus: build an adventurer-style actor with class-facing abilities, practical skills, and gear that matches the source.";
+    case "hazard":
+      return "Hazard focus: include trigger/routine behavior, clear disable counterplay, and hazard-appropriate defensive profile details.";
+    case "vehicle":
+      return "Vehicle focus: include operation context (crew/passengers), movement profile, and actions that represent vehicle capabilities.";
+    case "familiar":
+      return "Familiar focus: keep abilities support-oriented with familiar-appropriate actions and lightweight combat expectations.";
+    default:
+      return "";
+  }
+}
+
 function buildActorRequest(input: ActorPromptInput): string {
   const parts: string[] = [
     `Create a ${input.systemId} actor entry named "${input.name}".`,
@@ -95,12 +114,23 @@ function buildActorRequest(input: ActorPromptInput): string {
     details.push(`Slug suggestion: ${input.slug}`);
   }
 
+  if (input.actorType) {
+    details.push(`Actor type: ${input.actorType}. Set the "actorType" field to this exact value.`);
+  }
+
   if (typeof input.level === "number" && Number.isFinite(input.level)) {
     details.push(`Target level: ${input.level}`);
   }
 
   if (details.length) {
     parts.splice(1, 0, ...details);
+  }
+
+  if (input.actorType) {
+    const actorTypeGuidance = buildActorTypeGuidance(input.actorType);
+    if (actorTypeGuidance) {
+      parts.push(actorTypeGuidance);
+    }
   }
 
   const publicationSection = renderPublicationSection(input.publication);

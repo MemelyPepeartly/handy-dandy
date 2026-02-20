@@ -234,6 +234,10 @@ export async function generateActor(
     schema: ACTOR_SCHEMA_DEFINITION,
   });
 
+  if (input.actorType) {
+    canonical.actorType = input.actorType;
+  }
+
   if (input.generateTokenImage && canGenerateImages(gptClient)) {
     reportProgress(options, {
       step: "image",

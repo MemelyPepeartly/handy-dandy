@@ -7,13 +7,17 @@ const SAMPLE_BASE64 = Buffer.from([0x89, 0x50, 0x4e, 0x47]).toString("base64");
 test("generateTransparentTokenImage uploads actor images into the actors directory", async () => {
   const priorPicker = (globalThis as { FilePicker?: unknown }).FilePicker;
   const createdDirectories: string[] = [];
+  const createdSources: string[] = [];
+  let uploadSource = "";
   let uploadTarget = "";
 
   (globalThis as { FilePicker?: unknown }).FilePicker = {
-    createDirectory: async (_source: string, target: string) => {
+    createDirectory: async (source: string, target: string) => {
+      createdSources.push(source);
       createdDirectories.push(target);
     },
-    upload: async (_source: string, target: string, file: File) => {
+    upload: async (source: string, target: string, file: File) => {
+      uploadSource = source;
       uploadTarget = target;
       return { path: `${target}/${file.name}` };
     },
@@ -31,8 +35,10 @@ test("generateTransparentTokenImage uploads actor images into the actors directo
       },
     );
 
-    assert.equal(uploadTarget, "assets/handy-dandy/generated-images/actors");
-    assert.ok(createdDirectories.includes("assets/handy-dandy/generated-images/actors"));
+    assert.ok(createdSources.every((source) => source === "assets"));
+    assert.equal(uploadSource, "assets");
+    assert.equal(uploadTarget, "handy-dandy/generated-images/actors");
+    assert.ok(createdDirectories.includes("handy-dandy/generated-images/actors"));
     assert.ok(result.startsWith("assets/handy-dandy/generated-images/actors/"));
     assert.ok(result.endsWith(".png"));
   } finally {
@@ -42,13 +48,15 @@ test("generateTransparentTokenImage uploads actor images into the actors directo
 
 test("generateTransparentTokenImage uploads item images into the items directory", async () => {
   const priorPicker = (globalThis as { FilePicker?: unknown }).FilePicker;
+  let uploadSource = "";
   let uploadTarget = "";
 
   (globalThis as { FilePicker?: unknown }).FilePicker = {
     createDirectory: async () => {
       /* no-op */
     },
-    upload: async (_source: string, target: string, file: File) => {
+    upload: async (source: string, target: string, file: File) => {
+      uploadSource = source;
       uploadTarget = target;
       return { path: `${target}/${file.name}` };
     },
@@ -66,7 +74,8 @@ test("generateTransparentTokenImage uploads item images into the items directory
       },
     );
 
-    assert.equal(uploadTarget, "assets/handy-dandy/generated-images/items");
+    assert.equal(uploadSource, "assets");
+    assert.equal(uploadTarget, "handy-dandy/generated-images/items");
   } finally {
     (globalThis as { FilePicker?: unknown }).FilePicker = priorPicker;
   }
@@ -107,13 +116,15 @@ test("generateTransparentTokenImage falls back to a data URI when upload fails",
 
 test("generateItemImage stores generated item art in the items directory", async () => {
   const priorPicker = (globalThis as { FilePicker?: unknown }).FilePicker;
+  let uploadSource = "";
   let uploadTarget = "";
 
   (globalThis as { FilePicker?: unknown }).FilePicker = {
     createDirectory: async () => {
       /* no-op */
     },
-    upload: async (_source: string, target: string, file: File) => {
+    upload: async (source: string, target: string, file: File) => {
+      uploadSource = source;
       uploadTarget = target;
       return { path: `${target}/${file.name}` };
     },
@@ -130,7 +141,8 @@ test("generateItemImage stores generated item art in the items directory", async
       },
     );
 
-    assert.equal(uploadTarget, "assets/handy-dandy/generated-images/items");
+    assert.equal(uploadSource, "assets");
+    assert.equal(uploadTarget, "handy-dandy/generated-images/items");
     assert.ok(result.startsWith("assets/handy-dandy/generated-images/items/"));
     assert.ok(result.endsWith(".png"));
   } finally {

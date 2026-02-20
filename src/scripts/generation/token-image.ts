@@ -21,8 +21,9 @@ export interface GenerateItemImageOptions {
   customPrompt?: string | null;
 }
 
-// Foundry VTT v13 introduces /assets for persistent user-managed files. Avoid module directories for uploads.
-const GENERATED_IMAGE_ROOT = "assets/handy-dandy/generated-images";
+// Store generated assets in Foundry's persistent /assets root, not in module directories.
+const GENERATED_IMAGE_SOURCE = "assets" as const;
+const GENERATED_IMAGE_ROOT = "handy-dandy/generated-images";
 const IMAGE_CATEGORY_DIRECTORY: Record<NonNullable<GenerateTokenImageOptions["imageCategory"]>, string> = {
   actor: "actors",
   item: "items",
@@ -60,6 +61,21 @@ function isAlreadyExistsError(error: unknown): boolean {
   return message.includes("eexist") || message.includes("already exists");
 }
 
+function normalizeUploadedPath(path: string): string {
+  const trimmed = path.trim();
+  if (!trimmed) return trimmed;
+  if (/^[a-z]+:\/\//i.test(trimmed) || trimmed.startsWith("data:")) {
+    return trimmed;
+  }
+
+  const withoutLeadingSlash = trimmed.replace(/^\/+/, "");
+  if (withoutLeadingSlash.toLowerCase().startsWith(`${GENERATED_IMAGE_SOURCE}/`)) {
+    return withoutLeadingSlash;
+  }
+
+  return `${GENERATED_IMAGE_SOURCE}/${withoutLeadingSlash}`;
+}
+
 async function ensureDataDirectory(path: string): Promise<void> {
   const picker = (globalThis as { FilePicker?: unknown }).FilePicker as
     | {
@@ -84,7 +100,7 @@ async function ensureDataDirectory(path: string): Promise<void> {
   for (const segment of segments) {
     current = current ? `${current}/${segment}` : segment;
     try {
-      await picker.createDirectory("data", current, { notify: false });
+      await picker.createDirectory(GENERATED_IMAGE_SOURCE, current, { notify: false });
     } catch (error) {
       if (!isAlreadyExistsError(error)) {
         throw error;
@@ -127,13 +143,13 @@ async function uploadImage(
     type: image.mimeType,
   });
 
-  const uploaded = await picker.upload("data", targetDir, file, {}, { notify: false });
+  const uploaded = await picker.upload(GENERATED_IMAGE_SOURCE, targetDir, file, {}, { notify: false });
   if (typeof uploaded?.path === "string" && uploaded.path) {
-    return uploaded.path;
+    return normalizeUploadedPath(uploaded.path);
   }
 
   if (Array.isArray(uploaded?.files) && typeof uploaded.files[0] === "string") {
-    return uploaded.files[0];
+    return normalizeUploadedPath(uploaded.files[0]);
   }
 
   return null;
