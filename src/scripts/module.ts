@@ -33,6 +33,7 @@ import type {
 import { exportSelectedEntities, generateWorkbenchEntry } from "./flows/prompt-workbench";
 import { ensureValid } from "./validation/ensure-valid";
 import { importAction } from "./mappers/import";
+import { initialiseMapMarkers } from "./map-markers/controller";
 
 type GeneratorFunction<TInput, TResult> = (
   input: TInput,
@@ -171,6 +172,7 @@ Hooks.once("setup", () => {
   };
 
   setDeveloperConsole(developerConsole);
+  initialiseMapMarkers();
 });
 
 // ---------- READY -----------------------------------------------------------

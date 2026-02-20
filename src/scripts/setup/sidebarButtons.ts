@@ -1,5 +1,6 @@
 import { CONSTANTS } from "../constants";
 import { runPromptWorkbenchFlow, runExportSelectionFlow } from "../flows/prompt-workbench-ui";
+import { setMapMarkerPlacementActive } from "../map-markers/controller";
 
 type LegacyTool = SceneControls.Tool & {
   onChange?: (...args: unknown[]) => void;
@@ -53,6 +54,36 @@ function compatibilityAddTool(collection: ToolCollection, tool: LegacyTool): voi
   }
 }
 
+function resolveToggleActive(args: unknown[], fallback = false, toolName?: string): boolean {
+  const second = args[1];
+  if (typeof second === "boolean") {
+    return second;
+  }
+
+  const first = args[0];
+  if (typeof first === "boolean") {
+    return first;
+  }
+
+  if (toolName) {
+    const tools = ui.controls?.control?.tools;
+    if (Array.isArray(tools)) {
+      const match = tools.find((candidate) => candidate?.name === toolName);
+      if (typeof match?.active === "boolean") {
+        return match.active;
+      }
+    } else if (tools && typeof tools === "object") {
+      const record = tools as Record<string, SceneControls.Tool | undefined>;
+      const match = record[toolName];
+      if (typeof match?.active === "boolean") {
+        return match.active;
+      }
+    }
+  }
+
+  return fallback;
+}
+
 function requireNamespace(): NonNullable<Game["handyDandy"]> {
   const namespace = game.handyDandy;
   if (!namespace) {
@@ -82,20 +113,23 @@ export function insertSidebarButtons(controls: ControlCollection): void {
   };
 
   compatibilityAddTool(handyGroup.tools, {
+    name: "map-marker",
+    title: "Map Marker",
+    icon: "fa-solid fa-location-dot",
+    toggle: true,
+    active: false,
+    onChange: (...args) => {
+      setMapMarkerPlacementActive(resolveToggleActive(args, false, "map-marker"));
+    },
+  });
+
+  compatibilityAddTool(handyGroup.tools, {
     name: "tool-guide",
     title: "Tool Guide",
     icon: "fa-solid fa-compass",
     toggle: true,
-    onClick: toggled => {
-      const handyDandy = requireNamespace();
-      const toolOverview = handyDandy.applications.toolOverview;
-      if (toggled) {
-        toolOverview.render(true);
-      } else {
-        toolOverview.close();
-      }
-    },
-    onChange: toggled => {
+    onChange: (...args) => {
+      const toggled = resolveToggleActive(args, false, "tool-guide");
       const handyDandy = requireNamespace();
       const toolOverview = handyDandy.applications.toolOverview;
       if (toggled) {
@@ -111,11 +145,10 @@ export function insertSidebarButtons(controls: ControlCollection): void {
     title: "Schema Tool",
     icon: "fa-solid fa-wand-magic-sparkles",
     button: true,
-    onClick: () => {
+    onChange: () => {
       console.debug(`${CONSTANTS.MODULE_NAME} | Opening Schema Tool`);
       requireNamespace().applications.schemaTool.render(true);
     },
-    onChange: noop,
   });
 
   compatibilityAddTool(handyGroup.tools, {
@@ -123,11 +156,10 @@ export function insertSidebarButtons(controls: ControlCollection): void {
     title: "Data Entry Tool",
     icon: "fa-solid fa-pen-to-square",
     button: true,
-    onClick: () => {
+    onChange: () => {
       console.debug(`${CONSTANTS.MODULE_NAME} | Opening Data Entry Tool`);
       requireNamespace().applications.dataEntryTool.render(true);
     },
-    onChange: noop,
   });
 
   compatibilityAddTool(handyGroup.tools, {
@@ -135,11 +167,10 @@ export function insertSidebarButtons(controls: ControlCollection): void {
     title: "Trait Browser",
     icon: "fa-solid fa-tags",
     button: true,
-    onClick: () => {
+    onChange: () => {
       console.debug(`${CONSTANTS.MODULE_NAME} | Opening Trait Browser Tool`);
       requireNamespace().applications.traitBrowserTool.render(true);
     },
-    onChange: noop,
   });
 
   compatibilityAddTool(handyGroup.tools, {
@@ -147,10 +178,9 @@ export function insertSidebarButtons(controls: ControlCollection): void {
     title: "Export Selection",
     icon: "fa-solid fa-file-export",
     button: true,
-    onClick: () => {
+    onChange: () => {
       void runExportSelectionFlow();
     },
-    onChange: noop,
   });
 
   compatibilityAddTool(handyGroup.tools, {
@@ -158,10 +188,9 @@ export function insertSidebarButtons(controls: ControlCollection): void {
     title: "Prompt Workbench",
     icon: "fa-solid fa-hat-wizard",
     button: true,
-    onClick: () => {
+    onChange: () => {
       void runPromptWorkbenchFlow();
     },
-    onChange: noop,
   });
 
   compatibilityAddTool(handyGroup.tools, {
@@ -169,10 +198,9 @@ export function insertSidebarButtons(controls: ControlCollection): void {
     title: "Developer Console",
     icon: "fa-solid fa-terminal",
     button: true,
-    onClick: () => {
+    onChange: () => {
       requireNamespace().developer.console.render(true);
     },
-    onChange: noop,
   });
 
   compatibilityAddControl(controls, handyGroup);

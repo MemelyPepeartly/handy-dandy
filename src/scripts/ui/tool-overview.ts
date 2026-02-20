@@ -38,6 +38,13 @@ export class ToolOverview extends FormApplication {
     return {
       tools: [
         {
+          id: "map-marker",
+          title: "Map Marker",
+          icon: "fas fa-location-dot",
+          description: "Place numbered or icon room markers on the map and double-click them to edit room prompts and boxtext.",
+          location: "Scene Controls → Handy Dandy Tools → Map Marker",
+        },
+        {
           id: "schema-tool",
           title: "Schema Tool",
           icon: "fas fa-magic",
