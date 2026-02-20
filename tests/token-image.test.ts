@@ -254,6 +254,60 @@ test("generateTransparentTokenImage stores repeated regenerations in one slug di
   }
 });
 
+test("generateTransparentTokenImage uses unique filenames when directory browse fails", async () => {
+  const priorPicker = (globalThis as { FilePicker?: unknown }).FilePicker;
+  const priorGame = (globalThis as { game?: unknown }).game;
+  const uploadedPaths: string[] = [];
+
+  (globalThis as { game?: unknown }).game = undefined;
+  (globalThis as { FilePicker?: unknown }).FilePicker = {
+    createDirectory: async () => {
+      /* no-op */
+    },
+    browse: async () => {
+      throw new Error("browse failed");
+    },
+    upload: async (_source: string, target: string, file: File) => {
+      const path = `${target}/${file.name}`;
+      uploadedPaths.push(path);
+      return { path };
+    },
+  };
+
+  try {
+    const first = await generateTransparentTokenImage(
+      {
+        generateImage: async () => ({ base64: SAMPLE_BASE64, mimeType: "image/png" }),
+      },
+      {
+        actorName: "Browse Failure Test",
+        actorSlug: "browse-failure-test",
+        imageCategory: "actor",
+      },
+    );
+
+    const second = await generateTransparentTokenImage(
+      {
+        generateImage: async () => ({ base64: SAMPLE_BASE64, mimeType: "image/png" }),
+      },
+      {
+        actorName: "Browse Failure Test",
+        actorSlug: "browse-failure-test",
+        imageCategory: "actor",
+      },
+    );
+
+    assert.equal(uploadedPaths.length, 2);
+    assert.notEqual(uploadedPaths[0], uploadedPaths[1]);
+    assert.notEqual(first, second);
+    assert.ok(first.startsWith("assets/handy-dandy/actors/browse-failure-test/"));
+    assert.ok(second.startsWith("assets/handy-dandy/actors/browse-failure-test/"));
+  } finally {
+    (globalThis as { FilePicker?: unknown }).FilePicker = priorPicker;
+    (globalThis as { game?: unknown }).game = priorGame;
+  }
+});
+
 test("generateTransparentTokenImage respects configured generated image directory setting", async () => {
   const priorPicker = (globalThis as { FilePicker?: unknown }).FilePicker;
   const priorGame = (globalThis as { game?: unknown }).game;

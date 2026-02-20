@@ -105,6 +105,11 @@ function parseImageSequenceNumber(fileName: string, prefix: string): number | nu
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
+function uniqueNumericSuffix(): number {
+  // Keep fallback names unique even when directory listing is unavailable.
+  return (Date.now() * 1000) + Math.floor(Math.random() * 1000);
+}
+
 function base64ToBlob(base64: string, mimeType: string): Blob {
   const bytes = atob(base64);
   const array = new Uint8Array(bytes.length);
@@ -239,7 +244,13 @@ async function uploadImage(
     type: image.mimeType,
   });
 
-  const uploaded = await picker.upload(GENERATED_IMAGE_SOURCE, targetDir, file, {}, { notify: false });
+  const uploaded = await picker.upload(
+    GENERATED_IMAGE_SOURCE,
+    targetDir,
+    file,
+    { overwrite: false },
+    { notify: false },
+  );
   if (typeof uploaded?.path === "string" && uploaded.path) {
     return normalizeUploadedPath(uploaded.path);
   }
@@ -273,7 +284,7 @@ async function resolveNextImageIndex(targetDir: string, fileNamePrefix: string):
 
     return max + 1;
   } catch (_error) {
-    return 1;
+    return uniqueNumericSuffix();
   }
 }
 
