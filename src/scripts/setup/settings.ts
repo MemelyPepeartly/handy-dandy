@@ -56,6 +56,15 @@ export function registerSettings(): void {
     },
   });
 
+  settings.register(CONSTANTS.MODULE_ID, "GeneratedImageDirectory", {
+    name: "Generated Image Directory",
+    hint: "Directory under Data/assets used for generated images. Examples: handy-dandy, assets/handy-dandy, Data/assets/handy-dandy.",
+    scope: "world",
+    config: true,
+    type: String,
+    default: "handy-dandy",
+  });
+
   settings.register(CONSTANTS.MODULE_ID, "GPTTemperature", {
     name: "GPT Temperature",
     hint: "Sampling temperature for OpenAI responses (0-2).",

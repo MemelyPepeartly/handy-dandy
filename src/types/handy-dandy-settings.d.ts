@@ -12,6 +12,7 @@ declare module "fvtt-types/configuration" {
     "handy-dandy.GPTOrganization": string;
     "handy-dandy.GPTModel": HandyDandyGPTModel;
     "handy-dandy.GPTImageModel": HandyDandyGPTImageModel;
+    "handy-dandy.GeneratedImageDirectory": string;
     "handy-dandy.GPTTemperature": number;
     "handy-dandy.GPTTopP": number;
     "handy-dandy.GPTSeed": number;

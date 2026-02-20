@@ -1,4 +1,5 @@
 import type { GenerateImageOptions, GeneratedImageResult } from "../gpt/client";
+import { CONSTANTS } from "../constants";
 
 export interface TokenImageGenerator {
   generateImage: (prompt: string, options?: GenerateImageOptions) => Promise<GeneratedImageResult>;
@@ -23,7 +24,7 @@ export interface GenerateItemImageOptions {
 
 // Store generated assets in Foundry's persistent /assets root, not in module directories.
 const GENERATED_IMAGE_SOURCE = "assets" as const;
-const GENERATED_IMAGE_ROOT = "handy-dandy/generated-images";
+const DEFAULT_GENERATED_IMAGE_ROOT = "handy-dandy" as const;
 const IMAGE_CATEGORY_DIRECTORY: Record<NonNullable<GenerateTokenImageOptions["imageCategory"]>, string> = {
   actor: "actors",
   item: "items",
@@ -76,18 +77,58 @@ function isAlreadyExistsError(error: unknown): boolean {
 }
 
 function normalizeUploadedPath(path: string): string {
-  const trimmed = path.trim();
+  const trimmed = path.trim().replace(/\\/g, "/");
   if (!trimmed) return trimmed;
   if (/^[a-z]+:\/\//i.test(trimmed) || trimmed.startsWith("data:")) {
     return trimmed;
   }
 
-  const withoutLeadingSlash = trimmed.replace(/^\/+/, "");
-  if (withoutLeadingSlash.toLowerCase().startsWith(`${GENERATED_IMAGE_SOURCE}/`)) {
-    return withoutLeadingSlash;
+  let normalized = trimmed.replace(/^\/+/, "");
+  normalized = normalized.replace(/^data\/+/i, "");
+
+  if (normalized.toLowerCase().startsWith(`${GENERATED_IMAGE_SOURCE}/`)) {
+    return normalized;
   }
 
-  return `${GENERATED_IMAGE_SOURCE}/${withoutLeadingSlash}`;
+  return `${GENERATED_IMAGE_SOURCE}/${normalized}`;
+}
+
+function normalizeDirectorySetting(value: unknown): string {
+  if (typeof value !== "string") {
+    return DEFAULT_GENERATED_IMAGE_ROOT;
+  }
+
+  const normalized = value
+    .trim()
+    .replace(/\\/g, "/")
+    .replace(/^\/+/, "")
+    .replace(/^data\/+/i, "")
+    .replace(/^assets\/+/i, "")
+    .replace(/\/+$/, "");
+
+  return normalized || DEFAULT_GENERATED_IMAGE_ROOT;
+}
+
+function getConfiguredImageRoot(): string {
+  const globalGame = (globalThis as {
+    game?: {
+      settings?: {
+        get?: (moduleId: string, key: string) => unknown;
+      };
+    };
+  }).game;
+
+  const getSetting = globalGame?.settings?.get;
+  if (typeof getSetting !== "function") {
+    return DEFAULT_GENERATED_IMAGE_ROOT;
+  }
+
+  try {
+    const configured = getSetting(CONSTANTS.MODULE_ID, "GeneratedImageDirectory");
+    return normalizeDirectorySetting(configured);
+  } catch (_error) {
+    return DEFAULT_GENERATED_IMAGE_ROOT;
+  }
 }
 
 async function ensureDataDirectory(path: string): Promise<void> {
@@ -168,10 +209,11 @@ function buildGenerationTargetDir(
   category: NonNullable<GenerateTokenImageOptions["imageCategory"]>,
   fileNameBase: string,
 ): string {
+  const rootDirectory = getConfiguredImageRoot();
   const categoryDir = IMAGE_CATEGORY_DIRECTORY[category] ?? IMAGE_CATEGORY_DIRECTORY.actor;
   const entityDir = sanitizeFilename(fileNameBase).replace(/-(token|item)$/i, "") || "generated";
   const generationDir = buildEntropySuffix();
-  return `${GENERATED_IMAGE_ROOT}/${categoryDir}/${entityDir}/${generationDir}`;
+  return `${rootDirectory}/${categoryDir}/${entityDir}/${generationDir}`;
 }
 
 export function buildTransparentTokenPrompt(options: GenerateTokenImageOptions): string {
