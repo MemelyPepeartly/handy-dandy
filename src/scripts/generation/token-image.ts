@@ -22,8 +22,10 @@ export interface GenerateItemImageOptions {
   customPrompt?: string | null;
 }
 
-// Store generated assets in Foundry's persistent /assets root, not in module directories.
-const GENERATED_IMAGE_SOURCE = "assets" as const;
+// Use FilePicker's "data" source (Foundry user-data root) and write into assets/<configured-dir>/...
+// so generated files land under Data/assets/... without requiring users to type "Data/" in settings.
+const GENERATED_IMAGE_SOURCE = "data" as const;
+const GENERATED_IMAGE_DATA_ROOT = "assets" as const;
 const DEFAULT_GENERATED_IMAGE_ROOT = "handy-dandy" as const;
 const IMAGE_CATEGORY_DIRECTORY: Record<NonNullable<GenerateTokenImageOptions["imageCategory"]>, string> = {
   actor: "actors",
@@ -85,12 +87,14 @@ function normalizeUploadedPath(path: string): string {
 
   let normalized = trimmed.replace(/^\/+/, "");
   normalized = normalized.replace(/^data\/+/i, "");
-
-  if (normalized.toLowerCase().startsWith(`${GENERATED_IMAGE_SOURCE}/`)) {
+  if (normalized.toLowerCase().startsWith(`${GENERATED_IMAGE_DATA_ROOT}/`)) {
     return normalized;
   }
+  if (normalized.toLowerCase().startsWith(`${GENERATED_IMAGE_SOURCE}/`)) {
+    return normalized.replace(/^data\//i, `${GENERATED_IMAGE_DATA_ROOT}/`);
+  }
 
-  return `${GENERATED_IMAGE_SOURCE}/${normalized}`;
+  return `${GENERATED_IMAGE_DATA_ROOT}/${normalized}`;
 }
 
 function normalizeDirectorySetting(value: unknown): string {
@@ -213,7 +217,7 @@ function buildGenerationTargetDir(
   const categoryDir = IMAGE_CATEGORY_DIRECTORY[category] ?? IMAGE_CATEGORY_DIRECTORY.actor;
   const entityDir = sanitizeFilename(fileNameBase).replace(/-(token|item)$/i, "") || "generated";
   const generationDir = buildEntropySuffix();
-  return `${rootDirectory}/${categoryDir}/${entityDir}/${generationDir}`;
+  return `${GENERATED_IMAGE_DATA_ROOT}/${rootDirectory}/${categoryDir}/${entityDir}/${generationDir}`;
 }
 
 export function buildTransparentTokenPrompt(options: GenerateTokenImageOptions): string {

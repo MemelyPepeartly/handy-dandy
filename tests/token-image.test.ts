@@ -37,13 +37,14 @@ test("generateTransparentTokenImage uploads actor images into the actors directo
       },
     );
 
-    assert.ok(createdSources.every((source) => source === "assets"));
-    assert.equal(uploadSource, "assets");
-    assert.match(uploadTarget, /^handy-dandy\/actors\/clockwork-wasp\/.+$/);
-    assert.ok(createdDirectories.includes("handy-dandy"));
-    assert.ok(createdDirectories.includes("handy-dandy/actors"));
-    assert.ok(createdDirectories.includes("handy-dandy/actors/clockwork-wasp"));
-    assert.ok(createdDirectories.some((entry) => /^handy-dandy\/actors\/clockwork-wasp\/.+$/.test(entry)));
+    assert.ok(createdSources.every((source) => source === "data"));
+    assert.equal(uploadSource, "data");
+    assert.match(uploadTarget, /^assets\/handy-dandy\/actors\/clockwork-wasp\/.+$/);
+    assert.ok(createdDirectories.includes("assets"));
+    assert.ok(createdDirectories.includes("assets/handy-dandy"));
+    assert.ok(createdDirectories.includes("assets/handy-dandy/actors"));
+    assert.ok(createdDirectories.includes("assets/handy-dandy/actors/clockwork-wasp"));
+    assert.ok(createdDirectories.some((entry) => /^assets\/handy-dandy\/actors\/clockwork-wasp\/.+$/.test(entry)));
     assert.ok(result.startsWith("assets/handy-dandy/actors/"));
     assert.ok(result.endsWith(".png"));
   } finally {
@@ -82,8 +83,8 @@ test("generateTransparentTokenImage uploads item images into the items directory
       },
     );
 
-    assert.equal(uploadSource, "assets");
-    assert.match(uploadTarget, /^handy-dandy\/items\/clockwork-lens\/.+$/);
+    assert.equal(uploadSource, "data");
+    assert.match(uploadTarget, /^assets\/handy-dandy\/items\/clockwork-lens\/.+$/);
   } finally {
     (globalThis as { FilePicker?: unknown }).FilePicker = priorPicker;
     (globalThis as { game?: unknown }).game = priorGame;
@@ -152,8 +153,8 @@ test("generateItemImage stores generated item art in the items directory", async
       },
     );
 
-    assert.equal(uploadSource, "assets");
-    assert.match(uploadTarget, /^handy-dandy\/items\/clockwork-key\/.+$/);
+    assert.equal(uploadSource, "data");
+    assert.match(uploadTarget, /^assets\/handy-dandy\/items\/clockwork-key\/.+$/);
     assert.ok(result.startsWith("assets/handy-dandy/items/"));
     assert.ok(result.endsWith(".png"));
   } finally {
@@ -279,7 +280,7 @@ test("generateTransparentTokenImage respects configured generated image director
       },
     );
 
-    assert.match(uploadTarget, /^my-custom-images\/actors\/configured-root-test\/.+$/);
+    assert.match(uploadTarget, /^assets\/my-custom-images\/actors\/configured-root-test\/.+$/);
     assert.ok(result.startsWith("assets/my-custom-images/actors/configured-root-test/"));
   } finally {
     (globalThis as { FilePicker?: unknown }).FilePicker = priorPicker;
