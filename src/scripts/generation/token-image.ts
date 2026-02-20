@@ -31,7 +31,6 @@ const IMAGE_CATEGORY_DIRECTORY: Record<NonNullable<GenerateTokenImageOptions["im
   actor: "actors",
   item: "items",
 };
-const DEFAULT_GENERATED_IMAGE_NAME = "render" as const;
 
 function sanitizeFilename(value: string): string {
   return value
@@ -42,25 +41,23 @@ function sanitizeFilename(value: string): string {
     .slice(0, 64) || "generated-token";
 }
 
-let imageFilenameCounter = 0;
-
-function buildEntropySuffix(): string {
-  imageFilenameCounter = (imageFilenameCounter + 1) % 46_656; // 36^3
-  const timePart = Date.now().toString(36);
-  const counterPart = imageFilenameCounter.toString(36).padStart(3, "0");
-  const randomPart = Math.floor(Math.random() * 36 ** 4)
-    .toString(36)
-    .padStart(4, "0");
-
-  return `${timePart}-${counterPart}-${randomPart}`;
+function extractFileName(path: string): string {
+  return path.replace(/\\/g, "/").split("/").filter(Boolean).pop() ?? "";
 }
 
-function buildUniqueFilename(base: string): string {
-  const safeBase = sanitizeFilename(base);
-  const suffix = buildEntropySuffix();
-  const maxBaseLength = Math.max(1, 48 - suffix.length);
-  const truncatedBase = safeBase.slice(0, maxBaseLength);
-  return `${truncatedBase}-${suffix}`;
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function parseImageSequenceNumber(fileName: string, prefix: string): number | null {
+  const pattern = new RegExp(`^${escapeRegExp(prefix)}-(\\d+)\\.[a-z0-9]+$`, "i");
+  const match = pattern.exec(fileName);
+  if (!match) {
+    return null;
+  }
+
+  const parsed = Number(match[1]);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
 function base64ToBlob(base64: string, mimeType: string): Blob {
@@ -102,15 +99,33 @@ function normalizeDirectorySetting(value: unknown): string {
     return DEFAULT_GENERATED_IMAGE_ROOT;
   }
 
-  const normalized = value
+  let normalized = value
     .trim()
     .replace(/\\/g, "/")
     .replace(/^\/+/, "")
     .replace(/^data\/+/i, "")
     .replace(/^assets\/+/i, "")
+    .replace(/^worlds\/[^/]+\/+/i, "")
     .replace(/\/+$/, "");
 
+  const assetsIndex = normalized.toLowerCase().lastIndexOf("assets/");
+  if (assetsIndex >= 0) {
+    normalized = normalized.slice(assetsIndex + "assets/".length);
+  }
+
   return normalized || DEFAULT_GENERATED_IMAGE_ROOT;
+}
+
+function resolveImageNamePrefix(
+  category: NonNullable<GenerateTokenImageOptions["imageCategory"]>,
+  fileNameBase: string,
+): string {
+  const normalized = sanitizeFilename(fileNameBase).replace(/-(token|item)$/i, "");
+  if (normalized.length > 0) {
+    return normalized;
+  }
+
+  return category === "actor" ? "token" : "item";
 }
 
 function getConfiguredImageRoot(): string {
@@ -209,6 +224,40 @@ async function uploadImage(
   return null;
 }
 
+async function resolveNextImageIndex(targetDir: string, fileNamePrefix: string): Promise<number> {
+  const picker = (globalThis as { FilePicker?: unknown }).FilePicker as
+    | {
+    browse?: (
+      source: string,
+      target: string,
+      options?: Record<string, unknown>,
+    ) => Promise<{ files?: string[] }>;
+  }
+    | undefined;
+
+  if (!picker || typeof picker.browse !== "function") {
+    return 1;
+  }
+
+  try {
+    const result = await picker.browse(GENERATED_IMAGE_SOURCE, targetDir, { wildcard: true });
+    const files = Array.isArray(result?.files) ? result.files : [];
+
+    let max = 0;
+    for (const entry of files) {
+      if (typeof entry !== "string") continue;
+      const sequence = parseImageSequenceNumber(extractFileName(entry), fileNamePrefix);
+      if (typeof sequence === "number" && sequence > max) {
+        max = sequence;
+      }
+    }
+
+    return max + 1;
+  } catch (_error) {
+    return 1;
+  }
+}
+
 function buildGenerationTargetDir(
   category: NonNullable<GenerateTokenImageOptions["imageCategory"]>,
   fileNameBase: string,
@@ -216,8 +265,7 @@ function buildGenerationTargetDir(
   const rootDirectory = getConfiguredImageRoot();
   const categoryDir = IMAGE_CATEGORY_DIRECTORY[category] ?? IMAGE_CATEGORY_DIRECTORY.actor;
   const entityDir = sanitizeFilename(fileNameBase).replace(/-(token|item)$/i, "") || "generated";
-  const generationDir = buildEntropySuffix();
-  return `${GENERATED_IMAGE_DATA_ROOT}/${rootDirectory}/${categoryDir}/${entityDir}/${generationDir}`;
+  return `${GENERATED_IMAGE_DATA_ROOT}/${rootDirectory}/${categoryDir}/${entityDir}`;
 }
 
 export function buildTransparentTokenPrompt(options: GenerateTokenImageOptions): string {
@@ -270,12 +318,25 @@ async function storeGeneratedImage(
   category: NonNullable<GenerateTokenImageOptions["imageCategory"]>,
 ): Promise<string> {
   const targetDir = buildGenerationTargetDir(category, fileNameBase);
-  const fileName = buildUniqueFilename(DEFAULT_GENERATED_IMAGE_NAME);
+  const fileNamePrefix = resolveImageNamePrefix(category, fileNameBase);
 
   try {
-    const uploadedPath = await uploadImage(image, fileName, targetDir);
-    if (uploadedPath) {
-      return uploadedPath;
+    let nextIndex = await resolveNextImageIndex(targetDir, fileNamePrefix);
+    for (let attempt = 0; attempt < 32; attempt += 1) {
+      const fileName = `${fileNamePrefix}-${nextIndex}`;
+      try {
+        const uploadedPath = await uploadImage(image, fileName, targetDir);
+        if (uploadedPath) {
+          return uploadedPath;
+        }
+      } catch (error) {
+        if (isAlreadyExistsError(error)) {
+          nextIndex += 1;
+          continue;
+        }
+        throw error;
+      }
+      nextIndex += 1;
     }
   } catch (error) {
     console.warn("Handy Dandy | Could not upload generated image, using inline data URI fallback.", error);

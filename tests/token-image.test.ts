@@ -4,7 +4,7 @@ import { generateItemImage, generateTransparentTokenImage } from "../src/scripts
 
 const SAMPLE_BASE64 = Buffer.from([0x89, 0x50, 0x4e, 0x47]).toString("base64");
 
-test("generateTransparentTokenImage uploads actor images into the actors directory", async () => {
+test("generateTransparentTokenImage uploads actor images into the actor slug directory", async () => {
   const priorPicker = (globalThis as { FilePicker?: unknown }).FilePicker;
   const priorGame = (globalThis as { game?: unknown }).game;
   const createdDirectories: string[] = [];
@@ -23,6 +23,7 @@ test("generateTransparentTokenImage uploads actor images into the actors directo
       uploadTarget = target;
       return { path: `${target}/${file.name}` };
     },
+    browse: async () => ({ files: [] }),
   };
 
   try {
@@ -39,13 +40,12 @@ test("generateTransparentTokenImage uploads actor images into the actors directo
 
     assert.ok(createdSources.every((source) => source === "data"));
     assert.equal(uploadSource, "data");
-    assert.match(uploadTarget, /^assets\/handy-dandy\/actors\/clockwork-wasp\/.+$/);
+    assert.equal(uploadTarget, "assets/handy-dandy/actors/clockwork-wasp");
     assert.ok(createdDirectories.includes("assets"));
     assert.ok(createdDirectories.includes("assets/handy-dandy"));
     assert.ok(createdDirectories.includes("assets/handy-dandy/actors"));
     assert.ok(createdDirectories.includes("assets/handy-dandy/actors/clockwork-wasp"));
-    assert.ok(createdDirectories.some((entry) => /^assets\/handy-dandy\/actors\/clockwork-wasp\/.+$/.test(entry)));
-    assert.ok(result.startsWith("assets/handy-dandy/actors/"));
+    assert.ok(result.startsWith("assets/handy-dandy/actors/clockwork-wasp/clockwork-wasp-"));
     assert.ok(result.endsWith(".png"));
   } finally {
     (globalThis as { FilePicker?: unknown }).FilePicker = priorPicker;
@@ -53,7 +53,7 @@ test("generateTransparentTokenImage uploads actor images into the actors directo
   }
 });
 
-test("generateTransparentTokenImage uploads item images into the items directory", async () => {
+test("generateTransparentTokenImage uploads item images into the item slug directory", async () => {
   const priorPicker = (globalThis as { FilePicker?: unknown }).FilePicker;
   const priorGame = (globalThis as { game?: unknown }).game;
   let uploadSource = "";
@@ -69,6 +69,7 @@ test("generateTransparentTokenImage uploads item images into the items directory
       uploadTarget = target;
       return { path: `${target}/${file.name}` };
     },
+    browse: async () => ({ files: [] }),
   };
 
   try {
@@ -84,7 +85,7 @@ test("generateTransparentTokenImage uploads item images into the items directory
     );
 
     assert.equal(uploadSource, "data");
-    assert.match(uploadTarget, /^assets\/handy-dandy\/items\/clockwork-lens\/.+$/);
+    assert.equal(uploadTarget, "assets/handy-dandy/items/clockwork-lens");
   } finally {
     (globalThis as { FilePicker?: unknown }).FilePicker = priorPicker;
     (globalThis as { game?: unknown }).game = priorGame;
@@ -102,6 +103,7 @@ test("generateTransparentTokenImage falls back to a data URI when upload fails",
     upload: async () => {
       throw new Error("upload failed");
     },
+    browse: async () => ({ files: [] }),
   };
   console.warn = () => undefined;
 
@@ -124,7 +126,7 @@ test("generateTransparentTokenImage falls back to a data URI when upload fails",
   }
 });
 
-test("generateItemImage stores generated item art in the items directory", async () => {
+test("generateItemImage stores generated item art in the item slug directory", async () => {
   const priorPicker = (globalThis as { FilePicker?: unknown }).FilePicker;
   const priorGame = (globalThis as { game?: unknown }).game;
   let uploadSource = "";
@@ -140,6 +142,7 @@ test("generateItemImage stores generated item art in the items directory", async
       uploadTarget = target;
       return { path: `${target}/${file.name}` };
     },
+    browse: async () => ({ files: [] }),
   };
 
   try {
@@ -154,8 +157,8 @@ test("generateItemImage stores generated item art in the items directory", async
     );
 
     assert.equal(uploadSource, "data");
-    assert.match(uploadTarget, /^assets\/handy-dandy\/items\/clockwork-key\/.+$/);
-    assert.ok(result.startsWith("assets/handy-dandy/items/"));
+    assert.equal(uploadTarget, "assets/handy-dandy/items/clockwork-key");
+    assert.ok(result.startsWith("assets/handy-dandy/items/clockwork-key/clockwork-key-"));
     assert.ok(result.endsWith(".png"));
   } finally {
     (globalThis as { FilePicker?: unknown }).FilePicker = priorPicker;
@@ -192,21 +195,25 @@ test("generateTransparentTokenImage supports prompt override and reference image
   );
 });
 
-test("generateTransparentTokenImage stores each regeneration at a unique path", async () => {
+test("generateTransparentTokenImage stores repeated regenerations in one slug directory with incrementing image names", async () => {
   const priorPicker = (globalThis as { FilePicker?: unknown }).FilePicker;
   const priorGame = (globalThis as { game?: unknown }).game;
-  const priorNow = Date.now;
-  const priorRandom = Math.random;
-
-  Date.now = () => 1_700_000_000_000;
-  Math.random = () => 0;
+  const filesByDirectory = new Map<string, string[]>();
 
   (globalThis as { game?: unknown }).game = undefined;
   (globalThis as { FilePicker?: unknown }).FilePicker = {
     createDirectory: async () => {
       /* no-op */
     },
-    upload: async (_source: string, target: string, file: File) => ({ path: `${target}/${file.name}` }),
+    browse: async (_source: string, target: string) => ({
+      files: (filesByDirectory.get(target) ?? []).map((name) => `${target}/${name}`),
+    }),
+    upload: async (_source: string, target: string, file: File) => {
+      const existing = filesByDirectory.get(target) ?? [];
+      existing.push(file.name);
+      filesByDirectory.set(target, existing);
+      return { path: `${target}/${file.name}` };
+    },
   };
 
   try {
@@ -233,15 +240,15 @@ test("generateTransparentTokenImage stores each regeneration at a unique path", 
     );
 
     assert.notEqual(first, second);
-    assert.notEqual(
+    assert.equal(
       first.split("/").slice(0, -1).join("/"),
       second.split("/").slice(0, -1).join("/"),
     );
-    assert.ok(first.startsWith("assets/handy-dandy/actors/"));
-    assert.ok(second.startsWith("assets/handy-dandy/actors/"));
+    assert.match(first, /\/collision-test-1\.png$/);
+    assert.match(second, /\/collision-test-2\.png$/);
+    assert.ok(first.startsWith("assets/handy-dandy/actors/collision-test/"));
+    assert.ok(second.startsWith("assets/handy-dandy/actors/collision-test/"));
   } finally {
-    Date.now = priorNow;
-    Math.random = priorRandom;
     (globalThis as { FilePicker?: unknown }).FilePicker = priorPicker;
     (globalThis as { game?: unknown }).game = priorGame;
   }
@@ -262,6 +269,7 @@ test("generateTransparentTokenImage respects configured generated image director
     createDirectory: async () => {
       /* no-op */
     },
+    browse: async () => ({ files: [] }),
     upload: async (_source: string, target: string, file: File) => {
       uploadTarget = target;
       return { path: `${target}/${file.name}` };
@@ -280,8 +288,50 @@ test("generateTransparentTokenImage respects configured generated image director
       },
     );
 
-    assert.match(uploadTarget, /^assets\/my-custom-images\/actors\/configured-root-test\/.+$/);
-    assert.ok(result.startsWith("assets/my-custom-images/actors/configured-root-test/"));
+    assert.equal(uploadTarget, "assets/my-custom-images/actors/configured-root-test");
+    assert.ok(result.startsWith("assets/my-custom-images/actors/configured-root-test/configured-root-test-"));
+  } finally {
+    (globalThis as { FilePicker?: unknown }).FilePicker = priorPicker;
+    (globalThis as { game?: unknown }).game = priorGame;
+  }
+});
+
+test("generateTransparentTokenImage strips world-relative path prefixes from configured directory", async () => {
+  const priorPicker = (globalThis as { FilePicker?: unknown }).FilePicker;
+  const priorGame = (globalThis as { game?: unknown }).game;
+  let uploadTarget = "";
+
+  (globalThis as { game?: unknown }).game = {
+    settings: {
+      get: (_moduleId: string, key: string) =>
+        key === "GeneratedImageDirectory" ? "worlds/my-world/assets/handy-dandy" : undefined,
+    },
+  };
+  (globalThis as { FilePicker?: unknown }).FilePicker = {
+    createDirectory: async () => {
+      /* no-op */
+    },
+    browse: async () => ({ files: [] }),
+    upload: async (_source: string, target: string, file: File) => {
+      uploadTarget = target;
+      return { path: `${target}/${file.name}` };
+    },
+  };
+
+  try {
+    const result = await generateTransparentTokenImage(
+      {
+        generateImage: async () => ({ base64: SAMPLE_BASE64, mimeType: "image/png" }),
+      },
+      {
+        actorName: "World Prefix Test",
+        actorSlug: "world-prefix-test",
+        imageCategory: "actor",
+      },
+    );
+
+    assert.equal(uploadTarget, "assets/handy-dandy/actors/world-prefix-test");
+    assert.ok(result.startsWith("assets/handy-dandy/actors/world-prefix-test/world-prefix-test-"));
   } finally {
     (globalThis as { FilePicker?: unknown }).FilePicker = priorPicker;
     (globalThis as { game?: unknown }).game = priorGame;
