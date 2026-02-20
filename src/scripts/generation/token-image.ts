@@ -86,8 +86,13 @@ function sanitizeFilename(value: string): string {
     .slice(0, 64) || "generated-token";
 }
 
+function stripPathQueryAndHash(value: string): string {
+  return value.split(/[?#]/, 1)[0] ?? value;
+}
+
 function extractFileName(path: string): string {
-  return path.replace(/\\/g, "/").split("/").filter(Boolean).pop() ?? "";
+  const withoutQuery = stripPathQueryAndHash(path);
+  return withoutQuery.replace(/\\/g, "/").split("/").filter(Boolean).pop() ?? "";
 }
 
 function escapeRegExp(value: string): string {
@@ -111,7 +116,8 @@ function uniqueNumericSuffix(): number {
 }
 
 function normalizeComparablePath(path: string): string {
-  return normalizeUploadedPath(path).replace(/\\/g, "/").replace(/^\/+/, "").toLowerCase();
+  const normalized = normalizeUploadedPath(path).replace(/\\/g, "/").replace(/^\/+/, "");
+  return stripPathQueryAndHash(normalized).toLowerCase();
 }
 
 async function verifyUploadedImagePath(uploadedPath: string, targetDir: string): Promise<boolean | undefined> {

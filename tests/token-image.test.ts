@@ -308,6 +308,59 @@ test("generateTransparentTokenImage uses unique filenames when directory browse 
   }
 });
 
+test("generateTransparentTokenImage increments sequence when browse returns cache-busted URLs", async () => {
+  const priorPicker = (globalThis as { FilePicker?: unknown }).FilePicker;
+  const priorGame = (globalThis as { game?: unknown }).game;
+  const filesByDirectory = new Map<string, string[]>();
+
+  (globalThis as { game?: unknown }).game = undefined;
+  (globalThis as { FilePicker?: unknown }).FilePicker = {
+    createDirectory: async () => {
+      /* no-op */
+    },
+    browse: async (_source: string, target: string) => ({
+      files: (filesByDirectory.get(target) ?? []).map((name) => `${target}/${name}?v=cache-bust`),
+    }),
+    upload: async (_source: string, target: string, file: File) => {
+      const existing = filesByDirectory.get(target) ?? [];
+      existing.push(file.name);
+      filesByDirectory.set(target, existing);
+      return { path: `${target}/${file.name}` };
+    },
+  };
+
+  try {
+    const first = await generateTransparentTokenImage(
+      {
+        generateImage: async () => ({ base64: SAMPLE_BASE64, mimeType: "image/png" }),
+      },
+      {
+        actorName: "Cache Bust Test",
+        actorSlug: "cache-bust-test",
+        imageCategory: "actor",
+      },
+    );
+
+    const second = await generateTransparentTokenImage(
+      {
+        generateImage: async () => ({ base64: SAMPLE_BASE64, mimeType: "image/png" }),
+      },
+      {
+        actorName: "Cache Bust Test",
+        actorSlug: "cache-bust-test",
+        imageCategory: "actor",
+      },
+    );
+
+    assert.match(first, /\/cache-bust-test-1\.png$/);
+    assert.match(second, /\/cache-bust-test-2\.png$/);
+    assert.notEqual(first, second);
+  } finally {
+    (globalThis as { FilePicker?: unknown }).FilePicker = priorPicker;
+    (globalThis as { game?: unknown }).game = priorGame;
+  }
+});
+
 test("generateTransparentTokenImage respects configured generated image directory setting", async () => {
   const priorPicker = (globalThis as { FilePicker?: unknown }).FilePicker;
   const priorGame = (globalThis as { game?: unknown }).game;
