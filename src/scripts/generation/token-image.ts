@@ -28,6 +28,7 @@ const IMAGE_CATEGORY_DIRECTORY: Record<NonNullable<GenerateTokenImageOptions["im
   actor: "actors",
   item: "items",
 };
+const DEFAULT_GENERATED_IMAGE_NAME = "render" as const;
 
 function sanitizeFilename(value: string): string {
   return value
@@ -54,7 +55,7 @@ function buildEntropySuffix(): string {
 function buildUniqueFilename(base: string): string {
   const safeBase = sanitizeFilename(base);
   const suffix = buildEntropySuffix();
-  const maxBaseLength = Math.max(1, 96 - suffix.length);
+  const maxBaseLength = Math.max(1, 48 - suffix.length);
   const truncatedBase = safeBase.slice(0, maxBaseLength);
   return `${truncatedBase}-${suffix}`;
 }
@@ -122,11 +123,6 @@ async function ensureDataDirectory(path: string): Promise<void> {
   }
 }
 
-async function ensureGeneratedImageDirectories(): Promise<void> {
-  await ensureDataDirectory(`${GENERATED_IMAGE_ROOT}/${IMAGE_CATEGORY_DIRECTORY.actor}`);
-  await ensureDataDirectory(`${GENERATED_IMAGE_ROOT}/${IMAGE_CATEGORY_DIRECTORY.item}`);
-}
-
 async function uploadImage(
   image: GeneratedImageResult,
   fileName: string,
@@ -148,7 +144,7 @@ async function uploadImage(
     return null;
   }
 
-  await ensureGeneratedImageDirectories();
+  await ensureDataDirectory(targetDir);
 
   const blob = base64ToBlob(image.base64, image.mimeType);
   const extension = image.mimeType === "image/webp" ? "webp" : "png";
@@ -166,6 +162,16 @@ async function uploadImage(
   }
 
   return null;
+}
+
+function buildGenerationTargetDir(
+  category: NonNullable<GenerateTokenImageOptions["imageCategory"]>,
+  fileNameBase: string,
+): string {
+  const categoryDir = IMAGE_CATEGORY_DIRECTORY[category] ?? IMAGE_CATEGORY_DIRECTORY.actor;
+  const entityDir = sanitizeFilename(fileNameBase).replace(/-(token|item)$/i, "") || "generated";
+  const generationDir = buildEntropySuffix();
+  return `${GENERATED_IMAGE_ROOT}/${categoryDir}/${entityDir}/${generationDir}`;
 }
 
 export function buildTransparentTokenPrompt(options: GenerateTokenImageOptions): string {
@@ -217,9 +223,8 @@ async function storeGeneratedImage(
   fileNameBase: string,
   category: NonNullable<GenerateTokenImageOptions["imageCategory"]>,
 ): Promise<string> {
-  const fileName = buildUniqueFilename(fileNameBase);
-  const categoryDir = IMAGE_CATEGORY_DIRECTORY[category] ?? IMAGE_CATEGORY_DIRECTORY.actor;
-  const targetDir = `${GENERATED_IMAGE_ROOT}/${categoryDir}`;
+  const targetDir = buildGenerationTargetDir(category, fileNameBase);
+  const fileName = buildUniqueFilename(DEFAULT_GENERATED_IMAGE_NAME);
 
   try {
     const uploadedPath = await uploadImage(image, fileName, targetDir);

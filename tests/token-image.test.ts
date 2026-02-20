@@ -37,8 +37,9 @@ test("generateTransparentTokenImage uploads actor images into the actors directo
 
     assert.ok(createdSources.every((source) => source === "assets"));
     assert.equal(uploadSource, "assets");
-    assert.equal(uploadTarget, "handy-dandy/generated-images/actors");
+    assert.match(uploadTarget, /^handy-dandy\/generated-images\/actors\/clockwork-wasp\/.+$/);
     assert.ok(createdDirectories.includes("handy-dandy/generated-images/actors"));
+    assert.ok(createdDirectories.some((entry) => /^handy-dandy\/generated-images\/actors\/clockwork-wasp\/.+$/.test(entry)));
     assert.ok(result.startsWith("assets/handy-dandy/generated-images/actors/"));
     assert.ok(result.endsWith(".png"));
   } finally {
@@ -75,7 +76,7 @@ test("generateTransparentTokenImage uploads item images into the items directory
     );
 
     assert.equal(uploadSource, "assets");
-    assert.equal(uploadTarget, "handy-dandy/generated-images/items");
+    assert.match(uploadTarget, /^handy-dandy\/generated-images\/items\/clockwork-lens\/.+$/);
   } finally {
     (globalThis as { FilePicker?: unknown }).FilePicker = priorPicker;
   }
@@ -142,7 +143,7 @@ test("generateItemImage stores generated item art in the items directory", async
     );
 
     assert.equal(uploadSource, "assets");
-    assert.equal(uploadTarget, "handy-dandy/generated-images/items");
+    assert.match(uploadTarget, /^handy-dandy\/generated-images\/items\/clockwork-key\/.+$/);
     assert.ok(result.startsWith("assets/handy-dandy/generated-images/items/"));
     assert.ok(result.endsWith(".png"));
   } finally {
@@ -218,6 +219,10 @@ test("generateTransparentTokenImage stores each regeneration at a unique path", 
     );
 
     assert.notEqual(first, second);
+    assert.notEqual(
+      first.split("/").slice(0, -1).join("/"),
+      second.split("/").slice(0, -1).join("/"),
+    );
     assert.ok(first.startsWith("assets/handy-dandy/generated-images/actors/"));
     assert.ok(second.startsWith("assets/handy-dandy/generated-images/actors/"));
   } finally {
