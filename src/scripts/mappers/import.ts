@@ -19,6 +19,8 @@ import { toPf2eRichText } from "../text/pf2e-rich-text";
 
 const DEFAULT_ACTION_IMAGE = "systems/pf2e/icons/default-icons/action.svg" as const;
 const DEFAULT_ACTOR_IMAGE = "systems/pf2e/icons/default-icons/npc.svg" as const;
+const DEFAULT_HAZARD_IMAGE = "systems/pf2e/icons/default-icons/hazard.svg" as const;
+const DEFAULT_LOOT_IMAGE = "systems/pf2e/icons/default-icons/loot.svg" as const;
 const DEFAULT_STRIKE_IMAGE = "systems/pf2e/icons/default-icons/melee.svg" as const;
 const DEFAULT_SPELL_IMAGE = "systems/pf2e/icons/default-icons/spell.svg" as const;
 const DEFAULT_SPELLCASTING_IMAGE = "systems/pf2e/icons/default-icons/spellcastingEntry.svg" as const;
@@ -381,52 +383,7 @@ type FoundryActorSource = {
   name: string;
   type: string;
   img: string;
-  system: {
-    slug: string;
-    traits: {
-      value: string[];
-      rarity: string;
-      size: { value: string };
-      otherTags: string[];
-    };
-    details: {
-      level: { value: number };
-      alignment: { value: string };
-      publicNotes: string;
-      privateNotes: string;
-      blurb: string;
-      languages: { value: string[]; details: string };
-      source: { value: string };
-      publication: { title: string; authors: string; license: string; remaster: boolean };
-    };
-    initiative: { statistic: string };
-    attributes: {
-      hp: { value: number; max: number; temp: number; details: string };
-      ac: { value: number; details: string };
-      speed: {
-        value: number;
-        details: string;
-        otherSpeeds: { type: string; value: number; details: string }[];
-      };
-      immunities: { type: string; exceptions: string[]; notes: string }[];
-      weaknesses: { type: string; value: number; exceptions: string[]; notes: string }[];
-      resistances: { type: string; value: number; exceptions: string[]; doubleVs: string[]; notes: string }[];
-      allSaves: { value: string };
-    };
-    resources: Record<string, unknown>;
-    _migration: {
-      version: number;
-      previous: { schema: number; foundry: string; system: string };
-    };
-    perception: { mod: number; details: string; senses: FoundrySense[]; vision: boolean };
-    saves: {
-      fortitude: { value: number; saveDetail: string };
-      reflex: { value: number; saveDetail: string };
-      will: { value: number; saveDetail: string };
-    };
-    abilities: Record<string, { mod: number }>;
-    skills: Record<string, { value: number; base: number; details: string }>;
-  };
+  system: Record<string, unknown>;
   prototypeToken: Record<string, unknown>;
   items: FoundryActorItemSource[];
   effects: unknown[];
@@ -693,6 +650,17 @@ function assertSystemCompatibility(expected: SystemId): void {
 
 function toRichText(text: string | null | undefined): string {
   return toPf2eRichText(text);
+}
+
+function resolveDefaultActorImage(actorType: ActorSchemaData["actorType"]): string {
+  switch (actorType) {
+    case "hazard":
+      return DEFAULT_HAZARD_IMAGE;
+    case "loot":
+      return DEFAULT_LOOT_IMAGE;
+    default:
+      return DEFAULT_ACTOR_IMAGE;
+  }
 }
 
 function priceToCoins(price: number | null | undefined): Record<string, number> {
@@ -1435,6 +1403,28 @@ function getNestedProperty(source: Record<string, unknown>, path: readonly strin
   return cursor;
 }
 
+function shouldPreserveOriginalEmbeddedType(originalType: string, resolvedType: string): boolean {
+  if (!originalType) {
+    return false;
+  }
+
+  if (originalType === resolvedType) {
+    return true;
+  }
+
+  switch (originalType) {
+    case "action":
+    case "spell":
+    case "effect":
+    case "condition":
+    case "melee":
+    case "spellcastingEntry":
+      return true;
+    default:
+      return false;
+  }
+}
+
 function mergeCompendiumActorItem(
   original: FoundryActorItemSource,
   match: OfficialItemMatch,
@@ -1473,7 +1463,12 @@ function mergeCompendiumActorItem(
   }
 
   const originalType = (original as { type?: unknown }).type;
-  if (typeof originalType === "string" && originalType) {
+  const resolvedType = typeof merged.type === "string" ? merged.type : "";
+  if (
+    typeof originalType === "string" &&
+    originalType &&
+    shouldPreserveOriginalEmbeddedType(originalType, resolvedType)
+  ) {
     merged.type = originalType;
   }
 
@@ -1751,6 +1746,18 @@ function prepareItemSource(item: ItemSchemaData): FoundryItemSource {
 }
 
 function prepareActorSource(actor: ActorSchemaData): FoundryActorSource {
+  if (actor.actorType === "loot") {
+    return prepareLootActorSource(actor);
+  }
+
+  if (actor.actorType === "hazard") {
+    return prepareHazardActorSource(actor);
+  }
+
+  return prepareCreatureActorSource(actor);
+}
+
+function prepareCreatureActorSource(actor: ActorSchemaData): FoundryActorSource {
   const traits = trimArray(actor.traits).map((value) => value.toLowerCase());
   const languages = trimArray(actor.languages).map((value) => value.toLowerCase());
   const source = sanitizeText(actor.source);
@@ -1775,8 +1782,8 @@ function prepareActorSource(actor: ActorSchemaData): FoundryActorSource {
 
   return {
     name: actor.name,
-    type: actor.actorType === "npc" ? "npc" : actor.actorType,
-    img: actor.img?.trim() || DEFAULT_ACTOR_IMAGE,
+    type: actor.actorType,
+    img: actor.img?.trim() || resolveDefaultActorImage(actor.actorType),
     system: {
       slug: actor.slug,
       traits: {
@@ -1864,6 +1871,201 @@ function prepareActorSource(actor: ActorSchemaData): FoundryActorSource {
   };
 }
 
+function prepareLootActorSource(actor: ActorSchemaData): FoundryActorSource {
+  const description = toRichText(actor.description);
+  const settings = actor.loot ?? null;
+  const lootSheetType = settings?.lootSheetType === "Merchant" ? "Merchant" : "Loot";
+  const hiddenWhenEmpty = settings?.hiddenWhenEmpty === true;
+  const inventoryItems = actor.inventory?.map((entry, index) => createInventoryItem(actor, entry, index, { lootOnly: true })) ?? [];
+
+  return {
+    name: actor.name,
+    type: "loot",
+    img: actor.img?.trim() || resolveDefaultActorImage("loot"),
+    system: {
+      slug: actor.slug,
+      details: {
+        description,
+        level: { value: Math.max(0, actor.level) },
+      },
+      lootSheetType,
+      hiddenWhenEmpty,
+      _migration: {
+        version: null,
+        previous: null,
+      },
+    },
+    prototypeToken: buildPrototypeToken(actor, { hpBarAttribute: null }),
+    items: inventoryItems,
+    effects: [],
+    folder: null,
+    flags: {},
+  };
+}
+
+function prepareHazardActorSource(actor: ActorSchemaData): FoundryActorSource {
+  const traits = trimArray(actor.traits).map((value) => value.toLowerCase());
+  const source = sanitizeText(actor.source);
+  const publication = normalizePublicationDetails(actor.publication, source);
+  const description = toRichText(actor.description);
+  const hazard = actor.hazard ?? null;
+  const stealthBonus = typeof hazard?.stealthBonus === "number" && Number.isFinite(hazard.stealthBonus)
+    ? Math.trunc(hazard.stealthBonus)
+    : actor.attributes.perception.value;
+  const stealthDetails = sanitizeText(hazard?.stealthDetails ?? actor.attributes.perception.details);
+  const hardness = typeof hazard?.hardness === "number" && Number.isFinite(hazard.hardness)
+    ? Math.max(0, Math.trunc(hazard.hardness))
+    : 0;
+  const disable = toRichText(hazard?.disable ?? "");
+  const routine = toRichText(hazard?.routine ?? "");
+  const reset = toRichText(hazard?.reset ?? "");
+  const emitsSound = normalizeHazardEmitsSound(hazard?.emitsSound);
+  const strikes = actor.strikes.map((strike, index) => createStrikeItem(actor, strike, index));
+  const actions = actor.actions.map((action, index) => createActionItem(actor, action, index));
+  const saves = {
+    fortitude: normalizeHazardSave(actor.attributes.saves.fortitude),
+    reflex: normalizeHazardSave(actor.attributes.saves.reflex),
+    will: normalizeHazardSave(actor.attributes.saves.will),
+  };
+
+  return {
+    name: actor.name,
+    type: "hazard",
+    img: actor.img?.trim() || resolveDefaultActorImage("hazard"),
+    system: {
+      slug: actor.slug,
+      traits: {
+        value: traits,
+        rarity: actor.rarity,
+        size: { value: actor.size },
+      },
+      attributes: {
+        hp: {
+          value: actor.attributes.hp.value,
+          max: actor.attributes.hp.max,
+          temp: actor.attributes.hp.temp ?? 0,
+          details: sanitizeText(actor.attributes.hp.details),
+        },
+        ac: { value: actor.attributes.ac.value },
+        hardness,
+        stealth: {
+          value: stealthBonus,
+          details: stealthDetails,
+        },
+        immunities: sanitizeHazardImmunities(actor.attributes.immunities),
+        weaknesses: sanitizeHazardWeaknesses(actor.attributes.weaknesses),
+        resistances: sanitizeHazardResistances(actor.attributes.resistances),
+        emitsSound,
+      },
+      details: {
+        description,
+        level: { value: actor.level },
+        isComplex: hazard?.isComplex === true,
+        disable,
+        routine,
+        reset,
+        publication,
+      },
+      saves,
+      statusEffects: [],
+      _migration: {
+        version: null,
+        previous: null,
+      },
+    },
+    prototypeToken: buildPrototypeToken(actor),
+    items: [...strikes, ...actions],
+    effects: [],
+    folder: null,
+    flags: {},
+  };
+}
+
+function normalizeHazardEmitsSound(value: NonNullable<ActorSchemaData["hazard"]>["emitsSound"] | undefined): boolean | "encounter" {
+  if (value === true || value === false) {
+    return value;
+  }
+  return "encounter";
+}
+
+function normalizeHazardSave(save: ActorSchemaData["attributes"]["saves"]["fortitude"]): {
+  value: number | null;
+  saveDetail: string;
+} {
+  const value = Number.isFinite(save.value) ? Math.trunc(save.value) : 0;
+  const saveDetail = sanitizeText(save.details);
+  return {
+    value: value === 0 && !saveDetail ? null : value,
+    saveDetail,
+  };
+}
+
+function sanitizeHazardImmunities(
+  values: ActorSchemaData["attributes"]["immunities"] | null | undefined,
+): Array<{ type: string; exceptions: string[] }> {
+  if (!values?.length) {
+    return [];
+  }
+
+  const sanitized: Array<{ type: string; exceptions: string[] }> = [];
+  for (const entry of values) {
+    if (!entry?.type) {
+      continue;
+    }
+    sanitized.push({
+      type: entry.type,
+      exceptions: sanitizeIwrStringList(entry.exceptions, "immunities"),
+    });
+  }
+
+  return sanitized;
+}
+
+function sanitizeHazardWeaknesses(
+  values: ActorSchemaData["attributes"]["weaknesses"] | null | undefined,
+): Array<{ type: string; value: number; exceptions: string[] }> {
+  if (!values?.length) {
+    return [];
+  }
+
+  const sanitized: Array<{ type: string; value: number; exceptions: string[] }> = [];
+  for (const entry of values) {
+    if (!entry?.type) {
+      continue;
+    }
+    sanitized.push({
+      type: entry.type,
+      value: Number.isFinite(entry.value) ? Math.max(1, Math.trunc(entry.value)) : 1,
+      exceptions: sanitizeIwrStringList(entry.exceptions, "weaknesses"),
+    });
+  }
+
+  return sanitized;
+}
+
+function sanitizeHazardResistances(
+  values: ActorSchemaData["attributes"]["resistances"] | null | undefined,
+): Array<{ type: string; value: number; exceptions: string[]; doubleVs: string[] }> {
+  if (!values?.length) {
+    return [];
+  }
+
+  const sanitized: Array<{ type: string; value: number; exceptions: string[]; doubleVs: string[] }> = [];
+  for (const entry of values) {
+    if (!entry?.type) {
+      continue;
+    }
+    sanitized.push({
+      type: entry.type,
+      value: Number.isFinite(entry.value) ? Math.max(1, Math.trunc(entry.value)) : 1,
+      exceptions: sanitizeIwrStringList(entry.exceptions, "resistances"),
+      doubleVs: sanitizeIwrStringList(entry.doubleVs, "resistances"),
+    });
+  }
+
+  return sanitized;
+}
+
 function prepareGeneratedActorSource(actor: ActorGenerationResult): FoundryActorSource {
   const sanitizedItems = sanitizeGeneratedActorItemsForImport(actor.items);
   const system = clone((actor.system ?? {}) as FoundryActorSource["system"]);
@@ -1873,7 +2075,7 @@ function prepareGeneratedActorSource(actor: ActorGenerationResult): FoundryActor
   return {
     name: actor.name,
     type: actor.type,
-    img: actor.img?.trim() || DEFAULT_ACTOR_IMAGE,
+    img: actor.img?.trim() || resolveDefaultActorImage(actor.type),
     system,
     prototypeToken: clone(actor.prototypeToken ?? {}),
     items: sanitizedItems,
@@ -2583,12 +2785,24 @@ function normalizeInventoryEntryImage(
   return trimmed;
 }
 
+function coerceLootInventoryItemType(itemType: ItemSchemaData["itemType"]): ItemSchemaData["itemType"] {
+  switch (itemType) {
+    case "feat":
+    case "spell":
+      return "equipment";
+    default:
+      return itemType;
+  }
+}
+
 function createInventoryItem(
   actor: ActorSchemaData,
   entry: ActorInventoryEntry,
   index: number,
+  options: { lootOnly?: boolean } = {},
 ): FoundryActorGenericItemSource {
-  const itemType = mapInventoryItemType(entry.itemType, entry.name, entry.description);
+  const mappedType = mapInventoryItemType(entry.itemType, entry.name, entry.description);
+  const itemType = options.lootOnly ? coerceLootInventoryItemType(mappedType) : mappedType;
   const slug = entry.slug?.trim() || toSlug(entry.name) || toSlug(generateId());
   const normalizedImg = normalizeInventoryEntryImage(entry.img ?? null, itemType);
   const source = prepareItemSource({
@@ -2628,10 +2842,12 @@ function createInventoryItem(
   };
 }
 
+type FoundryActorSkillMap = Record<string, { value: number; base: number; details: string }>;
+
 function buildSkillMap(
   skills: ActorSchemaData["skills"],
-): FoundryActorSource["system"]["skills"] {
-  const result: FoundryActorSource["system"]["skills"] = {};
+): FoundryActorSkillMap {
+  const result: FoundryActorSkillMap = {};
   for (const skill of skills) {
     result[skill.slug] = {
       value: skill.modifier,
@@ -2651,9 +2867,13 @@ const TOKEN_SIZE_MAP: Record<ActorSchemaData["size"], number> = {
   grg: 4,
 };
 
-function buildPrototypeToken(actor: ActorSchemaData): Record<string, unknown> {
-  const img = actor.img?.trim() || DEFAULT_ACTOR_IMAGE;
+function buildPrototypeToken(
+  actor: ActorSchemaData,
+  options: { hpBarAttribute?: string | null } = {},
+): Record<string, unknown> {
+  const img = actor.img?.trim() || resolveDefaultActorImage(actor.actorType);
   const tokenSize = TOKEN_SIZE_MAP[actor.size] ?? 1;
+  const hpBarAttribute = Object.hasOwn(options, "hpBarAttribute") ? options.hpBarAttribute ?? null : "attributes.hp";
   return {
     name: actor.name,
     displayName: 20,
@@ -2678,7 +2898,7 @@ function buildPrototypeToken(actor: ActorSchemaData): Record<string, unknown> {
     alpha: 1,
     disposition: -1,
     displayBars: 20,
-    bar1: { attribute: "attributes.hp" },
+    bar1: { attribute: hpBarAttribute },
     bar2: { attribute: null },
     light: {
       negative: false,
@@ -2743,9 +2963,14 @@ export function toFoundryActorData(actor: ActorSchemaData): FoundryActorSource {
   return prepareActorSource(actor);
 }
 
-export async function toFoundryActorDataWithCompendium(actor: ActorSchemaData): Promise<FoundryActorSource> {
+export async function toFoundryActorDataWithCompendium(
+  actor: ActorSchemaData,
+  options: { resolveOfficialContent?: boolean } = {},
+): Promise<FoundryActorSource> {
   const source = prepareActorSource(actor);
-  source.items = await resolveActorItems(source.items);
+  if (options.resolveOfficialContent !== false) {
+    source.items = await resolveActorItems(source.items);
+  }
   return source;
 }
 

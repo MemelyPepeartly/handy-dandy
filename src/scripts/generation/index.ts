@@ -260,10 +260,14 @@ export async function generateActor(
 
   reportProgress(options, {
     step: "mapping",
-    message: "Resolving compendium links and finalizing actor data...",
+    message: input.includeOfficialContent === false
+      ? "Finalizing actor data without official compendium linking..."
+      : "Resolving compendium links and finalizing actor data...",
     percent: 90,
   });
-  const foundry = await toFoundryActorDataWithCompendium(canonical);
+  const foundry = await toFoundryActorDataWithCompendium(canonical, {
+    resolveOfficialContent: input.includeOfficialContent !== false,
+  });
 
   if (input.generateTokenImage && canonical.img?.trim()) {
     const generatedImage = canonical.img.trim();

@@ -71,6 +71,8 @@ export interface PromptWorkbenchRequest<T extends EntityType> extends ImporterOp
   readonly publication?: PublicationData;
   readonly includeSpellcasting?: boolean;
   readonly includeInventory?: boolean;
+  readonly includeOfficialContent?: boolean;
+  readonly includeGeneratedContent?: boolean;
   readonly generateTokenImage?: boolean;
   readonly tokenPrompt?: string;
   readonly generateItemImage?: boolean;
@@ -197,6 +199,8 @@ export async function generateWorkbenchEntry<T extends EntityType>(
     publication,
     includeSpellcasting,
     includeInventory,
+    includeOfficialContent,
+    includeGeneratedContent,
     generateTokenImage,
     tokenPrompt,
     generateItemImage,
@@ -218,6 +222,8 @@ export async function generateWorkbenchEntry<T extends EntityType>(
     level,
     includeSpellcasting,
     includeInventory,
+    includeOfficialContent,
+    includeGeneratedContent,
     generateTokenImage,
     tokenPrompt,
     generateItemImage,
@@ -256,6 +262,8 @@ function buildPromptInput<T extends EntityType>(
     level?: number;
     includeSpellcasting?: boolean;
     includeInventory?: boolean;
+    includeOfficialContent?: boolean;
+    includeGeneratedContent?: boolean;
     generateTokenImage?: boolean;
     tokenPrompt?: string;
     generateItemImage?: boolean;
@@ -272,6 +280,8 @@ function buildPromptInput<T extends EntityType>(
     level,
     includeSpellcasting,
     includeInventory,
+    includeOfficialContent,
+    includeGeneratedContent,
     generateTokenImage,
     tokenPrompt,
     generateItemImage,
@@ -316,6 +326,8 @@ function buildPromptInput<T extends EntityType>(
         level,
         includeSpellcasting,
         includeInventory,
+        includeOfficialContent,
+        includeGeneratedContent,
         generateTokenImage,
         tokenPrompt,
       } satisfies ActorPromptInput as PromptInputMap[T];

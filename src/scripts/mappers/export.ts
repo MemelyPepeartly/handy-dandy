@@ -50,6 +50,7 @@ const ITEM_TYPE_MAP: Record<string, ItemCategory> = {
 const ACTOR_TYPE_MAP: Record<string, ActorCategory> = {
   character: "character",
   npc: "npc",
+  loot: "loot",
   hazard: "hazard",
   vehicle: "vehicle",
   familiar: "familiar"
@@ -293,6 +294,74 @@ function normalizeAlignment(value: unknown): string | null {
     return normalizeAlignment((value as { value?: unknown }).value ?? null);
   }
   return null;
+}
+
+function extractActorDescriptionByType(doc: FoundryActor, actorType: ActorCategory): string | null {
+  const details = doc.system?.details;
+  if (actorType === "hazard" || actorType === "loot") {
+    const rawDescription = typeof details?.description === "string"
+      ? details.description
+      : (details?.description as { value?: unknown } | undefined)?.value;
+    const normalized = normalizeHtml(rawDescription);
+    return normalized || null;
+  }
+
+  return normalizeHtml(details?.publicNotes);
+}
+
+function extractActorRecallKnowledgeByType(doc: FoundryActor, actorType: ActorCategory): string | null {
+  if (actorType === "hazard" || actorType === "loot") {
+    return null;
+  }
+
+  return normalizeHtml(doc.system?.details?.privateNotes);
+}
+
+function resolveHazardEmitsSound(value: unknown): NonNullable<ActorSchemaData["hazard"]>["emitsSound"] {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true") {
+      return true;
+    }
+    if (normalized === "false") {
+      return false;
+    }
+  }
+
+  return "encounter";
+}
+
+function extractLootSettings(doc: FoundryActor): ActorSchemaData["loot"] {
+  const sheetTypeRaw = doc.system?.lootSheetType;
+  const normalizedType = typeof sheetTypeRaw === "string" && sheetTypeRaw.trim().toLowerCase() === "merchant"
+    ? "Merchant"
+    : "Loot";
+
+  return {
+    lootSheetType: normalizedType,
+    hiddenWhenEmpty: Boolean(doc.system?.hiddenWhenEmpty),
+  };
+}
+
+function extractHazardSettings(doc: FoundryActor): ActorSchemaData["hazard"] {
+  const details = (doc.system?.details ?? {}) as Record<string, unknown>;
+  const attributes = (doc.system?.attributes ?? {}) as Record<string, unknown>;
+  const stealth = (attributes.stealth ?? {}) as Record<string, unknown>;
+
+  return {
+    isComplex: Boolean(details.isComplex),
+    disable: coerceOptionalString(details.disable),
+    routine: coerceOptionalString(details.routine),
+    reset: coerceOptionalString(details.reset),
+    emitsSound: resolveHazardEmitsSound(attributes.emitsSound),
+    hardness: coerceNonNegativeInteger(attributes.hardness, 0),
+    stealthBonus: coerceInteger(stealth.value, 0),
+    stealthDetails: coerceOptionalString(stealth.details),
+  };
 }
 
 function extractActorAttributes(doc: FoundryActor): ActorSchemaData["attributes"] {
@@ -1090,6 +1159,7 @@ export function fromFoundryItem(doc: FoundryItem): ItemSchemaData {
 
 export function fromFoundryActor(doc: FoundryActor): ActorSchemaData {
   const slug = normalizeSlug({ ...doc, system: doc.system });
+  const actorType = resolveActorType(doc.type);
 
   const levelRaw =
     typeof doc.system?.details?.level === "number" || typeof doc.system?.details?.level === "string"
@@ -1107,6 +1177,8 @@ export function fromFoundryActor(doc: FoundryActor): ActorSchemaData {
   const source = normalizeSource(doc.system?.details?.source ?? doc.system?.source) ?? "";
   const publication = normalizePublication(doc.system?.details?.publication, source);
   const img = normalizeImg(doc.img) ?? null;
+  const description = extractActorDescriptionByType(doc, actorType);
+  const recallKnowledge = extractActorRecallKnowledgeByType(doc, actorType);
 
   const result: ActorSchemaData = {
     schema_version: DEFAULT_SCHEMA_VERSION,
@@ -1114,7 +1186,7 @@ export function fromFoundryActor(doc: FoundryActor): ActorSchemaData {
     type: "actor",
     slug,
     name: doc.name,
-    actorType: resolveActorType(doc.type),
+    actorType,
     rarity: normalizeRarity(rarityValue),
     level: Number.isFinite(level) ? Number(level) : 0,
     size: normalizeActorSize(
@@ -1132,8 +1204,8 @@ export function fromFoundryActor(doc: FoundryActor): ActorSchemaData {
     actions: extractActorActions(doc.items),
     spellcasting: extractActorSpellcasting(doc.items),
     inventory: extractActorInventory(doc.items),
-    description: normalizeHtml(doc.system?.details?.publicNotes),
-    recallKnowledge: normalizeHtml(doc.system?.details?.privateNotes),
+    description,
+    recallKnowledge,
     img,
     source,
     publication,
@@ -1145,6 +1217,18 @@ export function fromFoundryActor(doc: FoundryActor): ActorSchemaData {
 
   if (!result.inventory?.length) {
     delete result.inventory;
+  }
+
+  if (actorType === "loot") {
+    result.loot = extractLootSettings(doc);
+  } else {
+    delete result.loot;
+  }
+
+  if (actorType === "hazard") {
+    result.hazard = extractHazardSettings(doc);
+  } else {
+    delete result.hazard;
   }
 
   return result;

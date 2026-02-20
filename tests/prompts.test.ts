@@ -82,3 +82,33 @@ test("buildActorPrompt includes PF2E structure expectations, inventory support, 
   assert.match(prompt, /transparent token image generation/i);
   assert.match(prompt, /Token image direction: glass visor and luminous rune sigils/);
 });
+
+test("buildActorPrompt supports loot and hazard source-mode guidance", () => {
+  const lootPrompt = buildActorPrompt({
+    systemId: "pf2e",
+    name: "Collapsed Armory Cache",
+    referenceText: "Ancient vault cache with curated official treasure only.",
+    actorType: "loot",
+    includeOfficialContent: true,
+    includeGeneratedContent: false,
+  });
+
+  assert.match(lootPrompt, /loot: optional object/i);
+  assert.match(lootPrompt, /Official content mode:/i);
+  assert.match(lootPrompt, /Avoid fabricated stand-ins/i);
+  assert.match(lootPrompt, /lootSheetType/i);
+
+  const hazardPrompt = buildActorPrompt({
+    systemId: "pf2e",
+    name: "Hall of Echoing Knives",
+    referenceText: "Complex magical hazard with DC checks and damage routines.",
+    actorType: "hazard",
+    includeOfficialContent: true,
+    includeGeneratedContent: true,
+  });
+
+  assert.match(hazardPrompt, /hazard: optional object/i);
+  assert.match(hazardPrompt, /Hazard focus:/i);
+  assert.match(hazardPrompt, /populate hazard metadata/i);
+  assert.match(hazardPrompt, /inline macros for dice rolls, checks, DCs/i);
+});

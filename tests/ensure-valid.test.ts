@@ -156,6 +156,76 @@ test("ensureValid filters traits to the PF2e dictionary", async () => {
   assert.deepEqual(result.actions[0]?.traits, ["auditory"]);
 });
 
+test("ensureValid normalizes loot and hazard actor-type settings", async () => {
+  const lootPayload = {
+    schema_version: 3,
+    systemId: "pf2e",
+    type: "actor",
+    slug: "vault-cache",
+    name: "Vault Cache",
+    actorType: "loot",
+    rarity: "common",
+    level: 2,
+    size: "med",
+    traits: [],
+    languages: [],
+    attributes: {
+      hp: { value: 1, max: 1 },
+      ac: { value: 10 },
+      perception: { value: 0 },
+      speed: { value: 0 },
+      saves: {
+        fortitude: { value: 0 },
+        reflex: { value: 0 },
+        will: { value: 0 },
+      },
+    },
+    abilities: { str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0 },
+    skills: [],
+    strikes: [],
+    actions: [],
+    loot: {
+      lootSheetType: "merchant",
+      hiddenWhenEmpty: "true",
+    },
+    img: null,
+    source: "",
+  };
+
+  const lootResult = await ensureValid({ type: "actor", payload: lootPayload });
+  assert.deepEqual(lootResult.loot, { lootSheetType: "Merchant", hiddenWhenEmpty: true });
+  assert.equal(lootResult.hazard, null);
+
+  const hazardPayload = {
+    ...lootPayload,
+    slug: "hall-of-blades",
+    name: "Hall of Blades",
+    actorType: "hazard",
+    hazard: {
+      isComplex: "true",
+      disable: "Thievery DC 24",
+      routine: "2d8 slashing damage each round.",
+      reset: "Resets each dawn.",
+      emitsSound: "false",
+      hardness: "7",
+      stealthBonus: "12",
+      stealthDetails: "Concealed hinges.",
+    },
+    loot: {
+      lootSheetType: "Loot",
+      hiddenWhenEmpty: false,
+    },
+  };
+
+  const hazardResult = await ensureValid({ type: "actor", payload: hazardPayload });
+  assert.equal(hazardResult.hazard?.isComplex, true);
+  assert.equal(hazardResult.hazard?.emitsSound, false);
+  assert.equal(hazardResult.hazard?.hardness, 7);
+  assert.equal(hazardResult.hazard?.stealthBonus, 12);
+  assert.equal(hazardResult.hazard?.stealthDetails, "Concealed hinges.");
+  assert.equal(hazardResult.loot, null);
+});
+
 test("ensureValid uses GPT repair when Ajv validation fails", async () => {
   const stub = new StubGPTClient();
   stub.enqueue({

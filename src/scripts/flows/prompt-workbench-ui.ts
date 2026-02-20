@@ -9,7 +9,6 @@ import {
 } from "./prompt-workbench";
 import type { GenerationProgressUpdate } from "../generation";
 import {
-  ACTOR_CATEGORIES,
   ITEM_CATEGORIES,
   SYSTEM_IDS,
   type ActorCategory,
@@ -72,10 +71,18 @@ type WorkbenchFormResponse = {
   readonly folderId: string;
   readonly includeSpellcasting: string | null;
   readonly includeInventory: string | null;
+  readonly includeOfficialContent: string | null;
+  readonly includeGeneratedContent: string | null;
   readonly tokenPrompt: string;
 };
 
 const workbenchHistory: WorkbenchHistoryEntry[] = [];
+const WORKBENCH_ACTOR_TYPES = ["npc", "loot", "hazard"] as const satisfies readonly ActorCategory[];
+type WorkbenchActorType = (typeof WORKBENCH_ACTOR_TYPES)[number];
+
+function isWorkbenchActorType(value: string): value is WorkbenchActorType {
+  return (WORKBENCH_ACTOR_TYPES as readonly string[]).includes(value);
+}
 
 Hooks.once("ready", () => {
   initialiseWorkbenchHistory();
@@ -703,11 +710,18 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
 
           <fieldset class="form-group" data-entity-scope="actor">
             <legend>Actor Content</legend>
-            <div class="form-fields">
+            <div class="form-fields" data-actor-type-scope="npc">
               <label><input type="checkbox" name="includeSpellcasting" /> Spellcasting?</label>
               <label><input type="checkbox" name="includeInventory" /> Inventory?</label>
             </div>
-            <p class="notes">Enable extra actor sections in the generated sheet data.</p>
+            <p class="notes" data-actor-type-scope="npc">Enable extra NPC sections in the generated sheet data.</p>
+            <div class="form-fields" data-actor-type-scope="loot hazard">
+              <label><input type="checkbox" name="includeOfficialContent" checked /> Official content</label>
+              <label><input type="checkbox" name="includeGeneratedContent" checked /> Generated content</label>
+            </div>
+            <p class="notes" data-actor-type-scope="loot hazard">
+              Select whether loot/hazard content should prefer official PF2E imports, generated content, or both.
+            </p>
           </fieldset>
           <fieldset class="form-group">
             <legend>Publication Details</legend>
@@ -791,6 +805,8 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
                 folderId: String(formData.get("folderId") ?? ""),
                 includeSpellcasting: formData.get("includeSpellcasting") as string | null,
                 includeInventory: formData.get("includeInventory") as string | null,
+                includeOfficialContent: formData.get("includeOfficialContent") as string | null,
+                includeGeneratedContent: formData.get("includeGeneratedContent") as string | null,
                 tokenPrompt: String(formData.get("tokenPrompt") ?? ""),
               });
             },
@@ -861,6 +877,17 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
     actorType = resolved;
   }
 
+  const usesActorContentModes = type === "actor" && (actorType === "loot" || actorType === "hazard");
+  const includeOfficialContent = usesActorContentModes ? Boolean(response.includeOfficialContent) : undefined;
+  const includeGeneratedContent = usesActorContentModes ? Boolean(response.includeGeneratedContent) : undefined;
+
+  if (usesActorContentModes && !includeOfficialContent && !includeGeneratedContent) {
+    ui.notifications?.error(
+      `${CONSTANTS.MODULE_NAME} | Select at least one content mode (Official content and/or Generated content).`,
+    );
+    return null;
+  }
+
   const referenceText = response.referenceText.trim();
   if (!referenceText) {
     ui.notifications?.error(`${CONSTANTS.MODULE_NAME} | Reference text or prompt is required.`);
@@ -888,7 +915,13 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
 
   const generateTokenImage = type === "actor" && actorArtMode === "token";
   const generateItemImage = type === "item" && itemArtMode === "generate";
-  const actorImagePath = response.actorImagePath.trim() || DEFAULT_IMAGE_PATH;
+  const actorDefaultImagePath = resolveActorDefaultImagePath(actorType);
+  const actorImageInput = response.actorImagePath.trim();
+  const actorImagePath = actorImageInput.length === 0
+    ? actorDefaultImagePath
+    : actorImageInput === DEFAULT_IMAGE_PATH && actorDefaultImagePath !== DEFAULT_IMAGE_PATH
+      ? actorDefaultImagePath
+      : actorImageInput;
   const itemImagePath = response.itemImagePath.trim() || DEFAULT_IMAGE_PATH;
   const img = type === "actor"
     ? (generateTokenImage ? undefined : actorImagePath)
@@ -913,8 +946,10 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
     folderId: response.folderId.trim() || undefined,
     publication,
     img,
-    includeSpellcasting: type === "actor" && response.includeSpellcasting ? true : undefined,
-    includeInventory: type === "actor" && response.includeInventory ? true : undefined,
+    includeSpellcasting: type === "actor" && actorType === "npc" && response.includeSpellcasting ? true : undefined,
+    includeInventory: type === "actor" && actorType === "npc" && response.includeInventory ? true : undefined,
+    includeOfficialContent,
+    includeGeneratedContent,
     generateTokenImage: generateTokenImage ? true : undefined,
     generateItemImage: generateItemImage ? true : undefined,
     tokenPrompt,
@@ -939,9 +974,20 @@ function sanitizeItemType(value: string): ItemCategory | null {
     : null;
 }
 
+function resolveActorDefaultImagePath(actorType: ActorCategory | undefined): string {
+  switch (actorType) {
+    case "hazard":
+      return "systems/pf2e/icons/default-icons/hazard.svg";
+    case "loot":
+      return "systems/pf2e/icons/default-icons/loot.svg";
+    default:
+      return DEFAULT_IMAGE_PATH;
+  }
+}
+
 function sanitizeActorType(value: string): ActorCategory | null {
   const normalized = value.trim().toLowerCase();
-  return ACTOR_CATEGORIES.includes(normalized as ActorCategory)
+  return isWorkbenchActorType(normalized)
     ? (normalized as ActorCategory)
     : null;
 }
@@ -999,14 +1045,14 @@ function formatActorTypeLabel(value: ActorCategory): string {
 function resolveAvailableActorCategories(): ActorCategory[] {
   const actorTypes = (game.system as { documentTypes?: { Actor?: unknown } } | undefined)?.documentTypes?.Actor;
   if (!Array.isArray(actorTypes)) {
-    return [...ACTOR_CATEGORIES];
+    return [...WORKBENCH_ACTOR_TYPES];
   }
 
   const supportedTypes = actorTypes
     .map((value) => (typeof value === "string" ? value.trim().toLowerCase() : ""))
-    .filter((value): value is ActorCategory => ACTOR_CATEGORIES.includes(value as ActorCategory));
+    .filter((value): value is ActorCategory => isWorkbenchActorType(value));
   if (!supportedTypes.length) {
-    return [...ACTOR_CATEGORIES];
+    return [...WORKBENCH_ACTOR_TYPES];
   }
 
   return Array.from(new Set(supportedTypes));
@@ -1836,6 +1882,8 @@ function setupWorkbenchRequestDialog(html: JQuery): void {
 
   const entityTypeField = container.querySelector<HTMLSelectElement>("#handy-dandy-workbench-entity-type");
   const scopedFields = Array.from(container.querySelectorAll<HTMLElement>("[data-entity-scope]"));
+  const actorTypeField = container.querySelector<HTMLSelectElement>("#handy-dandy-workbench-actor-type");
+  const actorTypeScopedFields = Array.from(container.querySelectorAll<HTMLElement>("[data-actor-type-scope]"));
   const actorArtModeInputs = Array.from(
     container.querySelectorAll<HTMLInputElement>("input[name=\"actorArtMode\"]"),
   );
@@ -1895,6 +1943,29 @@ function setupWorkbenchRequestDialog(html: JQuery): void {
     }
   };
 
+  const updateActorTypeScopedVisibility = (): void => {
+    const currentType = entityTypeField?.value ?? "";
+    const isActor = currentType === "actor";
+    const currentActorType = actorTypeField?.value?.trim().toLowerCase() ?? "";
+
+    for (const field of actorTypeScopedFields) {
+      const scopes = (field.dataset.actorTypeScope ?? "")
+        .split(/\s+/)
+        .map((value) => value.trim().toLowerCase())
+        .filter(Boolean);
+      const shouldShow = isActor && scopes.includes(currentActorType);
+      field.style.display = shouldShow ? "" : "none";
+      field.setAttribute("aria-hidden", shouldShow ? "false" : "true");
+
+      const controls = Array.from(
+        field.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>("input, select, textarea"),
+      );
+      for (const control of controls) {
+        control.disabled = !shouldShow;
+      }
+    }
+  };
+
   const updateScopedFieldVisibility = (): void => {
     const currentType = entityTypeField?.value ?? "";
     for (const field of scopedFields) {
@@ -1925,6 +1996,7 @@ function setupWorkbenchRequestDialog(html: JQuery): void {
 
     updateActorArtModeVisibility();
     updateItemArtModeVisibility();
+    updateActorTypeScopedVisibility();
   };
 
   const historyList = container.querySelector<HTMLElement>("[data-history-list]");
@@ -1943,6 +2015,7 @@ function setupWorkbenchRequestDialog(html: JQuery): void {
   updateDialogButtonsVisibility();
   updateScopedFieldVisibility();
   entityTypeField?.addEventListener("change", updateScopedFieldVisibility);
+  actorTypeField?.addEventListener("change", updateActorTypeScopedVisibility);
   for (const input of actorArtModeInputs) {
     input.addEventListener("change", updateActorArtModeVisibility);
   }

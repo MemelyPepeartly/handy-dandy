@@ -8,8 +8,24 @@ const GLYPH_MAP: Record<string, string> = {
 };
 
 const CHECK_STAT_MAP: Record<string, string> = {
+  acrobatics: "acrobatics",
+  arcana: "arcana",
+  athletics: "athletics",
+  crafting: "crafting",
+  deception: "deception",
+  diplomacy: "diplomacy",
   fortitude: "fortitude",
+  intimidation: "intimidation",
+  medicine: "medicine",
+  nature: "nature",
+  occultism: "occultism",
+  performance: "performance",
   reflex: "reflex",
+  religion: "religion",
+  society: "society",
+  stealth: "stealth",
+  survival: "survival",
+  thievery: "thievery",
   will: "will",
   perception: "perception",
 };
@@ -159,14 +175,17 @@ function applyInlineMarkdown(value: string): string {
 
 function applyInlineChecks(value: string): string {
   let next = value;
+  const statPattern = Object.keys(CHECK_STAT_MAP)
+    .sort((left, right) => right.length - left.length)
+    .join("|");
 
   next = next.replace(
-    /\bDC\s*(\d+)\s*(Fortitude|Reflex|Will|Perception)\b/gi,
+    new RegExp(`\\bDC\\s*(\\d+)\\s*(${statPattern})\\b`, "gi"),
     (_match, dc: string, stat: string) => `@Check[${CHECK_STAT_MAP[stat.toLowerCase()] ?? stat.toLowerCase()}|dc:${dc}]`,
   );
 
   next = next.replace(
-    /\b(Fortitude|Reflex|Will|Perception)\s*DC\s*(\d+)\b/gi,
+    new RegExp(`\\b(${statPattern})\\s*DC\\s*(\\d+)\\b`, "gi"),
     (_match, stat: string, dc: string) => `@Check[${CHECK_STAT_MAP[stat.toLowerCase()] ?? stat.toLowerCase()}|dc:${dc}]`,
   );
 

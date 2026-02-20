@@ -422,6 +422,106 @@ test("toFoundryActorData converts markdown emphasis inside HTML action descripti
   assert.equal(action!.system.description.value.includes("<strong>Frequency</strong>"), true);
 });
 
+test("toFoundryActorData maps loot actors to loot-sheet structure", () => {
+  const actor = createActor();
+  actor.actorType = "loot";
+  actor.level = 3;
+  actor.description = "A communal vault stash.";
+  actor.strikes = [];
+  actor.actions = [];
+  actor.spellcasting = [];
+  actor.loot = {
+    lootSheetType: "Merchant",
+    hiddenWhenEmpty: true,
+  };
+  actor.inventory = [
+    {
+      name: "Healing Potion",
+      itemType: "consumable",
+      quantity: 2,
+      level: 1,
+      description: "A restorative draft.",
+      img: null,
+    },
+    {
+      name: "Spell Ledger",
+      itemType: "spell",
+      quantity: 1,
+      level: 3,
+      description: "A copied spellbook page.",
+      img: null,
+    },
+  ];
+
+  const result = toFoundryActorData(actor);
+  const system = result.system as Record<string, any>;
+
+  assert.equal(result.type, "loot");
+  assert.equal(system.lootSheetType, "Merchant");
+  assert.equal(system.hiddenWhenEmpty, true);
+  assert.equal(system.details.level.value, 3);
+  assert.equal(result.items.length, 2);
+  assert.equal(result.items.some((item) => item.type === "spell" || item.type === "feat"), false);
+  const barAttribute = (result.prototypeToken as { bar1?: { attribute?: unknown } }).bar1?.attribute;
+  assert.equal(barAttribute, null);
+});
+
+test("toFoundryActorData maps hazards with hazard metadata and macro-ready text", () => {
+  const actor = createActor();
+  actor.actorType = "hazard";
+  actor.level = 7;
+  actor.traits = ["magical"];
+  actor.inventory = [];
+  actor.spellcasting = [];
+  actor.hazard = {
+    isComplex: true,
+    disable: "Thievery DC 26 to jam the gears.",
+    routine: "Each round, spinning blades deal 2d8 slashing damage (Reflex DC 24).",
+    reset: "Resets after 1 hour.",
+    emitsSound: "encounter",
+    hardness: 8,
+    stealthBonus: 14,
+    stealthDetails: "Visible to a trained eye.",
+  };
+  actor.actions = [
+    {
+      name: "Blade Burst",
+      actionCost: "reaction",
+      description: "Trigger A creature enters the corridor. Effect 2d8 slashing damage; Reflex DC 24.",
+      traits: ["fire"],
+      requirements: null,
+      trigger: null,
+      frequency: null,
+    },
+  ];
+  actor.strikes = [
+    {
+      name: "Spinning Blade",
+      type: "melee",
+      attackBonus: 15,
+      traits: ["agile"],
+      damage: [{ formula: "2d8", damageType: "slashing", notes: null }],
+      effects: [],
+      description: null,
+    },
+  ];
+
+  const result = toFoundryActorData(actor);
+  const system = result.system as Record<string, any>;
+
+  assert.equal(result.type, "hazard");
+  assert.equal(system.details.isComplex, true);
+  assert.equal(system.attributes.hardness, 8);
+  assert.equal(system.attributes.stealth.value, 14);
+  assert.equal(system.attributes.emitsSound, "encounter");
+  assert.match(String(system.details.disable), /@Check\[thievery\|dc:26\]/i);
+
+  const action = result.items.find((item) => item.type === "action" && item.name === "Blade Burst");
+  assert.ok(action, "expected generated hazard action");
+  assert.match(String((action as any).system.description.value), /@Damage\[/i);
+  assert.match(String((action as any).system.description.value), /@Check\[reflex\|dc:24\]/i);
+});
+
 test("toFoundryActorData links condition-style strike effects in descriptions", () => {
   const actor = createActor();
   actor.strikes = [

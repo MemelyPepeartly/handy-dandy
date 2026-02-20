@@ -29,6 +29,7 @@ export type ItemCategory = (typeof ITEM_CATEGORIES)[number];
 export const ACTOR_CATEGORIES = [
   "character",
   "npc",
+  "loot",
   "hazard",
   "vehicle",
   "familiar"
@@ -249,6 +250,22 @@ export interface ActorInventoryEntryData {
   img?: string | null;
 }
 
+export interface ActorLootSheetData {
+  lootSheetType?: "Loot" | "Merchant" | null;
+  hiddenWhenEmpty?: boolean | null;
+}
+
+export interface ActorHazardSheetData {
+  isComplex?: boolean | null;
+  disable?: string | null;
+  routine?: string | null;
+  reset?: string | null;
+  emitsSound?: boolean | "encounter" | null;
+  hardness?: number | null;
+  stealthBonus?: number | null;
+  stealthDetails?: string | null;
+}
+
 export interface ActorAttributeBlock {
   hp: ActorHitPointsData;
   ac: ActorArmorClassData;
@@ -275,6 +292,8 @@ export interface ActorSchemaData extends BaseEntity<"actor"> {
   actions: ActorActionData[];
   spellcasting?: ActorSpellcastingEntryData[] | null;
   inventory?: ActorInventoryEntryData[] | null;
+  loot?: ActorLootSheetData | null;
+  hazard?: ActorHazardSheetData | null;
   description?: string | null;
   recallKnowledge?: string | null;
   img: string | null;
@@ -418,7 +437,7 @@ export const actorSchema = {
     type: { type: "string", enum: ["actor"] as const },
     actorType: { type: "string", enum: ACTOR_CATEGORIES },
     rarity: { type: "string", enum: RARITIES },
-    level: { type: "integer", minimum: 0 },
+    level: { type: "integer", minimum: -1 },
     size: { type: "string", enum: ACTOR_SIZES },
     traits: {
       type: "array",
@@ -745,6 +764,41 @@ export const actorSchema = {
           description: { type: "string", nullable: true, default: null },
           img: { type: "string", nullable: true, default: null },
         },
+      },
+    },
+    loot: {
+      type: "object",
+      nullable: true,
+      default: null,
+      additionalProperties: false,
+      required: [],
+      properties: {
+        lootSheetType: { type: "string", enum: ["Loot", "Merchant"] as const, nullable: true, default: "Loot" },
+        hiddenWhenEmpty: { type: "boolean", nullable: true, default: false },
+      },
+    },
+    hazard: {
+      type: "object",
+      nullable: true,
+      default: null,
+      additionalProperties: false,
+      required: [],
+      properties: {
+        isComplex: { type: "boolean", nullable: true, default: false },
+        disable: { type: "string", nullable: true, default: null },
+        routine: { type: "string", nullable: true, default: null },
+        reset: { type: "string", nullable: true, default: null },
+        emitsSound: {
+          anyOf: [
+            { type: "boolean" },
+            { type: "string", enum: ["encounter"] as const },
+            { type: "null" },
+          ],
+          default: "encounter",
+        },
+        hardness: { type: "integer", minimum: 0, nullable: true, default: 0 },
+        stealthBonus: { type: "integer", nullable: true, default: null },
+        stealthDetails: { type: "string", nullable: true, default: null },
       },
     },
     description: { type: "string", nullable: true, default: null },

@@ -26,6 +26,8 @@ export interface ActorPromptInput {
   readonly level?: number;
   readonly includeSpellcasting?: boolean;
   readonly includeInventory?: boolean;
+  readonly includeOfficialContent?: boolean;
+  readonly includeGeneratedContent?: boolean;
   readonly generateTokenImage?: boolean;
   readonly tokenPrompt?: string;
 }
@@ -56,7 +58,7 @@ function buildActorSchemaSection(): string {
     "- name: non-empty string.",
     `- actorType: string enum (${categories}).`,
     `- rarity: string enum (${rarities}).`,
-    "- level: integer >= 0.",
+    "- level: integer >= -1.",
     `- size: string enum (${sizes}).`,
     `- traits: array of lowercase PF2e trait slugs from the active system; defaults to ${traitsDefault}.`,
     "- alignment: optional string; defaults to null.",
@@ -74,6 +76,8 @@ function buildActorSchemaSection(): string {
     "- actions: array of special abilities { name, actionCost (one-action|two-actions|three-actions|free|reaction|passive), traits, requirements, trigger, frequency, description } with traits limited to valid PF2e slugs.",
     "- spellcasting: optional array of entries { name, tradition, castingType (prepared|spontaneous|innate|focus|ritual), attackBonus, saveDC, notes, spells[] } where spells are { level, name, description, tradition }.",
     "- inventory: optional array of carried items { name, itemType, slug, quantity, level, description, img } used for gear import.",
+    "- loot: optional object { lootSheetType: \"Loot\"|\"Merchant\", hiddenWhenEmpty: boolean } for loot-sheet controls.",
+    "- hazard: optional object { isComplex, disable, routine, reset, emitsSound (boolean|\"encounter\"), hardness, stealthBonus, stealthDetails } for hazard-sheet controls.",
     "- When actions or spells correspond to official PF2e compendium entries, preserve canonical names/slugs so import can link to existing records instead of fabricating replacements.",
     "- description: optional string; defaults to null.",
     "- recallKnowledge: optional string; defaults to null.",
@@ -89,10 +93,12 @@ function buildActorTypeGuidance(actorType: ActorCategory): string {
   switch (actorType) {
     case "npc":
       return "NPC focus: build encounter-ready strikes, actions, spellcasting, and defenses following official PF2E NPC conventions.";
+    case "loot":
+      return "Loot focus: make this an inventory-first loot sheet with practical contents and no unnecessary combat stat inflation.";
     case "character":
       return "Character focus: build an adventurer-style actor with class-facing abilities, practical skills, and gear that matches the source.";
     case "hazard":
-      return "Hazard focus: include trigger/routine behavior, clear disable counterplay, and hazard-appropriate defensive profile details.";
+      return "Hazard focus: include trigger/routine behavior, clear disable counterplay, and macro-ready text for checks, DCs, and damage.";
     case "vehicle":
       return "Vehicle focus: include operation context (crew/passengers), movement profile, and actions that represent vehicle capabilities.";
     case "familiar":
@@ -100,6 +106,48 @@ function buildActorTypeGuidance(actorType: ActorCategory): string {
     default:
       return "";
   }
+}
+
+function buildContentSourceGuidance(input: ActorPromptInput): string[] {
+  if (!input.actorType || (input.actorType !== "loot" && input.actorType !== "hazard")) {
+    return [];
+  }
+
+  const includeOfficial = input.includeOfficialContent !== false;
+  const includeGenerated = input.includeGeneratedContent !== false;
+  const guidance: string[] = [];
+
+  if (includeOfficial) {
+    guidance.push(
+      "Official content mode: preserve canonical PF2E names/slugs for actions/spells/items/effects so import helpers can link compendium content.",
+    );
+  }
+
+  if (includeGenerated) {
+    guidance.push("Generated content mode: custom generated entries are allowed where the source text calls for them.");
+  }
+
+  if (includeOfficial && !includeGenerated) {
+    guidance.push("Avoid fabricated stand-ins when an official PF2E equivalent exists.");
+  } else if (!includeOfficial && includeGenerated) {
+    guidance.push("Do not force official compendium linkage; output fully generated content.");
+  }
+
+  if (input.actorType === "loot") {
+    guidance.push("For loot actors, prioritize inventory entries and populate loot.lootSheetType plus loot.hiddenWhenEmpty.");
+    guidance.push("Keep strikes/actions/spellcasting minimal unless explicitly required by the source text.");
+  }
+
+  if (input.actorType === "hazard") {
+    guidance.push(
+      "For hazards, populate hazard metadata with isComplex, disable, routine, reset, emitsSound, hardness, stealthBonus, and stealthDetails.",
+    );
+    guidance.push(
+      "Hazard action and section text should include PF2E inline macros for dice rolls, checks, DCs, and condition/effect links when applicable.",
+    );
+  }
+
+  return guidance;
 }
 
 function buildActorRequest(input: ActorPromptInput): string {
@@ -149,6 +197,11 @@ function buildActorRequest(input: ActorPromptInput): string {
 
   if (input.includeInventory) {
     parts.push("List an inventory section covering notable gear, treasure, and equipment carried.");
+  }
+
+  const contentSourceGuidance = buildContentSourceGuidance(input);
+  if (contentSourceGuidance.length > 0) {
+    parts.push(contentSourceGuidance.join("\n"));
   }
 
   if (input.generateTokenImage) {

@@ -417,6 +417,24 @@ function coerceActor(value: Record<string, unknown>): void {
   } else {
     delete value.inventory;
   }
+
+  const actorType = typeof value.actorType === "string"
+    ? (value.actorType as ActorSchemaData["actorType"])
+    : null;
+
+  const loot = normalizeActorLootSettings(value.loot, actorType);
+  if (loot) {
+    value.loot = loot;
+  } else {
+    delete value.loot;
+  }
+
+  const hazard = normalizeActorHazardSettings(value.hazard, actorType);
+  if (hazard) {
+    value.hazard = hazard;
+  } else {
+    delete value.hazard;
+  }
 }
 
 function normalizeActorAttributes(raw: unknown): ActorSchemaData["attributes"] {
@@ -837,6 +855,87 @@ function normalizeActorInventory(raw: unknown): NonNullable<ActorSchemaData["inv
   }
 
   return result;
+}
+
+function normalizeActorLootSettings(
+  raw: unknown,
+  actorType: ActorSchemaData["actorType"] | null,
+): ActorSchemaData["loot"] {
+  if (actorType !== "loot") {
+    return null;
+  }
+
+  const source = isRecord(raw) ? raw : {};
+  const rawSheetType = normalizeNullableString(source.lootSheetType);
+  const normalizedSheetType = rawSheetType?.toLowerCase() === "merchant" ? "Merchant" : "Loot";
+
+  return {
+    lootSheetType: normalizedSheetType,
+    hiddenWhenEmpty: normalizeBoolean(source.hiddenWhenEmpty, false),
+  };
+}
+
+function normalizeActorHazardSettings(
+  raw: unknown,
+  actorType: ActorSchemaData["actorType"] | null,
+): ActorSchemaData["hazard"] {
+  if (actorType !== "hazard") {
+    return null;
+  }
+
+  const source = isRecord(raw) ? raw : {};
+  const stealth = isRecord(source.stealth) ? source.stealth : {};
+  const emitsSound = normalizeHazardEmitsSound(source.emitsSound);
+
+  return {
+    isComplex: normalizeBoolean(source.isComplex, false),
+    disable: normalizeNullableString(source.disable),
+    routine: normalizeNullableString(source.routine),
+    reset: normalizeNullableString(source.reset),
+    emitsSound,
+    hardness: normalizeNonNegativeInteger(source.hardness, 0),
+    stealthBonus: normalizeOptionalInteger(source.stealthBonus ?? stealth.value),
+    stealthDetails: normalizeNullableString(source.stealthDetails ?? stealth.details),
+  };
+}
+
+function normalizeBoolean(value: unknown, fallback: boolean): boolean {
+  if (typeof value === "boolean") {
+    return value;
+  }
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true") {
+      return true;
+    }
+    if (normalized === "false") {
+      return false;
+    }
+  }
+  return fallback;
+}
+
+function normalizeHazardEmitsSound(
+  value: unknown,
+): NonNullable<ActorSchemaData["hazard"]>["emitsSound"] {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true") {
+      return true;
+    }
+    if (normalized === "false") {
+      return false;
+    }
+    if (normalized === "encounter") {
+      return "encounter";
+    }
+  }
+
+  return "encounter";
 }
 
 function normalizeTraitArray(value: unknown): string[] {
