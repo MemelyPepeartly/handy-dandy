@@ -6,6 +6,7 @@ import {
   MAP_MARKER_SELECT_TOOL_NAME,
   setMapMarkerMode,
 } from "../map-markers/controller";
+import { MAP_MARKER_LAYER_NAME } from "../map-markers/layer";
 
 type LegacyTool = SceneControls.Tool & {
   onChange?: (...args: unknown[]) => void;
@@ -18,8 +19,8 @@ export type ControlCollection = SceneControls.Control[] | Record<string, Control
 
 type ControlWithToolCollection = Omit<SceneControls.Control, "tools"> & {
   tools: ToolCollection;
-  onChange?: (activeTool: string) => void;
-  onToolChange?: (activeTool: string) => void;
+  onChange?: (...args: unknown[]) => void;
+  onToolChange?: (...args: unknown[]) => void;
 };
 
 function useObjectToolCollections(): boolean {
@@ -106,6 +107,42 @@ function resolveMapMarkerMode(activeTool: string): "placement" | "select" {
   return "placement";
 }
 
+function resolveToolName(candidate: unknown): string | null {
+  if (typeof candidate === "string" && candidate.length > 0) {
+    return candidate;
+  }
+
+  if (candidate && typeof candidate === "object") {
+    const name = (candidate as { name?: unknown }).name;
+    if (typeof name === "string" && name.length > 0) {
+      return name;
+    }
+  }
+
+  return null;
+}
+
+function resolveActiveMapMarkerTool(): string {
+  const controls = ui.controls as {
+    tool?: unknown;
+    control?: { activeTool?: unknown };
+  } | null | undefined;
+
+  const activeTool = controls?.tool;
+  const activeToolName = resolveToolName(activeTool);
+  if (activeToolName) {
+    return activeToolName;
+  }
+
+  const controlTool = controls?.control?.activeTool;
+  const controlToolName = resolveToolName(controlTool);
+  if (controlToolName) {
+    return controlToolName;
+  }
+
+  return MAP_MARKER_PLACEMENT_TOOL_NAME;
+}
+
 export function insertSidebarButtons(controls: ControlCollection): void {
   const tools: ToolCollection = useObjectToolCollections() ? {} : [];
   const mapNoteTools: ToolCollection = useObjectToolCollections() ? {} : [];
@@ -113,22 +150,28 @@ export function insertSidebarButtons(controls: ControlCollection): void {
   const noop = (): void => {
     /* noop for legacy Foundry compatibility */
   };
-  const syncMapMarkerMode = (activeTool: string): void => {
-    setMapMarkerMode(resolveMapMarkerMode(activeTool));
+  const syncMapMarkerMode = (activeTool: unknown): void => {
+    const toolName = resolveToolName(activeTool) ?? resolveActiveMapMarkerTool();
+    setMapMarkerMode(resolveMapMarkerMode(toolName));
   };
 
   const mapNotesGroup: ControlWithToolCollection = {
     name: MAP_MARKER_CONTROL_NAME,
     title: "Map Notes",
     icon: "fa-solid fa-map-location-dot",
-    layer: "interface",
+    layer: MAP_MARKER_LAYER_NAME,
     visible: true,
     activeTool: MAP_MARKER_PLACEMENT_TOOL_NAME,
-    onChange: (activeTool) => {
-      syncMapMarkerMode(activeTool);
+    onChange: (_event, active) => {
+      if (!active) {
+        setMapMarkerMode("off");
+        return;
+      }
+
+      syncMapMarkerMode(resolveActiveMapMarkerTool());
     },
-    onToolChange: (activeTool) => {
-      syncMapMarkerMode(activeTool);
+    onToolChange: (_event, tool) => {
+      syncMapMarkerMode(tool);
     },
     tools: mapNoteTools,
   };
@@ -137,12 +180,18 @@ export function insertSidebarButtons(controls: ControlCollection): void {
     name: MAP_MARKER_PLACEMENT_TOOL_NAME,
     title: "Placement Mode",
     icon: "fa-solid fa-location-dot",
+    onChange: () => {
+      setMapMarkerMode("placement");
+    },
   });
 
   compatibilityAddTool(mapNotesGroup.tools, {
     name: MAP_MARKER_SELECT_TOOL_NAME,
     title: "Select Mode",
     icon: "fa-solid fa-object-group",
+    onChange: () => {
+      setMapMarkerMode("select");
+    },
   });
 
   compatibilityAddControl(controls, mapNotesGroup);
