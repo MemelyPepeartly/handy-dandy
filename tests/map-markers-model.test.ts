@@ -9,10 +9,25 @@ import {
 } from "../src/scripts/map-markers/model";
 
 test("normalizeMapMarkerDefaults returns safe fallback values", () => {
-  assert.deepEqual(normalizeMapMarkerDefaults(undefined), { prompt: "", areaTheme: "" });
+  assert.deepEqual(normalizeMapMarkerDefaults(undefined), {
+    prompt: "",
+    areaTheme: "",
+    tone: "neutral",
+    boxTextLength: "medium",
+  });
   assert.deepEqual(
-    normalizeMapMarkerDefaults({ prompt: "Room intro", areaTheme: "Mossy crypt" }),
-    { prompt: "Room intro", areaTheme: "Mossy crypt" },
+    normalizeMapMarkerDefaults({
+      prompt: "Room intro",
+      areaTheme: "Mossy crypt",
+      tone: "grim",
+      boxTextLength: "short",
+    }),
+    {
+      prompt: "Room intro",
+      areaTheme: "Mossy crypt",
+      tone: "grim",
+      boxTextLength: "short",
+    },
   );
 });
 
@@ -23,8 +38,17 @@ test("resolveNextMarkerNumber returns one higher than the max numeric label", ()
       x: 0,
       y: 0,
       kind: "specific-room",
+      title: "",
       prompt: "",
       areaTheme: "",
+      sensoryDetails: "",
+      notableFeatures: "",
+      occupants: "",
+      hazards: "",
+      gmNotes: "",
+      tone: "neutral",
+      boxTextLength: "medium",
+      includeGmNotes: false,
       boxText: "",
       hidden: false,
       displayMode: "number",
@@ -38,8 +62,17 @@ test("resolveNextMarkerNumber returns one higher than the max numeric label", ()
       x: 10,
       y: 10,
       kind: "map-note",
+      title: "",
       prompt: "",
       areaTheme: "",
+      sensoryDetails: "",
+      notableFeatures: "",
+      occupants: "",
+      hazards: "",
+      gmNotes: "",
+      tone: "neutral",
+      boxTextLength: "medium",
+      includeGmNotes: false,
       boxText: "",
       hidden: false,
       displayMode: "icon",
@@ -55,7 +88,17 @@ test("resolveNextMarkerNumber returns one higher than the max numeric label", ()
 
 test("normalizeMapMarkerList filters invalid entries and deduplicates by id", () => {
   const markers = normalizeMapMarkerList([
-    { id: "one", x: 1, y: 2, kind: "specific-room", numberLabel: "1", displayMode: "number" },
+    {
+      id: "one",
+      x: 1,
+      y: 2,
+      kind: "specific-room",
+      title: "Entry",
+      numberLabel: "1",
+      displayMode: "number",
+      tone: "mysterious",
+      boxTextLength: "long",
+    },
     { id: "one", x: 99, y: 99, kind: "map-note", numberLabel: "2", displayMode: "icon" },
     { id: "bad", x: "oops", y: 2 },
     null,
@@ -64,6 +107,8 @@ test("normalizeMapMarkerList filters invalid entries and deduplicates by id", ()
   assert.equal(markers.length, 1);
   assert.equal(markers[0]?.id, "one");
   assert.equal(markers[0]?.x, 1);
+  assert.equal(markers[0]?.tone, "mysterious");
+  assert.equal(markers[0]?.boxTextLength, "long");
 });
 
 test("createDefaultMapMarker uses defaults and increments numbering", () => {
@@ -78,15 +123,29 @@ test("createDefaultMapMarker uses defaults and increments numbering", () => {
     const marker = createDefaultMapMarker({
       x: 120,
       y: 240,
-      defaults: { prompt: "Base prompt", areaTheme: "Dark vault" },
+      defaults: {
+        prompt: "Base prompt",
+        areaTheme: "Dark vault",
+        tone: "ominous",
+        boxTextLength: "short",
+      },
       existing: [
         {
           id: "one",
           x: 0,
           y: 0,
           kind: "specific-room",
+          title: "",
           prompt: "",
           areaTheme: "",
+          sensoryDetails: "",
+          notableFeatures: "",
+          occupants: "",
+          hazards: "",
+          gmNotes: "",
+          tone: "neutral",
+          boxTextLength: "medium",
+          includeGmNotes: false,
           boxText: "",
           hidden: false,
           displayMode: "number",
@@ -104,6 +163,8 @@ test("createDefaultMapMarker uses defaults and increments numbering", () => {
     assert.equal(marker.areaTheme, "Dark vault");
     assert.equal(marker.kind, "specific-room");
     assert.equal(marker.displayMode, "number");
+    assert.equal(marker.tone, "ominous");
+    assert.equal(marker.boxTextLength, "short");
   } finally {
     (globalThis as { foundry?: unknown }).foundry = previousFoundry;
   }
