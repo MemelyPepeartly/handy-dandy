@@ -39,7 +39,10 @@ function buildDialogContent(marker: MapMarkerData): string {
         display: flex;
         flex-direction: column;
         gap: 0.75rem;
-        min-width: 600px;
+        min-width: min(720px, 90vw);
+        max-height: 70vh;
+        overflow-y: auto;
+        padding-right: 0.25rem;
       }
 
       .handy-dandy-map-marker-form .form-group {
@@ -55,8 +58,15 @@ function buildDialogContent(marker: MapMarkerData): string {
       }
 
       .handy-dandy-map-marker-form textarea {
-        min-height: 6rem;
+        min-height: 8rem;
+        max-height: 18rem;
+        line-height: 1.35;
+        overflow-y: auto;
         resize: vertical;
+      }
+
+      .handy-dandy-map-marker-form textarea[name="boxText"] {
+        min-height: 11rem;
       }
 
       .handy-dandy-map-marker-row {
@@ -73,7 +83,8 @@ function buildDialogContent(marker: MapMarkerData): string {
 
       .handy-dandy-map-marker-form .notes {
         margin: 0;
-        font-size: 0.86rem;
+        font-size: 0.89rem;
+        line-height: 1.3;
         color: var(--color-text-light-6, #bbb);
       }
     </style>
@@ -110,13 +121,13 @@ function buildDialogContent(marker: MapMarkerData): string {
 
       <div class="form-group">
         <label for="handy-dandy-marker-prompt">Prompt</label>
-        <textarea id="handy-dandy-marker-prompt" name="prompt">${escapeHtml(marker.prompt)}</textarea>
+        <textarea id="handy-dandy-marker-prompt" name="prompt" rows="6">${escapeHtml(marker.prompt)}</textarea>
         <p class="notes">Base prompting notes for this room/area. Saved for this marker and remembered for new markers.</p>
       </div>
 
       <div class="form-group">
         <label for="handy-dandy-marker-theme">Area Specifics and Theme</label>
-        <textarea id="handy-dandy-marker-theme" name="areaTheme">${escapeHtml(marker.areaTheme)}</textarea>
+        <textarea id="handy-dandy-marker-theme" name="areaTheme" rows="6">${escapeHtml(marker.areaTheme)}</textarea>
         <p class="notes">Regional flavor, room context, hazards, and tone. Saved for this marker and remembered for new markers.</p>
       </div>
 
@@ -125,7 +136,7 @@ function buildDialogContent(marker: MapMarkerData): string {
           <label for="handy-dandy-marker-boxtext">Boxtext</label>
           <button type="button" data-action="generate-boxtext">Generate Boxtext</button>
         </div>
-        <textarea id="handy-dandy-marker-boxtext" name="boxText">${escapeHtml(marker.boxText)}</textarea>
+        <textarea id="handy-dandy-marker-boxtext" name="boxText" rows="8">${escapeHtml(marker.boxText)}</textarea>
       </div>
     </form>
   `;
@@ -286,7 +297,8 @@ export async function promptMapMarkerDialog(marker: MapMarkerData): Promise<MapM
         },
       },
       {
-        width: 720,
+        width: 860,
+        resizable: true,
       },
     );
 

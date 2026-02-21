@@ -1,6 +1,11 @@
 import { CONSTANTS } from "../constants";
 import { runPromptWorkbenchFlow, runExportSelectionFlow } from "../flows/prompt-workbench-ui";
-import { setMapMarkerPlacementActive } from "../map-markers/controller";
+import {
+  MAP_MARKER_CONTROL_NAME,
+  MAP_MARKER_PLACEMENT_TOOL_NAME,
+  MAP_MARKER_SELECT_TOOL_NAME,
+  setMapMarkerMode,
+} from "../map-markers/controller";
 
 type LegacyTool = SceneControls.Tool & {
   onChange?: (...args: unknown[]) => void;
@@ -93,12 +98,54 @@ function requireNamespace(): NonNullable<Game["handyDandy"]> {
   return namespace;
 }
 
+function resolveMapMarkerMode(activeTool: string): "placement" | "select" {
+  if (activeTool === MAP_MARKER_SELECT_TOOL_NAME) {
+    return "select";
+  }
+
+  return "placement";
+}
+
 export function insertSidebarButtons(controls: ControlCollection): void {
   const tools: ToolCollection = useObjectToolCollections() ? {} : [];
+  const mapNoteTools: ToolCollection = useObjectToolCollections() ? {} : [];
 
   const noop = (): void => {
     /* noop for legacy Foundry compatibility */
   };
+  const syncMapMarkerMode = (activeTool: string): void => {
+    setMapMarkerMode(resolveMapMarkerMode(activeTool));
+  };
+
+  const mapNotesGroup: ControlWithToolCollection = {
+    name: MAP_MARKER_CONTROL_NAME,
+    title: "Map Notes",
+    icon: "fa-solid fa-map-location-dot",
+    layer: "interface",
+    visible: true,
+    activeTool: MAP_MARKER_PLACEMENT_TOOL_NAME,
+    onChange: (activeTool) => {
+      syncMapMarkerMode(activeTool);
+    },
+    onToolChange: (activeTool) => {
+      syncMapMarkerMode(activeTool);
+    },
+    tools: mapNoteTools,
+  };
+
+  compatibilityAddTool(mapNotesGroup.tools, {
+    name: MAP_MARKER_PLACEMENT_TOOL_NAME,
+    title: "Placement Mode",
+    icon: "fa-solid fa-location-dot",
+  });
+
+  compatibilityAddTool(mapNotesGroup.tools, {
+    name: MAP_MARKER_SELECT_TOOL_NAME,
+    title: "Select Mode",
+    icon: "fa-solid fa-object-group",
+  });
+
+  compatibilityAddControl(controls, mapNotesGroup);
 
   const handyGroup: ControlWithToolCollection = {
     name: "handy-dandy",
@@ -111,17 +158,6 @@ export function insertSidebarButtons(controls: ControlCollection): void {
     onToolChange: noop,
     tools,
   };
-
-  compatibilityAddTool(handyGroup.tools, {
-    name: "map-marker",
-    title: "Map Marker",
-    icon: "fa-solid fa-location-dot",
-    toggle: true,
-    active: false,
-    onChange: (...args) => {
-      setMapMarkerPlacementActive(resolveToggleActive(args, false, "map-marker"));
-    },
-  });
 
   compatibilityAddTool(handyGroup.tools, {
     name: "tool-guide",

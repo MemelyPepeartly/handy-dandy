@@ -17,6 +17,13 @@ interface Point2D {
   y: number;
 }
 
+type MapMarkerDragState = {
+  start: Point2D;
+  positions: Map<string, Point2D>;
+  offset: Point2D;
+  moved: boolean;
+};
+
 type CanvasPointerEvent = {
   stopPropagation?: () => void;
   button?: number;
@@ -28,9 +35,46 @@ type CanvasPointerEvent = {
   getLocalPosition?: (container: PIXI.Container) => PIXI.IPointData;
 };
 
+export type MapMarkerToolMode = "off" | "placement" | "select";
+
+export const MAP_MARKER_CONTROL_NAME = "handy-dandy-map-notes" as const;
+export const MAP_MARKER_PLACEMENT_TOOL_NAME = "map-marker-place" as const;
+export const MAP_MARKER_SELECT_TOOL_NAME = "map-marker-select" as const;
+
+function resolveCurrentSceneControlName(): string | null {
+  const controls = ui.controls as { control?: { name?: unknown } } | undefined;
+  const name = controls?.control?.name;
+  return typeof name === "string" && name.length > 0 ? name : null;
+}
+
+function resolveCurrentSceneToolName(): string | null {
+  const controls = ui.controls as {
+    tool?: unknown;
+    control?: { activeTool?: unknown };
+  } | undefined;
+
+  const activeTool = controls?.tool;
+  if (typeof activeTool === "string" && activeTool.length > 0) {
+    return activeTool;
+  }
+
+  const controlTool = controls?.control?.activeTool;
+  return typeof controlTool === "string" && controlTool.length > 0 ? controlTool : null;
+}
+
+function resolveModeFromTool(toolName: string | null): MapMarkerToolMode {
+  if (toolName === MAP_MARKER_SELECT_TOOL_NAME) {
+    return "select";
+  }
+  if (toolName === MAP_MARKER_PLACEMENT_TOOL_NAME) {
+    return "placement";
+  }
+  return "off";
+}
+
 class MapMarkerController {
   #initialised = false;
-  #placementActive = false;
+  #mode: MapMarkerToolMode = "off";
   #overlay: PIXI.Container | null = null;
   #markerSurface: PIXI.Container | null = null;
   #selectionGraphics: PIXI.Graphics | null = null;
@@ -39,6 +83,8 @@ class MapMarkerController {
   #pointerDownStart: Point2D | null = null;
   #pointerDownLatest: Point2D | null = null;
   #pointerDragged = false;
+  #dragState: MapMarkerDragState | null = null;
+  #dragPreviewPositions: Map<string, Point2D> | null = null;
   #stageMouseDownListener: ((event: PIXI.FederatedPointerEvent) => void) | null = null;
   #stageMouseMoveListener: ((event: PIXI.FederatedPointerEvent) => void) | null = null;
   #stageMouseUpListener: ((event: PIXI.FederatedPointerEvent) => void) | null = null;
@@ -52,6 +98,7 @@ class MapMarkerController {
     this.#initialised = true;
 
     Hooks.on("canvasReady", () => {
+      this.#syncModeFromSceneControls();
       this.#mountCanvasOverlay();
       this.renderMarkers();
     });
@@ -66,17 +113,22 @@ class MapMarkerController {
       }
       this.renderMarkers();
     });
+
+    Hooks.on("renderSceneControls", () => {
+      this.#syncModeFromSceneControls();
+    });
   }
 
-  setPlacementActive(active: boolean): void {
-    const canPlace = !!game.user?.isGM;
-    const nextActive = canPlace && active;
-    if (!nextActive) {
+  setMode(mode: MapMarkerToolMode): void {
+    const canUse = !!game.user?.isGM;
+    const nextMode: MapMarkerToolMode = canUse ? mode : "off";
+    if (nextMode !== "select") {
       this.#clearSelection();
       this.#clearSelectionBox();
+      this.#clearDragState();
     }
 
-    this.#placementActive = nextActive;
+    this.#mode = nextMode;
     this.renderMarkers();
   }
 
@@ -92,8 +144,36 @@ class MapMarkerController {
 
     const visibleMarkers = markers.filter((marker) => !(marker.hidden && !game.user?.isGM));
     for (const marker of visibleMarkers) {
-      const display = this.#createMarkerDisplay(marker, this.#selectedMarkerIds.has(marker.id));
+      const dragPosition = this.#dragPreviewPositions?.get(marker.id) ?? null;
+      const display = this.#createMarkerDisplay(
+        marker,
+        this.#selectedMarkerIds.has(marker.id),
+        dragPosition,
+      );
       surface.addChild(display);
+    }
+  }
+
+  #syncModeFromSceneControls(): void {
+    if (!game.user?.isGM) {
+      if (this.#mode !== "off") {
+        this.setMode("off");
+      }
+      return;
+    }
+
+    const activeControl = resolveCurrentSceneControlName();
+    if (activeControl !== MAP_MARKER_CONTROL_NAME) {
+      if (this.#mode !== "off") {
+        this.setMode("off");
+      }
+      return;
+    }
+
+    const nextMode = resolveModeFromTool(resolveCurrentSceneToolName());
+    const fallbackMode = nextMode === "off" ? "placement" : nextMode;
+    if (this.#mode !== fallbackMode) {
+      this.setMode(fallbackMode);
     }
   }
 
@@ -196,6 +276,7 @@ class MapMarkerController {
     this.#selectionGraphics = null;
     this.#lastTapByMarker.clear();
     this.#clearSelection();
+    this.#clearDragState();
     this.#pointerDownStart = null;
     this.#pointerDownLatest = null;
     this.#pointerDragged = false;
@@ -208,11 +289,17 @@ class MapMarkerController {
     }
   }
 
-  #createMarkerDisplay(marker: MapMarkerData, selected: boolean): PIXI.Container {
+  #createMarkerDisplay(
+    marker: MapMarkerData,
+    selected: boolean,
+    dragPosition: Point2D | null,
+  ): PIXI.Container {
     const container = new PIXI.Container();
     container.name = `handy-dandy-map-marker-${marker.id}`;
-    container.position.set(marker.x, marker.y);
-    container.zIndex = marker.y;
+    const x = dragPosition?.x ?? marker.x;
+    const y = dragPosition?.y ?? marker.y;
+    container.position.set(x, y);
+    container.zIndex = y;
     container.alpha = marker.hidden && game.user?.isGM ? 0.45 : 1;
 
     if (selected) {
@@ -308,6 +395,60 @@ class MapMarkerController {
     this.#pointerDownStart = point;
     this.#pointerDownLatest = point;
     this.#pointerDragged = false;
+    this.#clearSelectionBox();
+
+    if (this.#mode !== "select") {
+      this.#clearDragState();
+      return;
+    }
+
+    const scene = canvas.scene;
+    if (!scene) {
+      return;
+    }
+
+    const markers = getSceneMapMarkers(scene);
+    const clickedMarker = this.#findMarkerAtPoint(markers, point, 20);
+    if (!clickedMarker) {
+      this.#clearDragState();
+      if (!event.shiftKey) {
+        this.#clearSelection();
+        this.renderMarkers();
+      }
+      return;
+    }
+
+    if (event.shiftKey) {
+      this.#setMarkerSelection(clickedMarker.id, true);
+      this.#clearDragState();
+      this.#pointerDownStart = null;
+      this.#pointerDownLatest = null;
+      this.renderMarkers();
+      event.stopPropagation?.();
+      return;
+    }
+
+    if (!this.#selectedMarkerIds.has(clickedMarker.id)) {
+      this.#selectedMarkerIds.clear();
+      this.#selectedMarkerIds.add(clickedMarker.id);
+    }
+
+    const positions = new Map<string, Point2D>();
+    for (const marker of markers) {
+      if (!this.#selectedMarkerIds.has(marker.id)) {
+        continue;
+      }
+      positions.set(marker.id, { x: marker.x, y: marker.y });
+    }
+
+    this.#dragState = {
+      start: point,
+      positions,
+      offset: { x: 0, y: 0 },
+      moved: false,
+    };
+    this.renderMarkers();
+    event.stopPropagation?.();
   }
 
   #handleStageMouseMove(event: CanvasPointerEvent): void {
@@ -322,7 +463,23 @@ class MapMarkerController {
     }
 
     this.#pointerDownLatest = current;
-    if (!this.#placementActive) {
+
+    if (this.#mode !== "select") {
+      return;
+    }
+
+    const dragState = this.#dragState;
+    if (dragState) {
+      const dx = current.x - dragState.start.x;
+      const dy = current.y - dragState.start.y;
+      if (!dragState.moved && Math.abs(dx) < 4 && Math.abs(dy) < 4) {
+        return;
+      }
+
+      dragState.moved = true;
+      dragState.offset = { x: dx, y: dy };
+      this.#setDragPreviewPositions(dragState);
+      event.stopPropagation?.();
       return;
     }
 
@@ -351,6 +508,7 @@ class MapMarkerController {
     const start = this.#pointerDownStart;
     const end = this.#resolveEventPosition(event) ?? this.#pointerDownLatest;
     const dragged = this.#pointerDragged;
+    const dragState = this.#dragState;
 
     this.#pointerDownStart = null;
     this.#pointerDownLatest = null;
@@ -361,7 +519,16 @@ class MapMarkerController {
       return;
     }
 
-    if (dragged && this.#placementActive) {
+    if (dragState?.moved) {
+      await this.#commitDragMove(dragState);
+      this.#clearSelectionBox();
+      this.#clearDragState();
+      this.renderMarkers();
+      event.stopPropagation?.();
+      return;
+    }
+
+    if (dragged && this.#mode === "select") {
       const scene = canvas.scene;
       if (!scene) {
         this.#clearSelectionBox();
@@ -376,6 +543,7 @@ class MapMarkerController {
     }
 
     this.#clearSelectionBox();
+    this.#clearDragState();
     await this.#handleStageClick(end, Boolean(event.shiftKey), event);
   }
 
@@ -388,7 +556,7 @@ class MapMarkerController {
     const markers = getSceneMapMarkers(scene);
     const clickedMarker = this.#findMarkerAtPoint(markers, point, 20);
     if (clickedMarker) {
-      if (this.#placementActive) {
+      if (this.#mode === "select") {
         this.#setMarkerSelection(clickedMarker.id, additiveSelection);
       }
       this.#handleMarkerTap(clickedMarker.id);
@@ -397,7 +565,7 @@ class MapMarkerController {
       return;
     }
 
-    if (this.#placementActive) {
+    if (this.#mode === "placement") {
       const marker = createDefaultMapMarker({
         x: point.x,
         y: point.y,
@@ -411,7 +579,7 @@ class MapMarkerController {
       return;
     }
 
-    if (this.#selectedMarkerIds.size) {
+    if (this.#mode === "select" && this.#selectedMarkerIds.size && !additiveSelection) {
       this.#clearSelection();
       this.renderMarkers();
     }
@@ -456,6 +624,64 @@ class MapMarkerController {
 
   #clearSelection(): void {
     this.#selectedMarkerIds.clear();
+  }
+
+  #clearDragState(): void {
+    this.#dragState = null;
+    this.#dragPreviewPositions = null;
+  }
+
+  #setDragPreviewPositions(dragState: MapMarkerDragState): void {
+    const preview = new Map<string, Point2D>();
+    for (const [markerId, position] of dragState.positions) {
+      preview.set(markerId, {
+        x: Math.round(position.x + dragState.offset.x),
+        y: Math.round(position.y + dragState.offset.y),
+      });
+    }
+
+    this.#dragPreviewPositions = preview;
+    this.renderMarkers();
+  }
+
+  async #commitDragMove(dragState: MapMarkerDragState): Promise<void> {
+    const scene = canvas.scene;
+    if (!scene || !dragState.moved) {
+      return;
+    }
+
+    const updatedPositions = new Map<string, Point2D>();
+    for (const [markerId, position] of dragState.positions) {
+      updatedPositions.set(markerId, {
+        x: Math.round(position.x + dragState.offset.x),
+        y: Math.round(position.y + dragState.offset.y),
+      });
+    }
+
+    if (!updatedPositions.size) {
+      return;
+    }
+
+    await setSceneMapMarkers(
+      scene,
+      getSceneMapMarkers(scene).map((marker) => {
+        const moved = updatedPositions.get(marker.id);
+        if (!moved) {
+          return marker;
+        }
+
+        if (moved.x === marker.x && moved.y === marker.y) {
+          return marker;
+        }
+
+        return {
+          ...marker,
+          x: moved.x,
+          y: moved.y,
+          updatedAt: Date.now(),
+        };
+      }),
+    );
   }
 
   #pruneSelection(markers: readonly MapMarkerData[]): void {
@@ -562,7 +788,7 @@ class MapMarkerController {
   }
 
   async #handleWindowKeyDown(event: KeyboardEvent): Promise<void> {
-    if (!game.user?.isGM || !this.#placementActive || !this.#selectedMarkerIds.size) {
+    if (!game.user?.isGM || this.#mode !== "select" || !this.#selectedMarkerIds.size) {
       return;
     }
 
@@ -655,12 +881,17 @@ export function initialiseMapMarkers(): void {
   mapMarkerController.initialize();
 }
 
-export function setMapMarkerPlacementActive(active: boolean): void {
-  if (!game.user?.isGM && active) {
-    ui.notifications?.warn(`${CONSTANTS.MODULE_NAME} | Only a GM can place map markers.`);
+export function setMapMarkerMode(mode: MapMarkerToolMode): void {
+  if (!game.user?.isGM && mode !== "off") {
+    ui.notifications?.warn(`${CONSTANTS.MODULE_NAME} | Only a GM can use map marker tools.`);
     return;
   }
-  mapMarkerController.setPlacementActive(active);
+
+  mapMarkerController.setMode(mode);
+}
+
+export function setMapMarkerPlacementActive(active: boolean): void {
+  setMapMarkerMode(active ? "placement" : "off");
 }
 
 export function refreshMapMarkers(): void {

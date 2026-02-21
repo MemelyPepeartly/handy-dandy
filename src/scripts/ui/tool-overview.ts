@@ -39,10 +39,11 @@ export class ToolOverview extends FormApplication {
       tools: [
         {
           id: "map-marker",
-          title: "Map Marker",
+          title: "Map Notes",
           icon: "fas fa-location-dot",
-          description: "Place numbered or icon room markers on the map and double-click them to edit room prompts and boxtext.",
-          location: "Scene Controls → Handy Dandy Tools → Map Marker",
+          description:
+            "Use Placement Mode to drop markers, then switch to Select Mode to box-select, drag to reposition, and delete selected markers.",
+          location: "Scene Controls → Map Notes → Placement Mode / Select Mode",
         },
         {
           id: "schema-tool",
