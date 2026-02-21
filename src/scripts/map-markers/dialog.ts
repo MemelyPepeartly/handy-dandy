@@ -114,11 +114,6 @@ function buildDialogContent(marker: MapMarkerData): string {
         </div>
       </div>
 
-      <label>
-        <input type="checkbox" name="hidden"${marker.hidden ? " checked" : ""} />
-        Hide from players
-      </label>
-
       <div class="form-group">
         <label for="handy-dandy-marker-prompt">Prompt</label>
         <textarea id="handy-dandy-marker-prompt" name="prompt" rows="6">${escapeHtml(marker.prompt)}</textarea>
@@ -224,7 +219,7 @@ function parseMarkerFromFormData(
       displayMode,
       numberLabel: String(formData.get("numberLabel") ?? marker.numberLabel).trim() || marker.numberLabel || "1",
       iconSymbol: String(formData.get("iconSymbol") ?? marker.iconSymbol).trim() || DEFAULT_MAP_MARKER_ICON,
-      hidden: formData.has("hidden"),
+      hidden: marker.hidden,
       prompt,
       areaTheme,
       boxText: String(formData.get("boxText") ?? ""),

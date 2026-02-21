@@ -26,9 +26,11 @@ type MapMarkerDragState = {
 
 type CanvasPointerEvent = {
   stopPropagation?: () => void;
+  preventDefault?: () => void;
   button?: number;
   shiftKey?: boolean;
   target?: EventTarget | null;
+  nativeEvent?: unknown;
   data?: {
     getLocalPosition?: (container: PIXI.Container) => PIXI.IPointData;
   };
@@ -40,6 +42,7 @@ export type MapMarkerToolMode = "off" | "placement" | "select";
 export const MAP_MARKER_CONTROL_NAME = "handy-dandy-map-notes" as const;
 export const MAP_MARKER_PLACEMENT_TOOL_NAME = "map-marker-place" as const;
 export const MAP_MARKER_SELECT_TOOL_NAME = "map-marker-select" as const;
+const MAP_MARKER_VISIBILITY_BUTTON_CLASS = "handy-dandy-map-marker-visibility-toggle" as const;
 
 function resolveCurrentSceneControlName(): string | null {
   const controls = ui.controls as { control?: { name?: unknown } } | undefined;
@@ -88,7 +91,10 @@ class MapMarkerController {
   #stageMouseDownListener: ((event: PIXI.FederatedPointerEvent) => void) | null = null;
   #stageMouseMoveListener: ((event: PIXI.FederatedPointerEvent) => void) | null = null;
   #stageMouseUpListener: ((event: PIXI.FederatedPointerEvent) => void) | null = null;
+  #stageRightDownListener: ((event: PIXI.FederatedPointerEvent) => void) | null = null;
   #windowKeyDownListener: ((event: KeyboardEvent) => void) | null = null;
+  #visibilityToggleButton: HTMLButtonElement | null = null;
+  #visibilityToggleTargetMarkerId: string | null = null;
 
   initialize(): void {
     if (this.#initialised) {
@@ -126,6 +132,7 @@ class MapMarkerController {
       this.#clearSelection();
       this.#clearSelectionBox();
       this.#clearDragState();
+      this.#hideVisibilityToggleButton();
     }
 
     this.#mode = nextMode;
@@ -152,6 +159,55 @@ class MapMarkerController {
       );
       surface.addChild(display);
     }
+  }
+
+  #resolveMarkerSize(): number {
+    const dimensions = canvas.dimensions as { size?: unknown } | undefined;
+    const grid = canvas.grid as { size?: unknown } | undefined;
+    const candidate = Number(dimensions?.size ?? grid?.size ?? 100);
+    if (!Number.isFinite(candidate) || candidate <= 8) {
+      return 100;
+    }
+
+    return Math.round(candidate);
+  }
+
+  #snapToGrid(point: Point2D): Point2D {
+    const grid = canvas.grid as {
+      getCenter?: (x: number, y: number) => [number, number] | PIXI.IPointData;
+      getSnappedPoint?: (point: Point2D, options?: { mode?: number }) => Point2D;
+    } | null;
+    if (!grid) {
+      return point;
+    }
+
+    const center = typeof grid.getCenter === "function"
+      ? grid.getCenter(point.x, point.y)
+      : null;
+
+    if (Array.isArray(center) && center.length >= 2) {
+      const [x, y] = center;
+      if (Number.isFinite(x) && Number.isFinite(y)) {
+        return { x: Math.round(x), y: Math.round(y) };
+      }
+    }
+
+    if (center && typeof center === "object") {
+      const cx = Number((center as { x?: unknown }).x);
+      const cy = Number((center as { y?: unknown }).y);
+      if (Number.isFinite(cx) && Number.isFinite(cy)) {
+        return { x: Math.round(cx), y: Math.round(cy) };
+      }
+    }
+
+    if (typeof grid.getSnappedPoint === "function") {
+      const snapped = grid.getSnappedPoint(point, { mode: 0 });
+      if (Number.isFinite(snapped.x) && Number.isFinite(snapped.y)) {
+        return { x: Math.round(snapped.x), y: Math.round(snapped.y) };
+      }
+    }
+
+    return point;
   }
 
   #syncModeFromSceneControls(): void {
@@ -234,6 +290,13 @@ class MapMarkerController {
       stage.on("mouseup", this.#stageMouseUpListener);
     }
 
+    if (!this.#stageRightDownListener) {
+      this.#stageRightDownListener = (event: PIXI.FederatedPointerEvent): void => {
+        void this.#handleStageRightDown(event);
+      };
+      stage.on("rightdown", this.#stageRightDownListener);
+    }
+
     if (!this.#windowKeyDownListener) {
       this.#windowKeyDownListener = (event: KeyboardEvent): void => {
         void this.#handleWindowKeyDown(event);
@@ -253,10 +316,14 @@ class MapMarkerController {
     if (this.#stageMouseUpListener && stage) {
       stage.off("mouseup", this.#stageMouseUpListener);
     }
+    if (this.#stageRightDownListener && stage) {
+      stage.off("rightdown", this.#stageRightDownListener);
+    }
 
     this.#stageMouseDownListener = null;
     this.#stageMouseMoveListener = null;
     this.#stageMouseUpListener = null;
+    this.#stageRightDownListener = null;
 
     if (this.#windowKeyDownListener) {
       window.removeEventListener("keydown", this.#windowKeyDownListener);
@@ -274,6 +341,7 @@ class MapMarkerController {
     this.#overlay = null;
     this.#markerSurface = null;
     this.#selectionGraphics = null;
+    this.#hideVisibilityToggleButton();
     this.#lastTapByMarker.clear();
     this.#clearSelection();
     this.#clearDragState();
@@ -301,12 +369,21 @@ class MapMarkerController {
     container.position.set(x, y);
     container.zIndex = y;
     container.alpha = marker.hidden && game.user?.isGM ? 0.45 : 1;
+    const markerSize = this.#resolveMarkerSize();
+    const half = markerSize / 2;
+    const cornerRadius = Math.max(5, Math.round(markerSize * 0.11));
 
     if (selected) {
       const selection = new PIXI.Graphics();
       selection.lineStyle(3, 0x8de9ff, 0.95);
       selection.beginFill(0x8de9ff, 0.08);
-      selection.drawCircle(0, 0, 21);
+      selection.drawRoundedRect(
+        -half - 4,
+        -half - 4,
+        markerSize + 8,
+        markerSize + 8,
+        cornerRadius + 2,
+      );
       selection.endFill();
       container.addChild(selection);
     }
@@ -315,20 +392,26 @@ class MapMarkerController {
 
     const shadow = new PIXI.Graphics();
     shadow.beginFill(0x000000, 0.33);
-    shadow.drawCircle(1.5, 2, 18);
+    shadow.drawRoundedRect(
+      -half + 1.5,
+      -half + 2,
+      markerSize,
+      markerSize,
+      cornerRadius,
+    );
     shadow.endFill();
     container.addChild(shadow);
 
     const chip = new PIXI.Graphics();
     chip.lineStyle(2, 0x151515, 0.9);
     chip.beginFill(fillColor, 1);
-    chip.drawCircle(0, 0, 16);
+    chip.drawRoundedRect(-half, -half, markerSize, markerSize, cornerRadius);
     chip.endFill();
     container.addChild(chip);
 
     const label = new PIXI.Text(this.#resolveMarkerLabel(marker), {
       fontFamily: "Signika",
-      fontSize: marker.displayMode === "icon" ? 18 : 16,
+      fontSize: Math.max(14, Math.round(markerSize * (marker.displayMode === "icon" ? 0.55 : 0.5))),
       fill: 0xffffff,
       fontWeight: "700",
       stroke: 0x151515,
@@ -340,21 +423,25 @@ class MapMarkerController {
     container.addChild(label);
 
     if (marker.kind === "map-note") {
+      const badgeWidth = Math.max(30, Math.round(markerSize * 0.45));
+      const badgeHeight = Math.max(11, Math.round(markerSize * 0.19));
+      const badgeX = half - badgeWidth - 4;
+      const badgeY = half - badgeHeight - 4;
       const tag = new PIXI.Graphics();
       tag.beginFill(0x151515, 0.95);
-      tag.drawRoundedRect(-16, 16, 32, 11, 3);
+      tag.drawRoundedRect(badgeX, badgeY, badgeWidth, badgeHeight, 3);
       tag.endFill();
       container.addChild(tag);
 
       const tagText = new PIXI.Text("NOTE", {
         fontFamily: "Signika",
-        fontSize: 8,
+        fontSize: Math.max(8, Math.round(markerSize * 0.15)),
         fill: 0xf5f5f5,
         fontWeight: "700",
         letterSpacing: 0.6,
       });
       tagText.anchor.set(0.5);
-      tagText.position.set(0, 21.5);
+      tagText.position.set(badgeX + badgeWidth / 2, badgeY + badgeHeight / 2);
       container.addChild(tagText);
     }
 
@@ -396,6 +483,7 @@ class MapMarkerController {
     this.#pointerDownLatest = point;
     this.#pointerDragged = false;
     this.#clearSelectionBox();
+    this.#hideVisibilityToggleButton();
 
     if (this.#mode !== "select") {
       this.#clearDragState();
@@ -408,7 +496,7 @@ class MapMarkerController {
     }
 
     const markers = getSceneMapMarkers(scene);
-    const clickedMarker = this.#findMarkerAtPoint(markers, point, 20);
+    const clickedMarker = this.#findMarkerAtPoint(markers, point);
     if (!clickedMarker) {
       this.#clearDragState();
       if (!event.shiftKey) {
@@ -547,6 +635,228 @@ class MapMarkerController {
     await this.#handleStageClick(end, Boolean(event.shiftKey), event);
   }
 
+  async #handleStageRightDown(event: CanvasPointerEvent): Promise<void> {
+    if (!game.user?.isGM || this.#mode !== "select") {
+      this.#hideVisibilityToggleButton();
+      return;
+    }
+
+    event.preventDefault?.();
+    event.stopPropagation?.();
+    const nativeEvent = event.nativeEvent as {
+      preventDefault?: () => void;
+      stopPropagation?: () => void;
+    } | null;
+    nativeEvent?.preventDefault?.();
+    nativeEvent?.stopPropagation?.();
+
+    const point = this.#resolveEventPosition(event);
+    const scene = canvas.scene;
+    if (!point || !scene) {
+      this.#hideVisibilityToggleButton();
+      return;
+    }
+
+    const markers = getSceneMapMarkers(scene);
+    const clickedMarker = this.#findMarkerAtPoint(markers, point);
+    if (!clickedMarker) {
+      this.#hideVisibilityToggleButton();
+      return;
+    }
+
+    if (!this.#selectedMarkerIds.has(clickedMarker.id)) {
+      this.#selectedMarkerIds.clear();
+      this.#selectedMarkerIds.add(clickedMarker.id);
+      this.renderMarkers();
+    }
+
+    this.#showVisibilityToggleButton(clickedMarker.id, event.nativeEvent);
+  }
+
+  #showVisibilityToggleButton(markerId: string, nativeEvent?: unknown): void {
+    const button = this.#ensureVisibilityToggleButton();
+    if (!button) {
+      return;
+    }
+
+    const targetIds = this.#resolveVisibilityTargetIds(markerId);
+    if (!targetIds.length) {
+      this.#hideVisibilityToggleButton();
+      return;
+    }
+
+    this.#visibilityToggleTargetMarkerId = markerId;
+    const { nextHidden } = this.#resolveVisibilityToggleState(markerId);
+    button.title = nextHidden ? "Hide from players" : "Unhide from players";
+    button.ariaLabel = button.title;
+    button.classList.toggle("active", !nextHidden);
+
+    const fallbackPosition = this.#resolveScreenPositionForMarker(markerId);
+    const pointerPosition = this.#resolveScreenPositionFromNativeEvent(nativeEvent);
+    const left = pointerPosition?.x ?? fallbackPosition.x;
+    const top = pointerPosition?.y ?? fallbackPosition.y;
+    button.style.left = `${Math.round(left + 16)}px`;
+    button.style.top = `${Math.round(top - 16)}px`;
+    button.style.display = "inline-flex";
+  }
+
+  #hideVisibilityToggleButton(): void {
+    this.#visibilityToggleTargetMarkerId = null;
+    if (this.#visibilityToggleButton) {
+      this.#visibilityToggleButton.style.display = "none";
+    }
+  }
+
+  #ensureVisibilityToggleButton(): HTMLButtonElement | null {
+    if (this.#visibilityToggleButton?.isConnected) {
+      return this.#visibilityToggleButton;
+    }
+
+    const root = document.body;
+    if (!root) {
+      return null;
+    }
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `control-icon ${MAP_MARKER_VISIBILITY_BUTTON_CLASS}`;
+    button.innerHTML = "<i class=\"fas fa-user-secret\"></i>";
+    button.style.position = "fixed";
+    button.style.zIndex = "120";
+    button.style.width = "34px";
+    button.style.height = "34px";
+    button.style.display = "none";
+    button.style.alignItems = "center";
+    button.style.justifyContent = "center";
+    button.style.border = "1px solid rgba(255, 255, 255, 0.32)";
+    button.style.background = "rgba(0, 0, 0, 0.72)";
+    button.style.color = "#f5f5f5";
+    button.style.borderRadius = "4px";
+    button.style.cursor = "pointer";
+
+    button.addEventListener("mousedown", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+    });
+    button.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+    });
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      void this.#toggleVisibilityFromHud();
+    });
+
+    root.appendChild(button);
+    this.#visibilityToggleButton = button;
+    return button;
+  }
+
+  #resolveVisibilityTargetIds(markerId: string): string[] {
+    if (this.#selectedMarkerIds.size && this.#selectedMarkerIds.has(markerId)) {
+      return Array.from(this.#selectedMarkerIds);
+    }
+
+    return [markerId];
+  }
+
+  #resolveVisibilityToggleState(markerId: string): { targetIds: string[]; nextHidden: boolean } {
+    const scene = canvas.scene;
+    if (!scene) {
+      return { targetIds: [], nextHidden: true };
+    }
+
+    const targetIds = this.#resolveVisibilityTargetIds(markerId);
+    if (!targetIds.length) {
+      return { targetIds, nextHidden: true };
+    }
+
+    const selectedIds = new Set(targetIds);
+    const markers = getSceneMapMarkers(scene).filter((entry) => selectedIds.has(entry.id));
+    const allHidden = markers.length > 0 && markers.every((entry) => entry.hidden);
+    return {
+      targetIds,
+      nextHidden: !allHidden,
+    };
+  }
+
+  #resolveScreenPositionForMarker(markerId: string): Point2D {
+    const scene = canvas.scene;
+    const stage = canvas.stage;
+    if (!scene || !stage) {
+      return { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+    }
+
+    const marker = getSceneMapMarkers(scene).find((entry) => entry.id === markerId);
+    if (!marker) {
+      return { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+    }
+
+    const worldPoint = new PIXI.Point(marker.x, marker.y);
+    const screenPoint = stage.toGlobal(worldPoint);
+    return {
+      x: Number.isFinite(screenPoint.x) ? screenPoint.x : window.innerWidth / 2,
+      y: Number.isFinite(screenPoint.y) ? screenPoint.y : window.innerHeight / 2,
+    };
+  }
+
+  #resolveScreenPositionFromNativeEvent(nativeEvent: unknown): Point2D | null {
+    if (!nativeEvent || typeof nativeEvent !== "object") {
+      return null;
+    }
+
+    const x = Number((nativeEvent as { clientX?: unknown }).clientX);
+    const y = Number((nativeEvent as { clientY?: unknown }).clientY);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      return null;
+    }
+
+    return { x, y };
+  }
+
+  async #toggleVisibilityFromHud(): Promise<void> {
+    const scene = canvas.scene;
+    const targetMarkerId = this.#visibilityToggleTargetMarkerId;
+    if (!scene || !targetMarkerId) {
+      this.#hideVisibilityToggleButton();
+      return;
+    }
+
+    const { targetIds, nextHidden } = this.#resolveVisibilityToggleState(targetMarkerId);
+    if (!targetIds.length) {
+      this.#hideVisibilityToggleButton();
+      return;
+    }
+
+    const selectedIds = new Set(targetIds);
+    const nextMarkers = getSceneMapMarkers(scene).map((marker) => {
+      if (!selectedIds.has(marker.id)) {
+        return marker;
+      }
+
+      if (marker.hidden === nextHidden) {
+        return marker;
+      }
+
+      return {
+        ...marker,
+        hidden: nextHidden,
+        updatedAt: Date.now(),
+      };
+    });
+
+    await setSceneMapMarkers(scene, nextMarkers);
+    this.renderMarkers();
+    this.#showVisibilityToggleButton(targetMarkerId);
+
+    const count = targetIds.length;
+    const verb = nextHidden ? "Hid" : "Unhid";
+    ui.notifications?.info(
+      `${CONSTANTS.MODULE_NAME} | ${verb} ${count} map marker${count === 1 ? "" : "s"} from players.`,
+    );
+  }
+
   async #handleStageClick(point: Point2D, additiveSelection: boolean, event: CanvasPointerEvent): Promise<void> {
     const scene = canvas.scene;
     if (!scene) {
@@ -554,7 +864,7 @@ class MapMarkerController {
     }
 
     const markers = getSceneMapMarkers(scene);
-    const clickedMarker = this.#findMarkerAtPoint(markers, point, 20);
+    const clickedMarker = this.#findMarkerAtPoint(markers, point);
     if (clickedMarker) {
       if (this.#mode === "select") {
         this.#setMarkerSelection(clickedMarker.id, additiveSelection);
@@ -566,9 +876,10 @@ class MapMarkerController {
     }
 
     if (this.#mode === "placement") {
+      const snappedPoint = this.#snapToGrid(point);
       const marker = createDefaultMapMarker({
-        x: point.x,
-        y: point.y,
+        x: snappedPoint.x,
+        y: snappedPoint.y,
         existing: markers,
         defaults: getUserMapMarkerDefaults(game.user),
       });
@@ -728,17 +1039,20 @@ class MapMarkerController {
   #findMarkerAtPoint(
     markers: readonly MapMarkerData[],
     point: { x: number; y: number },
-    radius: number,
   ): MapMarkerData | null {
+    const half = this.#resolveMarkerSize() / 2;
     let found: MapMarkerData | null = null;
     let bestDistance = Number.POSITIVE_INFINITY;
-    const limit = radius * radius;
 
     for (const marker of markers) {
       const dx = marker.x - point.x;
       const dy = marker.y - point.y;
+      if (Math.abs(dx) > half || Math.abs(dy) > half) {
+        continue;
+      }
+
       const distance = dx * dx + dy * dy;
-      if (distance > limit || distance >= bestDistance) {
+      if (distance >= bestDistance) {
         continue;
       }
 
@@ -784,6 +1098,7 @@ class MapMarkerController {
     }
 
     this.#lastTapByMarker.delete(markerId);
+    this.#hideVisibilityToggleButton();
     void this.#openMarkerDialog(markerId);
   }
 
@@ -840,6 +1155,7 @@ class MapMarkerController {
 
     await setSceneMapMarkers(scene, next);
     this.#clearSelection();
+    this.#hideVisibilityToggleButton();
     this.renderMarkers();
     ui.notifications?.info(
       `${CONSTANTS.MODULE_NAME} | Deleted ${removedCount} map marker${removedCount === 1 ? "" : "s"}.`,

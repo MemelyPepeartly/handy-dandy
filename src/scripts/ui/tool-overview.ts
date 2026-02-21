@@ -42,7 +42,7 @@ export class ToolOverview extends FormApplication {
           title: "Map Notes",
           icon: "fas fa-location-dot",
           description:
-            "Use Placement Mode to drop markers, then switch to Select Mode to box-select, drag to reposition, and delete selected markers.",
+            "Use Placement Mode to drop square-sized markers, then Select Mode to box-select, drag to reposition, delete, and right-click for the mask visibility toggle.",
           location: "Scene Controls → Map Notes → Placement Mode / Select Mode",
         },
         {
