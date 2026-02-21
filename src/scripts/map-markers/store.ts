@@ -5,7 +5,12 @@ import {
   touchMapMarker,
 } from "./model";
 import type { MapMarkerData, MapMarkerDefaults } from "./types";
-import { MAP_MARKER_DEFAULTS_USER_FLAG_KEY, MAP_MARKER_SCENE_FLAG_KEY } from "./types";
+import {
+  DEFAULT_MAP_MARKER_BOXTEXT_LENGTH,
+  DEFAULT_MAP_MARKER_TONE,
+  MAP_MARKER_DEFAULTS_USER_FLAG_KEY,
+  MAP_MARKER_SCENE_FLAG_KEY,
+} from "./types";
 
 function getSceneFlagValue(scene: Scene): unknown {
   return scene.getFlag(CONSTANTS.MODULE_ID, MAP_MARKER_SCENE_FLAG_KEY);
@@ -59,7 +64,12 @@ export async function removeSceneMapMarker(scene: Scene, markerId: string): Prom
 
 export function getUserMapMarkerDefaults(user: User | null | undefined): MapMarkerDefaults {
   if (!user) {
-    return { prompt: "", areaTheme: "" };
+    return {
+      prompt: "",
+      areaTheme: "",
+      tone: DEFAULT_MAP_MARKER_TONE,
+      boxTextLength: DEFAULT_MAP_MARKER_BOXTEXT_LENGTH,
+    };
   }
 
   return normalizeMapMarkerDefaults(user.getFlag(CONSTANTS.MODULE_ID, MAP_MARKER_DEFAULTS_USER_FLAG_KEY));
