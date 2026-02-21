@@ -1,10 +1,14 @@
 import {
+  DEFAULT_MAP_MARKER_BOXTEXT_LENGTH,
   DEFAULT_MAP_MARKER_ICON,
+  DEFAULT_MAP_MARKER_TONE,
   type MapMarkerData,
+  type MapMarkerBoxTextLength,
   type MapMarkerDefaults,
   type MapMarkerDisplayMode,
   type MapMarkerKind,
   type MapMarkerSeed,
+  type MapMarkerTone,
 } from "./types";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -31,14 +35,44 @@ function normalizeDisplayMode(value: unknown): MapMarkerDisplayMode {
   return value === "icon" ? "icon" : "number";
 }
 
+function normalizeTone(value: unknown): MapMarkerTone {
+  switch (value) {
+    case "mysterious":
+    case "ominous":
+    case "wondrous":
+    case "grim":
+    case "lively":
+      return value;
+    default:
+      return DEFAULT_MAP_MARKER_TONE;
+  }
+}
+
+function normalizeBoxTextLength(value: unknown): MapMarkerBoxTextLength {
+  switch (value) {
+    case "short":
+    case "long":
+      return value;
+    default:
+      return DEFAULT_MAP_MARKER_BOXTEXT_LENGTH;
+  }
+}
+
 export function normalizeMapMarkerDefaults(value: unknown): MapMarkerDefaults {
   if (!isRecord(value)) {
-    return { prompt: "", areaTheme: "" };
+    return {
+      prompt: "",
+      areaTheme: "",
+      tone: DEFAULT_MAP_MARKER_TONE,
+      boxTextLength: DEFAULT_MAP_MARKER_BOXTEXT_LENGTH,
+    };
   }
 
   return {
     prompt: normalizeString(value["prompt"]),
     areaTheme: normalizeString(value["areaTheme"]),
+    tone: normalizeTone(value["tone"]),
+    boxTextLength: normalizeBoxTextLength(value["boxTextLength"]),
   };
 }
 
@@ -61,8 +95,17 @@ export function createDefaultMapMarker(seed: MapMarkerSeed): MapMarkerData {
     x: seed.x,
     y: seed.y,
     kind: "specific-room",
+    title: "",
     prompt: seed.defaults.prompt,
     areaTheme: seed.defaults.areaTheme,
+    sensoryDetails: "",
+    notableFeatures: "",
+    occupants: "",
+    hazards: "",
+    gmNotes: "",
+    tone: seed.defaults.tone,
+    boxTextLength: seed.defaults.boxTextLength,
+    includeGmNotes: false,
     boxText: "",
     hidden: false,
     displayMode: "number",
@@ -93,8 +136,17 @@ export function normalizeMapMarker(value: unknown): MapMarkerData | null {
     x,
     y,
     kind: normalizeMarkerKind(value["kind"]),
+    title: normalizeString(value["title"]),
     prompt: normalizeString(value["prompt"]),
     areaTheme: normalizeString(value["areaTheme"]),
+    sensoryDetails: normalizeString(value["sensoryDetails"]),
+    notableFeatures: normalizeString(value["notableFeatures"]),
+    occupants: normalizeString(value["occupants"]),
+    hazards: normalizeString(value["hazards"]),
+    gmNotes: normalizeString(value["gmNotes"]),
+    tone: normalizeTone(value["tone"]),
+    boxTextLength: normalizeBoxTextLength(value["boxTextLength"]),
+    includeGmNotes: normalizeBoolean(value["includeGmNotes"]),
     boxText: normalizeString(value["boxText"]),
     hidden: normalizeBoolean(value["hidden"]),
     displayMode: normalizeDisplayMode(value["displayMode"]),
