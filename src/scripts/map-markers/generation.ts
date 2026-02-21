@@ -19,28 +19,105 @@ const BOXTEXT_GENERATION_SCHEMA: JsonSchemaDefinition = {
   },
 };
 
-export function buildMapMarkerBoxTextPrompt(marker: Pick<MapMarkerData, "kind" | "prompt" | "areaTheme">): string {
+function resolveLengthGuidance(length: MapMarkerData["boxTextLength"] | undefined): string {
+  switch (length) {
+    case "short":
+      return "2-3 sentences";
+    case "long":
+      return "5-7 sentences";
+    default:
+      return "3-5 sentences";
+  }
+}
+
+function resolveToneGuidance(tone: MapMarkerData["tone"] | undefined): string {
+  switch (tone) {
+    case "mysterious":
+      return "enigmatic and suspenseful";
+    case "ominous":
+      return "foreboding and tense";
+    case "wondrous":
+      return "awe-struck and evocative";
+    case "grim":
+      return "stark and unsettling";
+    case "lively":
+      return "energetic and bustling";
+    default:
+      return "grounded and atmospheric";
+  }
+}
+
+function cleanSection(value: string | undefined): string {
+  const text = typeof value === "string" ? value.trim() : "";
+  return text || "None provided.";
+}
+
+export function buildMapMarkerBoxTextPrompt(
+  marker: Pick<
+    MapMarkerData,
+    | "kind"
+    | "title"
+    | "prompt"
+    | "areaTheme"
+    | "sensoryDetails"
+    | "notableFeatures"
+    | "occupants"
+    | "hazards"
+    | "gmNotes"
+    | "tone"
+    | "boxTextLength"
+    | "includeGmNotes"
+  >,
+): string {
   const markerType = marker.kind === "specific-room" ? "Specific Room" : "Map Note";
-  const promptText = marker.prompt.trim() || "None provided.";
-  const areaTheme = marker.areaTheme.trim() || "None provided.";
+  const includeGmNotes = marker.includeGmNotes === true;
+  const gmNotesDirective = includeGmNotes
+    ? "- You may incorporate GM notes, but keep reveals subtle and player-facing."
+    : "- Treat GM notes as private prep only. Do not reveal secrets directly.";
 
   return [
     "You are writing boxed text for a Pathfinder 2e Game Master.",
-    "Produce one ready-to-read boxed text passage.",
+    "Produce one ready-to-read boxed text passage for live narration.",
     "",
     `Marker type: ${markerType}`,
-    `Prompt notes: ${promptText}`,
-    `Area specifics and theme: ${areaTheme}`,
+    `Area title: ${cleanSection(marker.title)}`,
+    `Prompt objective: ${cleanSection(marker.prompt)}`,
+    `Area specifics and theme: ${cleanSection(marker.areaTheme)}`,
+    `First sensory impression: ${cleanSection(marker.sensoryDetails)}`,
+    `Notable features and interactables: ${cleanSection(marker.notableFeatures)}`,
+    `Occupants and activity: ${cleanSection(marker.occupants)}`,
+    `Hazards and tension: ${cleanSection(marker.hazards)}`,
+    `GM notes: ${cleanSection(marker.gmNotes)}`,
+    `Narrative tone target: ${resolveToneGuidance(marker.tone)}`,
+    `Target length: ${resolveLengthGuidance(marker.boxTextLength)}`,
     "",
     "Constraints:",
     "- Write in second person present tense when describing what players perceive.",
-    "- Keep it vivid and specific, but concise (roughly 2-4 sentences).",
+    "- Lead with what players notice first, then layer in detail.",
+    "- Keep it vivid, concrete, and immediately usable at the table.",
+    gmNotesDirective,
     "- Do not include mechanics, checks, or meta commentary.",
     "- Return plain text only in the boxText field.",
   ].join("\n");
 }
 
-export async function generateMapMarkerBoxText(marker: Pick<MapMarkerData, "kind" | "prompt" | "areaTheme">): Promise<string> {
+export async function generateMapMarkerBoxText(
+  marker: Pick<
+    MapMarkerData,
+    | "kind"
+    | "title"
+    | "prompt"
+    | "areaTheme"
+    | "sensoryDetails"
+    | "notableFeatures"
+    | "occupants"
+    | "hazards"
+    | "gmNotes"
+    | "tone"
+    | "boxTextLength"
+    | "includeGmNotes"
+  >,
+): Promise<string> {
   const gptClient = game.handyDandy?.gptClient;
   if (!gptClient) {
     throw new Error(`${CONSTANTS.MODULE_NAME} | GPT client has not been initialised`);
