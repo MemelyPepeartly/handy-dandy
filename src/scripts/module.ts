@@ -15,6 +15,7 @@ import { registerNpcRemixButton } from "./ui/npc-remix-button";
 import { registerNpcPortraitRegenerateButton } from "./ui/npc-portrait-regenerate-button";
 import { registerNpcRemixSectionButtons } from "./ui/npc-remix-section-buttons";
 import { registerItemImageGenerateButton } from "./ui/item-image-generate-button";
+import { registerItemDescriptionFormatFixButton } from "./ui/item-description-format-fix-button";
 import { registerItemRemixButton } from "./ui/item-remix-button";
 import { registerTokenImagePreviewHudButton } from "./ui/token-image-preview-hud-button";
 import {
@@ -65,6 +66,7 @@ registerNpcRemixButton();
 registerNpcPortraitRegenerateButton();
 registerNpcRemixSectionButtons();
 registerItemImageGenerateButton();
+registerItemDescriptionFormatFixButton();
 registerItemRemixButton();
 registerTokenImagePreviewHudButton();
 

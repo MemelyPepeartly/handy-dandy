@@ -403,6 +403,38 @@ function normalizeExistingHtmlRichText(value: string): string {
   return applyConditionLinks(withMarkdown);
 }
 
+function repairInlineMacrosInPlainText(value: string): string {
+  const withMacroCase = normalizeInlineMacroCasing(value);
+  const withChecks = applyInlineChecks(withMacroCase);
+  const withDamage = applyInlineDamage(withChecks);
+  const withTemplates = applyInlineTemplates(withDamage);
+  return applyConditionLinks(withTemplates);
+}
+
+function repairInlineMacrosInHtml(value: string): string {
+  const parts = value.split(/(<[^>]+>)/g);
+  return parts
+    .map((part) => {
+      if (!part || part.startsWith("<")) {
+        return part;
+      }
+
+      return repairInlineMacrosInPlainText(part);
+    })
+    .join("");
+}
+
+export function repairPf2eInlineMacros(value: string | null | undefined): string {
+  const input = value ?? "";
+  if (!input.trim()) {
+    return "";
+  }
+
+  return isLikelyHtml(input)
+    ? repairInlineMacrosInHtml(input)
+    : repairInlineMacrosInPlainText(input);
+}
+
 function buildParagraph(lines: string[]): string {
   return `<p>${lines.join("<br />")}</p>`;
 }
