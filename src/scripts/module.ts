@@ -36,6 +36,7 @@ import { exportSelectedEntities, generateWorkbenchEntry } from "./flows/prompt-w
 import { ensureValid } from "./validation/ensure-valid";
 import { importAction } from "./mappers/import";
 import { initialiseMapMarkers } from "./map-markers/controller";
+import { registerMapMarkerLayer } from "./map-markers/layer";
 
 type GeneratorFunction<TInput, TResult> = (
   input: TInput,
@@ -121,6 +122,7 @@ declare global {
 // ---------- INIT ------------------------------------------------------------
 Hooks.once("init", async () => {
   console.log(`${CONSTANTS.MODULE_NAME} | init`);
+  registerMapMarkerLayer();
   registerSettings();
 
   // Load and register templates with specific names
