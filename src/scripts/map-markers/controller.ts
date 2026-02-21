@@ -1,5 +1,6 @@
 import { CONSTANTS } from "../constants";
 import { promptMapMarkerDialog } from "./dialog";
+import { MAP_MARKER_LAYER_NAME } from "./layer";
 import { createDefaultMapMarker } from "./model";
 import {
   addSceneMapMarker,
@@ -60,6 +61,12 @@ function resolveCurrentSceneToolName(): string | null {
   if (typeof activeTool === "string" && activeTool.length > 0) {
     return activeTool;
   }
+  if (activeTool && typeof activeTool === "object") {
+    const name = (activeTool as { name?: unknown }).name;
+    if (typeof name === "string" && name.length > 0) {
+      return name;
+    }
+  }
 
   const controlTool = controls?.control?.activeTool;
   return typeof controlTool === "string" && controlTool.length > 0 ? controlTool : null;
@@ -91,6 +98,7 @@ class MapMarkerController {
   #stageMouseDownListener: ((event: PIXI.FederatedPointerEvent) => void) | null = null;
   #stageMouseMoveListener: ((event: PIXI.FederatedPointerEvent) => void) | null = null;
   #stageMouseUpListener: ((event: PIXI.FederatedPointerEvent) => void) | null = null;
+  #stageMouseUpOutsideListener: ((event: PIXI.FederatedPointerEvent) => void) | null = null;
   #stageRightDownListener: ((event: PIXI.FederatedPointerEvent) => void) | null = null;
   #windowKeyDownListener: ((event: KeyboardEvent) => void) | null = null;
   #visibilityToggleButton: HTMLButtonElement | null = null;
@@ -227,14 +235,22 @@ class MapMarkerController {
     }
 
     const nextMode = resolveModeFromTool(resolveCurrentSceneToolName());
-    const fallbackMode = nextMode === "off" ? "placement" : nextMode;
-    if (this.#mode !== fallbackMode) {
-      this.setMode(fallbackMode);
+    if (nextMode === "off") {
+      return;
+    }
+
+    if (this.#mode !== nextMode) {
+      this.setMode(nextMode);
     }
   }
 
   #mountCanvasOverlay(): void {
-    if (!canvas.ready || !canvas.interface || this.#overlay) {
+    if (!canvas.ready || this.#overlay) {
+      return;
+    }
+
+    const overlayParent = this.#resolveOverlayParent();
+    if (!overlayParent) {
       return;
     }
 
@@ -255,12 +271,21 @@ class MapMarkerController {
 
     overlay.addChild(markerSurface);
     overlay.addChild(selectionGraphics);
-    canvas.interface.addChild(overlay);
+    overlayParent.addChild(overlay);
 
     this.#overlay = overlay;
     this.#markerSurface = markerSurface;
     this.#selectionGraphics = selectionGraphics;
     this.#attachStageListeners();
+  }
+
+  #resolveOverlayParent(): PIXI.Container | null {
+    const mapLayer = (canvas as unknown as Record<string, unknown>)[MAP_MARKER_LAYER_NAME];
+    if (mapLayer && typeof mapLayer === "object" && "addChild" in mapLayer) {
+      return mapLayer as PIXI.Container;
+    }
+
+    return canvas.interface ?? null;
   }
 
   #attachStageListeners(): void {
@@ -273,21 +298,28 @@ class MapMarkerController {
       this.#stageMouseDownListener = (event: PIXI.FederatedPointerEvent): void => {
         this.#handleStageMouseDown(event);
       };
-      stage.on("mousedown", this.#stageMouseDownListener);
+      stage.on("pointerdown", this.#stageMouseDownListener);
     }
 
     if (!this.#stageMouseMoveListener) {
       this.#stageMouseMoveListener = (event: PIXI.FederatedPointerEvent): void => {
         this.#handleStageMouseMove(event);
       };
-      stage.on("mousemove", this.#stageMouseMoveListener);
+      stage.on("pointermove", this.#stageMouseMoveListener);
     }
 
     if (!this.#stageMouseUpListener) {
       this.#stageMouseUpListener = (event: PIXI.FederatedPointerEvent): void => {
         void this.#handleStageMouseUp(event);
       };
-      stage.on("mouseup", this.#stageMouseUpListener);
+      stage.on("pointerup", this.#stageMouseUpListener);
+    }
+
+    if (!this.#stageMouseUpOutsideListener) {
+      this.#stageMouseUpOutsideListener = (event: PIXI.FederatedPointerEvent): void => {
+        void this.#handleStageMouseUp(event);
+      };
+      stage.on("pointerupoutside", this.#stageMouseUpOutsideListener);
     }
 
     if (!this.#stageRightDownListener) {
@@ -308,13 +340,16 @@ class MapMarkerController {
   #detachStageListeners(): void {
     const stage = canvas.stage;
     if (this.#stageMouseDownListener && stage) {
-      stage.off("mousedown", this.#stageMouseDownListener);
+      stage.off("pointerdown", this.#stageMouseDownListener);
     }
     if (this.#stageMouseMoveListener && stage) {
-      stage.off("mousemove", this.#stageMouseMoveListener);
+      stage.off("pointermove", this.#stageMouseMoveListener);
     }
     if (this.#stageMouseUpListener && stage) {
-      stage.off("mouseup", this.#stageMouseUpListener);
+      stage.off("pointerup", this.#stageMouseUpListener);
+    }
+    if (this.#stageMouseUpOutsideListener && stage) {
+      stage.off("pointerupoutside", this.#stageMouseUpOutsideListener);
     }
     if (this.#stageRightDownListener && stage) {
       stage.off("rightdown", this.#stageRightDownListener);
@@ -323,6 +358,7 @@ class MapMarkerController {
     this.#stageMouseDownListener = null;
     this.#stageMouseMoveListener = null;
     this.#stageMouseUpListener = null;
+    this.#stageMouseUpOutsideListener = null;
     this.#stageRightDownListener = null;
 
     if (this.#windowKeyDownListener) {
@@ -372,11 +408,12 @@ class MapMarkerController {
     const markerSize = this.#resolveMarkerSize();
     const half = markerSize / 2;
     const cornerRadius = Math.max(5, Math.round(markerSize * 0.11));
+    const selectionColor = this.#resolveSelectionColor();
 
     if (selected) {
       const selection = new PIXI.Graphics();
-      selection.lineStyle(3, 0x8de9ff, 0.95);
-      selection.beginFill(0x8de9ff, 0.08);
+      selection.lineStyle(3, selectionColor, 0.95);
+      selection.beginFill(selectionColor, 0.13);
       selection.drawRoundedRect(
         -half - 4,
         -half - 4,
@@ -463,6 +500,16 @@ class MapMarkerController {
     }
 
     return marker.kind === "map-note" ? 0x3477db : 0xd17825;
+  }
+
+  #resolveSelectionColor(): number {
+    const canvasConfig = CONFIG.Canvas as { dispositionColors?: { CONTROLLED?: unknown } } | undefined;
+    const candidate = Number(canvasConfig?.dispositionColors?.CONTROLLED ?? 0xff9829);
+    if (Number.isFinite(candidate) && candidate > 0) {
+      return candidate;
+    }
+
+    return 0xff9829;
   }
 
   #handleStageMouseDown(event: CanvasPointerEvent): void {
@@ -925,8 +972,15 @@ class MapMarkerController {
       this.#selectedMarkerIds.clear();
     }
 
+    const half = this.#resolveMarkerSize() / 2;
     for (const marker of markers) {
-      if (marker.x < left || marker.x > right || marker.y < top || marker.y > bottom) {
+      const markerLeft = marker.x - half;
+      const markerRight = marker.x + half;
+      const markerTop = marker.y - half;
+      const markerBottom = marker.y + half;
+      const intersects =
+        markerRight >= left && markerLeft <= right && markerBottom >= top && markerTop <= bottom;
+      if (!intersects) {
         continue;
       }
       this.#selectedMarkerIds.add(marker.id);
@@ -945,9 +999,13 @@ class MapMarkerController {
   #setDragPreviewPositions(dragState: MapMarkerDragState): void {
     const preview = new Map<string, Point2D>();
     for (const [markerId, position] of dragState.positions) {
-      preview.set(markerId, {
+      const snapped = this.#snapToGrid({
         x: Math.round(position.x + dragState.offset.x),
         y: Math.round(position.y + dragState.offset.y),
+      });
+      preview.set(markerId, {
+        x: snapped.x,
+        y: snapped.y,
       });
     }
 
@@ -963,9 +1021,13 @@ class MapMarkerController {
 
     const updatedPositions = new Map<string, Point2D>();
     for (const [markerId, position] of dragState.positions) {
-      updatedPositions.set(markerId, {
+      const snapped = this.#snapToGrid({
         x: Math.round(position.x + dragState.offset.x),
         y: Math.round(position.y + dragState.offset.y),
+      });
+      updatedPositions.set(markerId, {
+        x: snapped.x,
+        y: snapped.y,
       });
     }
 
@@ -1009,25 +1071,34 @@ class MapMarkerController {
   }
 
   #drawSelectionBox(start: Point2D, end: Point2D): void {
-    const graphics = this.#selectionGraphics;
-    if (!graphics) {
-      return;
-    }
-
     const x = Math.min(start.x, end.x);
     const y = Math.min(start.y, end.y);
     const width = Math.abs(end.x - start.x);
     const height = Math.abs(end.y - start.y);
+    const rect = { x, y, width, height };
 
-    graphics.clear();
-    graphics.lineStyle(2, 0x8de9ff, 0.95);
-    graphics.beginFill(0x8de9ff, 0.16);
-    graphics.drawRect(x, y, width, height);
-    graphics.endFill();
-    graphics.visible = true;
+    const controls = canvas.controls as { drawSelect?: (coords: Canvas.Rectangle) => void } | undefined;
+    if (typeof controls?.drawSelect === "function") {
+      controls.drawSelect(rect);
+      return;
+    }
+
+    const graphics = this.#selectionGraphics;
+    if (graphics) {
+      const color = this.#resolveSelectionColor();
+      graphics.clear();
+      graphics.lineStyle(2, color, 0.92);
+      graphics.beginFill(color, 0.1);
+      graphics.drawRect(x, y, width, height);
+      graphics.endFill();
+      graphics.visible = true;
+    }
   }
 
   #clearSelectionBox(): void {
+    const controls = canvas.controls as { select?: PIXI.Graphics } | undefined;
+    controls?.select?.clear();
+
     const graphics = this.#selectionGraphics;
     if (!graphics) {
       return;
@@ -1076,7 +1147,20 @@ class MapMarkerController {
 
     const point = viaEvent ?? viaData;
     if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) {
-      return null;
+      const global = (event as { global?: PIXI.IPointData }).global;
+      if (!global || !Number.isFinite(global.x) || !Number.isFinite(global.y)) {
+        return null;
+      }
+
+      const local = stage.toLocal(new PIXI.Point(global.x, global.y));
+      if (!Number.isFinite(local.x) || !Number.isFinite(local.y)) {
+        return null;
+      }
+
+      return {
+        x: Math.round(local.x),
+        y: Math.round(local.y),
+      };
     }
 
     return {
