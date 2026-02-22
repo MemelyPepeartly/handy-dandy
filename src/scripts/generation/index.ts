@@ -100,7 +100,7 @@ export async function generateAction(
   const prompt = buildActionPrompt(input);
   reportProgress(options, {
     step: "model",
-    message: "Generating action JSON with GPT...",
+    message: "Generating action JSON with OpenRouter...",
     percent: 35,
   });
   const draft = await gptClient.generateWithSchema<ActionSchemaData>(
@@ -142,7 +142,7 @@ export async function generateItem(
   const prompt = buildItemPrompt(input);
   reportProgress(options, {
     step: "model",
-    message: "Generating item JSON with GPT...",
+    message: "Generating item JSON with OpenRouter...",
     percent: 35,
   });
   const draft = await gptClient.generateWithSchema<ItemSchemaData>(
@@ -212,7 +212,7 @@ export async function generateActor(
   const prompt = buildActorPrompt(input);
   reportProgress(options, {
     step: "model",
-    message: "Generating actor JSON with GPT...",
+    message: "Generating actor JSON with OpenRouter...",
     percent: 25,
   });
   const draft = await gptClient.generateWithSchema<ActorSchemaData>(
