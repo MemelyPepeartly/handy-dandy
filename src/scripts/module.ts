@@ -37,6 +37,7 @@ import { ensureValid } from "./validation/ensure-valid";
 import { importAction } from "./mappers/import";
 import { initialiseMapMarkers } from "./map-markers/controller";
 import { registerMapMarkerLayer } from "./map-markers/layer";
+import { initializeAIClientFromSettings } from "./gpt/runtime";
 
 type GeneratorFunction<TInput, TResult> = (
   input: TInput,
@@ -78,7 +79,7 @@ function bindGenerator<TInput, TResult>(
     const { gptClient: explicitClient, seed, maxAttempts, onProgress } = options;
     const gptClient = explicitClient ?? game.handyDandy?.gptClient;
     if (!gptClient) {
-      throw new Error(`${CONSTANTS.MODULE_NAME} | GPT client has not been initialised`);
+      throw new Error(`${CONSTANTS.MODULE_NAME} | AI client has not been initialised`);
     }
 
     return fn(input, {
@@ -96,6 +97,7 @@ declare global {
     handyDandy?: {
       openai: OpenAI | null,
       gptClient: GPTClient | null,
+      refreshAIClient: () => void,
       generation: {
         generateAction: BoundGenerateAction,
         generateItem: BoundGenerateItem,
@@ -133,6 +135,7 @@ Hooks.once("init", async () => {
     "trait-browser-tool": `${CONSTANTS.TEMPLATE_PATH}/trait-browser-tool.hbs`,
     "developer-console": `${CONSTANTS.TEMPLATE_PATH}/developer-console.hbs`,
     "tool-overview": `${CONSTANTS.TEMPLATE_PATH}/tool-overview.hbs`,
+    "openrouter-account": `${CONSTANTS.TEMPLATE_PATH}/openrouter-account.hbs`,
   });
 });
 
@@ -160,6 +163,7 @@ Hooks.once("setup", () => {
   game.handyDandy = {
     openai: null,
     gptClient: null,
+    refreshAIClient: initializeAIClientFromSettings,
     generation,
     applications: {
       schemaTool: new SchemaTool,
@@ -182,31 +186,20 @@ Hooks.once("setup", () => {
 });
 
 // ---------- READY -----------------------------------------------------------
-Hooks.once("ready", () => {
-  // Only the GM needs an API key to call OpenAI from the browser
-  if (!game.user?.isGM) return;
-
-  ui.notifications?.info(
-    `${CONSTANTS.MODULE_NAME} tools live under the Scene Controls toolbar. ` +
-      `Open Handy Dandy Tools or the Tool Guide from Module Settings for quick access.`,
-  );
-
-  const key = game.settings.get(CONSTANTS.MODULE_ID, "GPTApiKey") as string;
-  if (!key) {
-    ui.notifications?.warn(`${CONSTANTS.MODULE_NAME} | No OpenAI API key set. Please configure it in the settings.`);
-    return;
+Hooks.once("ready", async () => {
+  if (game.user?.isGM) {
+    ui.notifications?.info(
+      `${CONSTANTS.MODULE_NAME} tools live under the Scene Controls toolbar. ` +
+        `Open Handy Dandy Tools or the Tool Guide from Module Settings for quick access.`,
+    );
   }
 
-  // Store on the namespace for easy access later
-  const openai = new OpenAI({
-    apiKey: key,
-    dangerouslyAllowBrowser: true
-  });
-
-  game.handyDandy!.openai = openai;
-  game.handyDandy!.gptClient = GPTClient.fromSettings(openai);
-
-  console.log(`${CONSTANTS.MODULE_NAME} | OpenAI SDK initialised`);
+  initializeAIClientFromSettings();
+  if (game.handyDandy?.gptClient) {
+    console.log(`${CONSTANTS.MODULE_NAME} | OpenRouter client initialised`);
+  } else {
+    console.log(`${CONSTANTS.MODULE_NAME} | OpenRouter client not configured for this user`);
+  }
 });
 
 // ---------- SCENE-CONTROL GROUP --------------------------------------------
