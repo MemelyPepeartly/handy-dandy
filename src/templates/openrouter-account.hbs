@@ -1,0 +1,42 @@
+<form class="openrouter-account-form">
+  <p>
+    Connect your OpenRouter account for this Foundry user. OAuth creates a user-scoped API key automatically.
+  </p>
+
+  {{#if isConnected}}
+    <p class="notes">
+      Status: <strong>{{authMethodLabel}}</strong> (<code>{{keyPreview}}</code>)
+    </p>
+  {{else}}
+    <p class="notes">Status: <strong>Not connected</strong></p>
+  {{/if}}
+
+  <div class="form-group">
+    <label for="openrouter-manual-key">Manual API Key</label>
+    <input
+      id="openrouter-manual-key"
+      name="manualApiKey"
+      type="password"
+      value="{{manualApiKey}}"
+      autocomplete="off"
+      spellcheck="false"
+    />
+  </div>
+  <p class="notes">You can paste an API key manually if you do not want OAuth. Leave blank and click Save to clear it.</p>
+  <p class="notes">Desktop Foundry opens your default browser for OAuth and listens on <code>localhost:3000</code> for the callback.</p>
+
+  <footer class="sheet-footer flexrow">
+    <button type="button" data-action="oauth-connect">
+      <i class="fas fa-right-to-bracket"></i>
+      Connect with OpenRouter
+    </button>
+    <button type="button" data-action="disconnect">
+      <i class="fas fa-link-slash"></i>
+      Disconnect
+    </button>
+    <button type="submit">
+      <i class="fas fa-save"></i>
+      Save Manual Key
+    </button>
+  </footer>
+</form>
