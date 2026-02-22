@@ -35,7 +35,8 @@ After enabling the module:
 2. Each user can choose their own text/image model IDs in Module Settings.
 
 There is also an optional manual API key field in the OpenRouter account dialog.
-OpenRouter OAuth works best when Foundry is served over HTTPS on port 443 (or 3000), or localhost:3000.
+Desktop Foundry OAuth uses your default browser and a temporary local callback listener on `localhost:3000`.
+If `localhost:3000` is already in use, OAuth login will fail until that port is freed.
 
 ## Usage
 
