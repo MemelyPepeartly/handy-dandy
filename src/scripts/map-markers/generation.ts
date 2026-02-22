@@ -120,7 +120,7 @@ export async function generateMapMarkerBoxText(
 ): Promise<string> {
   const gptClient = game.handyDandy?.gptClient;
   if (!gptClient) {
-    throw new Error(`${CONSTANTS.MODULE_NAME} | GPT client has not been initialised`);
+    throw new Error(`${CONSTANTS.MODULE_NAME} | AI client has not been initialised`);
   }
 
   const response = await gptClient.generateWithSchema<BoxTextGenerationResult>(
