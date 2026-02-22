@@ -76,11 +76,11 @@ beforeEach(() => {
       get(moduleId: string, key: string) {
         if (moduleId !== "handy-dandy") throw new Error("Unknown module");
         const values: Record<string, unknown> = {
-          GPTModel: "gpt-5-mini",
-          GPTImageModel: "gpt-image-1",
-          GPTTemperature: 0.5,
-          GPTTopP: 0.75,
-          GPTSeed: 123,
+          OpenRouterModel: "openai/gpt-5-mini",
+          OpenRouterImageModel: "openai/gpt-image-1",
+          OpenRouterTemperature: 0.5,
+          OpenRouterTopP: 0.75,
+          OpenRouterSeed: 123,
         };
         return values[key] ?? null;
       }
@@ -91,25 +91,25 @@ beforeEach(() => {
 test("readGPTSettings pulls module settings with sane defaults", () => {
   const config = readGPTSettings();
   assert.deepEqual(config, {
-    model: "gpt-5-mini",
-    imageModel: "gpt-image-1",
+    model: "openai/gpt-5-mini",
+    imageModel: "openai/gpt-image-1",
     temperature: 0.5,
     top_p: 0.75,
     seed: 123,
   });
 });
 
-test("readGPTSettings falls back to defaults for unknown model ids", () => {
+test("readGPTSettings falls back to defaults for malformed model ids", () => {
   globalThis.game = {
     settings: {
       get(moduleId: string, key: string) {
         if (moduleId !== "handy-dandy") throw new Error("Unknown module");
         const values: Record<string, unknown> = {
-          GPTModel: "not-a-real-model",
-          GPTImageModel: "not-a-real-image-model",
-          GPTTemperature: 0.25,
-          GPTTopP: 0.5,
-          GPTSeed: Number.NaN,
+          OpenRouterModel: null,
+          OpenRouterImageModel: 999,
+          OpenRouterTemperature: 0.25,
+          OpenRouterTopP: 0.5,
+          OpenRouterSeed: Number.NaN,
         };
         return values[key] ?? null;
       },
@@ -118,8 +118,8 @@ test("readGPTSettings falls back to defaults for unknown model ids", () => {
 
   const config = readGPTSettings();
   assert.deepEqual(config, {
-    model: "gpt-5-mini",
-    imageModel: "gpt-image-1.5",
+    model: "openai/gpt-5-mini",
+    imageModel: "openai/gpt-image-1",
     temperature: 0.25,
     top_p: 0.5,
   });
