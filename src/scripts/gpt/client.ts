@@ -5,8 +5,7 @@ import type { GPTUsageMetrics } from "../dev/developer-console";
 import {
   DEFAULT_GPT_IMAGE_MODEL,
   DEFAULT_GPT_MODEL,
-  isValidGPTImageModel,
-  isValidGPTModel,
+  normalizeModelId,
 } from "./models";
 
 export interface JsonSchemaDefinition {
@@ -102,15 +101,24 @@ const sanitizeNumber = (value: unknown): number | undefined => {
 
 export const readGPTSettings = (): GPTClientConfig => {
   const settings = game.settings;
-  const model = settings?.get(CONSTANTS.MODULE_ID, "GPTModel") as string | undefined;
-  const imageModel = settings?.get(CONSTANTS.MODULE_ID, "GPTImageModel") as string | undefined;
-  const temperature = settings?.get(CONSTANTS.MODULE_ID, "GPTTemperature");
-  const top_p = settings?.get(CONSTANTS.MODULE_ID, "GPTTopP");
-  const seedSetting = settings?.get(CONSTANTS.MODULE_ID, "GPTSeed");
+  const safeGet = (key: string): unknown => {
+    if (!settings) return undefined;
+    try {
+      return settings.get(CONSTANTS.MODULE_ID as never, key as never);
+    } catch {
+      return undefined;
+    }
+  };
+
+  const model = safeGet("OpenRouterModel");
+  const imageModel = safeGet("OpenRouterImageModel");
+  const temperature = safeGet("OpenRouterTemperature");
+  const top_p = safeGet("OpenRouterTopP");
+  const seedSetting = safeGet("OpenRouterSeed");
 
   const config: GPTClientConfig = {
-    model: isValidGPTModel(model) ? model : DEFAULT_GPT_MODEL,
-    imageModel: isValidGPTImageModel(imageModel) ? imageModel : DEFAULT_GPT_IMAGE_MODEL,
+    model: normalizeModelId(model, DEFAULT_GPT_MODEL),
+    imageModel: normalizeModelId(imageModel, DEFAULT_GPT_IMAGE_MODEL),
     temperature: sanitizeNumber(temperature) ?? 0,
     top_p: sanitizeNumber(top_p) ?? 1,
   };
@@ -251,7 +259,7 @@ export class GPTClient {
     const referenceImages = options.referenceImages?.filter((entry): entry is File => entry instanceof File) ?? [];
 
     if (referenceImages.length > 16) {
-      throw new Error("OpenAI image edits support up to 16 reference images.");
+      throw new Error("OpenRouter image edits support up to 16 reference images.");
     }
 
     const requestBase: Record<string, unknown> = {
@@ -271,7 +279,7 @@ export class GPTClient {
     const response = usesImageEdit
       ? await (() => {
         if (typeof images.edit !== "function") {
-          throw new Error("OpenAI image edit API is unavailable.");
+          throw new Error("OpenRouter image edit API is unavailable.");
         }
 
         const editRequest: Record<string, unknown> = {
@@ -324,7 +332,7 @@ export class GPTClient {
     }
 
     if (!base64) {
-      throw new Error("OpenAI image generation did not return base64 image data.");
+      throw new Error("OpenRouter image generation did not return base64 image data.");
     }
 
     const revisedPrompt = typeof first?.revised_prompt === "string"
@@ -350,7 +358,7 @@ export class GPTClient {
       model: this.#config.model,
       input: this.#createInputMessages(
         prompt,
-        "You can consult the web_search tool to look up current and authoritative information before responding. Prefer using it whenever the prompt benefits from recent or factual context, then answer with valid JSON that satisfies the requested schema.",
+        "Return valid JSON that satisfies the requested schema.",
       ),
       metadata: this.#createMetadata(options?.seed),
       text: {
@@ -362,9 +370,6 @@ export class GPTClient {
           strict: true,
         },
       },
-      tools: [
-        { type: "web_search_preview" },
-      ],
     };
 
     this.#applySamplingParameters(request);
@@ -388,10 +393,9 @@ export class GPTClient {
       metadata: this.#createMetadata(options?.seed),
       input: this.#createInputMessages(
         prompt,
-        `You are a JSON serializer. Always provide valid JSON for the ${schema.name} tool that satisfies the supplied schema. When helpful, consult the web_search tool to gather up-to-date information before returning your final answer.`,
+        `You are a JSON serializer. Always provide valid JSON for the ${schema.name} tool that satisfies the supplied schema.`,
       ),
       tools: [
-        { type: "web_search_preview" },
         {
           type: "function",
           name: prepared.name,
@@ -517,7 +521,10 @@ export class GPTClient {
   }
 
   #supportsTemperature(): boolean {
-    return !this.#config.model.startsWith("gpt-5");
+    const normalized = this.#config.model.includes("/")
+      ? this.#config.model.split("/").pop() ?? this.#config.model
+      : this.#config.model;
+    return !normalized.startsWith("gpt-5");
   }
 
   #createMetadata(seedOverride: number | undefined): Record<string, string> | undefined {
