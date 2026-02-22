@@ -100,7 +100,7 @@ export class ToolOverview extends FormApplication {
           id: "developer-console",
           title: "Developer Console",
           icon: "fas fa-terminal",
-          description: "Access developer helpers for validation, imports, and GPT-driven workflows (GM or developer mode only).",
+          description: "Access developer helpers for validation, imports, and AI-driven workflows (GM or developer mode only).",
           location: "Scene Controls → Handy Dandy Tools → Developer Console",
           buttonAction: "open-dev-console",
           buttonLabel: "Open Developer Console",
