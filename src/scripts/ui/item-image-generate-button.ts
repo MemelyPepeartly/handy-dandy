@@ -88,7 +88,7 @@ export function registerItemImageGenerateButton(): void {
 
       const gptClient = game.handyDandy?.gptClient;
       if (!gptClient || typeof gptClient.generateImage !== "function") {
-        ui.notifications?.error(`${CONSTANTS.MODULE_NAME} | GPT image generation is unavailable.`);
+        ui.notifications?.error(`${CONSTANTS.MODULE_NAME} | AI image generation is unavailable.`);
         return;
       }
 
