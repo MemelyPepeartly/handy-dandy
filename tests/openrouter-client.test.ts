@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { beforeEach, test } from "node:test";
 import type { OpenAI } from "openai";
-import { GPTClient, readGPTSettings, type JsonSchemaDefinition } from "../src/scripts/gpt/client";
+import { OpenRouterClient, readOpenRouterSettings, type JsonSchemaDefinition } from "../src/scripts/openrouter/client";
 
 type ResponsesCall = Record<string, any>;
 
@@ -84,8 +84,8 @@ beforeEach(() => {
   } as any;
 });
 
-test("readGPTSettings pulls module settings with sane defaults", () => {
-  const config = readGPTSettings();
+test("readOpenRouterSettings pulls module settings with sane defaults", () => {
+  const config = readOpenRouterSettings();
   assert.deepEqual(config, {
     model: "openai/gpt-5-mini",
     imageModel: "openai/gpt-image-1",
@@ -95,7 +95,7 @@ test("readGPTSettings pulls module settings with sane defaults", () => {
   });
 });
 
-test("readGPTSettings falls back to defaults for malformed model ids", () => {
+test("readOpenRouterSettings falls back to defaults for malformed model ids", () => {
   globalThis.game = {
     settings: {
       get(moduleId: string, key: string) {
@@ -112,7 +112,7 @@ test("readGPTSettings falls back to defaults for malformed model ids", () => {
     },
   } as any;
 
-  const config = readGPTSettings();
+  const config = readOpenRouterSettings();
   assert.deepEqual(config, {
     model: "openai/gpt-5-mini",
     imageModel: "openai/gpt-image-1",
@@ -137,7 +137,7 @@ test("generateWithSchema returns parsed JSON from structured outputs", async () 
     ]
   });
 
-  const client = GPTClient.fromSettings(stub as unknown as OpenAI);
+  const client = OpenRouterClient.fromSettings(stub as unknown as OpenAI);
   const result = await client.generateWithSchema<{ value: number }>("Say hello", schema);
 
   assert.deepEqual(result, { value: 42 });
@@ -163,7 +163,7 @@ test("generateWithSchema normalizes schema required properties for strict mode",
     ]
   });
 
-  const client = GPTClient.fromSettings(stub as unknown as OpenAI);
+  const client = OpenRouterClient.fromSettings(stub as unknown as OpenAI);
   const complexSchema = {
     name: "Complex",
     schema: {
@@ -224,7 +224,7 @@ test("generateWithSchema falls back to tool calls when response_format unsupport
     ]
   });
 
-  const client = GPTClient.fromSettings(stub as unknown as OpenAI);
+  const client = OpenRouterClient.fromSettings(stub as unknown as OpenAI);
   const result = await client.generateWithSchema<{ value: number }>("Say hello", schema);
 
   assert.deepEqual(result, { value: 7 });
@@ -254,7 +254,7 @@ test("generateImage uses chat completions image modalities and parses data URLs"
     ],
   });
 
-  const client = GPTClient.fromSettings(stub as unknown as OpenAI);
+  const client = OpenRouterClient.fromSettings(stub as unknown as OpenAI);
   const result = await client.generateImage("Create token art", { format: "png" });
 
   assert.equal(result.base64, "Zm9v");
@@ -282,7 +282,7 @@ test("generateImage includes reference images in chat content blocks", async () 
     ],
   });
 
-  const client = GPTClient.fromSettings(stub as unknown as OpenAI);
+  const client = OpenRouterClient.fromSettings(stub as unknown as OpenAI);
   const referenceImage = new File([Buffer.from("image")], "reference.png", { type: "image/png" });
   await client.generateImage("Edit token art", { referenceImages: [referenceImage] });
 

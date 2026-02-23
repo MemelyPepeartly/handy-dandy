@@ -7,7 +7,7 @@ import {
   generateItem,
 } from "../src/scripts/generation";
 import { toFoundryActorData } from "../src/scripts/mappers/import";
-import type { GeneratedImageResult, JsonSchemaDefinition } from "../src/scripts/gpt/client";
+import type { GeneratedImageResult, JsonSchemaDefinition } from "../src/scripts/openrouter/client";
 import type {
   ActionSchemaData,
   ActorSchemaData,
@@ -52,7 +52,7 @@ interface RecordedCall {
   seed?: number;
 }
 
-class FixtureGPTClient {
+class FixtureOpenRouterClient {
   public calls: RecordedCall[] = [];
 
   constructor(
@@ -88,7 +88,7 @@ class FixtureGPTClient {
   }
 }
 
-class FixtureImageGPTClient extends FixtureGPTClient {
+class FixtureImageOpenRouterClient extends FixtureOpenRouterClient {
   public imagePrompts: string[] = [];
 
   async generateImage(prompt: string): Promise<GeneratedImageResult> {
@@ -123,12 +123,12 @@ const baseActorInput: ActorPromptInput = {
   referenceText: "A nimble scout who excels at reconnaissance.",
 };
 
-const createClient = (): FixtureGPTClient =>
-  new FixtureGPTClient({ Action: actionFixture, Item: itemFixture, Actor: actorFixture });
+const createClient = (): FixtureOpenRouterClient =>
+  new FixtureOpenRouterClient({ Action: actionFixture, Item: itemFixture, Actor: actorFixture });
 
 test("generateAction yields deterministic results with identical input and seed", async () => {
   const client = createClient();
-  const options = { gptClient: client, seed: 42 } as const;
+  const options = { openRouterClient: client, seed: 42 } as const;
 
   const first = await generateAction(baseActionInput, options);
   const second = await generateAction(baseActionInput, options);
@@ -141,7 +141,7 @@ test("generateAction yields deterministic results with identical input and seed"
 
 test("generateItem defaults to the canonical seed for stable output", async () => {
   const client = createClient();
-  const options = { gptClient: client } as const;
+  const options = { openRouterClient: client } as const;
 
   const first = await generateItem(baseItemInput, options);
   const second = await generateItem(baseItemInput, options);
@@ -155,8 +155,8 @@ test("generateItem defaults to the canonical seed for stable output", async () =
 test("generateActor respects custom seeds for deterministic behaviour", async () => {
   const client = createClient();
 
-  const first = await generateActor(baseActorInput, { gptClient: client, seed: 7 });
-  const second = await generateActor(baseActorInput, { gptClient: client, seed: 7 });
+  const first = await generateActor(baseActorInput, { openRouterClient: client, seed: 7 });
+  const second = await generateActor(baseActorInput, { openRouterClient: client, seed: 7 });
 
   const canonical = cloneFixture(actorFixture) as ActorSchemaData;
   canonical.recallKnowledge = null;
@@ -185,7 +185,7 @@ test("generateActor respects custom seeds for deterministic behaviour", async ()
 });
 
 test("generateActor keeps generated token art as actor and token image", async () => {
-  const client = new FixtureImageGPTClient({ Action: actionFixture, Item: itemFixture, Actor: actorFixture });
+  const client = new FixtureImageOpenRouterClient({ Action: actionFixture, Item: itemFixture, Actor: actorFixture });
   const priorFilePicker = (globalThis as { FilePicker?: unknown }).FilePicker;
   (globalThis as { FilePicker?: unknown }).FilePicker = undefined;
 
@@ -195,7 +195,7 @@ test("generateActor keeps generated token art as actor and token image", async (
         ...baseActorInput,
         generateTokenImage: true,
       },
-      { gptClient: client },
+      { openRouterClient: client },
     );
 
     assert.ok(generated.img.startsWith("data:image/png;base64,"));
@@ -207,7 +207,7 @@ test("generateActor keeps generated token art as actor and token image", async (
 });
 
 test("generateItem can generate transparent icon art when enabled", async () => {
-  const client = new FixtureImageGPTClient({ Action: actionFixture, Item: itemFixture, Actor: actorFixture });
+  const client = new FixtureImageOpenRouterClient({ Action: actionFixture, Item: itemFixture, Actor: actorFixture });
   const priorFilePicker = (globalThis as { FilePicker?: unknown }).FilePicker;
   (globalThis as { FilePicker?: unknown }).FilePicker = undefined;
 
@@ -218,7 +218,7 @@ test("generateItem can generate transparent icon art when enabled", async () => 
         generateItemImage: true,
         itemImagePrompt: "ornate silver filigree",
       },
-      { gptClient: client },
+      { openRouterClient: client },
     );
 
     assert.ok(generated.img?.startsWith("data:image/png;base64,"));

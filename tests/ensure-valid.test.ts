@@ -6,7 +6,7 @@ import {
   EnsureValidError,
   type EnsureValidDiagnostics,
 } from "../src/scripts/validation/ensure-valid";
-import type { JsonSchemaDefinition, GPTClient } from "../src/scripts/gpt/client";
+import type { JsonSchemaDefinition, OpenRouterClient } from "../src/scripts/openrouter/client";
 
 (globalThis as { CONFIG?: unknown }).CONFIG = {
   PF2E: {
@@ -34,7 +34,7 @@ import type { JsonSchemaDefinition, GPTClient } from "../src/scripts/gpt/client"
   },
 };
 
-class StubGPTClient {
+class StubOpenRouterClient {
   public calls: Array<{ prompt: string; schema: JsonSchemaDefinition }> = [];
   private readonly responses: Array<unknown> = [];
 
@@ -226,8 +226,8 @@ test("ensureValid normalizes loot and hazard actor-type settings", async () => {
   assert.equal(hazardResult.loot, null);
 });
 
-test("ensureValid uses GPT repair when Ajv validation fails", async () => {
-  const stub = new StubGPTClient();
+test("ensureValid uses OpenRouter repair when Ajv validation fails", async () => {
+  const stub = new StubOpenRouterClient();
   stub.enqueue({
     schema_version: 3,
     systemId: "pf2e",
@@ -258,7 +258,7 @@ test("ensureValid uses GPT repair when Ajv validation fails", async () => {
   const result = await ensureValid({
     type: "item",
     payload,
-    gptClient: stub as unknown as GPTClient,
+    openRouterClient: stub as unknown as OpenRouterClient,
   });
 
   assert.equal(stub.calls.length, 1);
@@ -269,7 +269,7 @@ test("ensureValid uses GPT repair when Ajv validation fails", async () => {
 });
 
 test("ensureValid throws typed error with diagnostics after exhausting retries", async () => {
-  const stub = new StubGPTClient();
+  const stub = new StubOpenRouterClient();
   stub.enqueue({
     schema_version: 3,
     systemId: "pf2e",
@@ -297,7 +297,7 @@ test("ensureValid throws typed error with diagnostics after exhausting retries",
     await ensureValid({
       type: "item",
       payload,
-      gptClient: stub as unknown as GPTClient,
+      openRouterClient: stub as unknown as OpenRouterClient,
       maxAttempts: 2,
     });
     assert.fail("Expected ensureValid to throw");
@@ -314,8 +314,8 @@ test("ensureValid throws typed error with diagnostics after exhausting retries",
   }
 });
 
-test("EnsureValidError exposes a repair helper that retries GPT fixes", async () => {
-  const stub = new StubGPTClient();
+test("EnsureValidError exposes a repair helper that retries OpenRouter fixes", async () => {
+  const stub = new StubOpenRouterClient();
   stub.enqueue({
     schema_version: 3,
     systemId: "pf2e",
@@ -343,7 +343,7 @@ test("EnsureValidError exposes a repair helper that retries GPT fixes", async ()
     await ensureValid({
       type: "item",
       payload,
-      gptClient: stub as unknown as GPTClient,
+      openRouterClient: stub as unknown as OpenRouterClient,
       maxAttempts: 2,
     });
     assert.fail("Expected ensureValid to throw");
