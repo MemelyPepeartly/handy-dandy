@@ -1,6 +1,6 @@
 import { OpenAI } from "openai";
 import { CONSTANTS } from "../constants";
-import { GPTClient } from "./client";
+import { OpenRouterClient } from "./client";
 
 const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 
@@ -33,7 +33,7 @@ export function createOpenRouterSdk(apiKey: string): OpenAI {
   });
 }
 
-export function initializeAIClientFromSettings(): void {
+export function initializeOpenRouterClientFromSettings(): void {
   const namespace = game.handyDandy;
   if (!namespace) {
     return;
@@ -41,12 +41,12 @@ export function initializeAIClientFromSettings(): void {
 
   const apiKey = readConfiguredApiKey();
   if (!apiKey) {
-    namespace.openai = null;
-    namespace.gptClient = null;
+    namespace.openRouterSdk = null;
+    namespace.openRouterClient = null;
     return;
   }
 
-  const openai = createOpenRouterSdk(apiKey);
-  namespace.openai = openai;
-  namespace.gptClient = GPTClient.fromSettings(openai);
+  const openRouterSdk = createOpenRouterSdk(apiKey);
+  namespace.openRouterSdk = openRouterSdk;
+  namespace.openRouterClient = OpenRouterClient.fromSettings(openRouterSdk);
 }
