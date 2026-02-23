@@ -1,0 +1,25 @@
+    <div class="handy-dandy-workbench-dialog" data-current-entry="{{currentEntryId}}">
+      <nav class="handy-dandy-workbench-tabs">
+        <button type="button" class="handy-dandy-workbench-tab active" data-tab="latest">Latest</button>
+        <button type="button" class="handy-dandy-workbench-tab" data-tab="history">History</button>
+      </nav>
+      <section class="handy-dandy-workbench-panel active" data-panel="latest">
+        {{{latestMarkup}}}
+      </section>
+      <section class="handy-dandy-workbench-panel" data-panel="history">
+        <div class="handy-dandy-workbench-history-toolbar">
+          <label class="handy-dandy-workbench-history-search">
+            <i class="fas fa-search"></i>
+            <input type="search" placeholder="Filter by name, type, or system" data-history-filter />
+          </label>
+          <span class="handy-dandy-workbench-history-summary" data-history-summary></span>
+        </div>
+        <div class="handy-dandy-workbench-history">
+          <aside class="handy-dandy-workbench-history-list" data-history-list>
+            {{{historyListMarkup}}}
+          </aside>
+          <div class="handy-dandy-workbench-history-view" data-history-view>{{{historyPlaceholder}}}</div>
+        </div>
+      </section>
+    </div>
+  

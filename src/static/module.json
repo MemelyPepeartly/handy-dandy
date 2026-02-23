@@ -19,6 +19,10 @@
   "bugs": "",
   "socket": true,
   "esmodules": ["handy-dandy.js"],
+  "styles": [
+    "styles/base.css",
+    "styles/prompt-workbench.css"
+  ],
   "languages": [],
   "packs": [],
   "relationships": {

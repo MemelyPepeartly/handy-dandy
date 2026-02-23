@@ -1,0 +1,16 @@
+{{#if hasEntries}}
+  {{#each entries}}
+    <div class="handy-dandy-workbench-history-item{{#if isActive}} active{{/if}}" data-entry-id="{{id}}">
+      <button type="button" class="handy-dandy-workbench-history-select" data-entry-id="{{id}}">
+        <span class="handy-dandy-workbench-history-chip">{{typeLabel}}</span>
+        <span class="handy-dandy-workbench-history-name">{{name}}</span>
+        <span class="handy-dandy-workbench-history-meta">{{meta}}</span>
+      </button>
+      <button type="button" class="handy-dandy-workbench-history-delete" data-entry-id="{{id}}" aria-label="Remove from history">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+  {{/each}}
+{{else}}
+  <p class="handy-dandy-workbench-history-empty">{{emptyMessage}}</p>
+{{/if}}

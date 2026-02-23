@@ -1,0 +1,33 @@
+<header class="handy-dandy-workbench-header">
+  <div class="handy-dandy-workbench-heading">
+    <h2 class="handy-dandy-workbench-name">{{name}}</h2>
+    <p class="handy-dandy-workbench-meta">{{meta}}</p>
+  </div>
+  <div class="handy-dandy-workbench-actions">
+    <button type="button" class="handy-dandy-workbench-action" data-action="copy" data-entry-id="{{id}}">
+      <i class="fas fa-copy"></i>
+      <span>Copy JSON</span>
+    </button>
+    <button type="button" class="handy-dandy-workbench-action" data-action="download" data-entry-id="{{id}}">
+      <i class="fas fa-download"></i>
+      <span>Download</span>
+    </button>
+    <button type="button" class="handy-dandy-workbench-action" data-action="repair" data-entry-id="{{id}}">
+      <i class="fas fa-tools"></i>
+      <span>Repair JSON</span>
+    </button>
+    {{#if importerAvailable}}
+      <button type="button" class="handy-dandy-workbench-action" data-action="import" data-entry-id="{{id}}">
+        <i class="fas fa-cloud-upload-alt"></i>
+        <span>{{importLabel}}</span>
+      </button>
+    {{else}}
+      <button type="button" class="handy-dandy-workbench-action" data-action="import" data-entry-id="{{id}}" disabled title="Import is unavailable for this entry.">
+        <i class="fas fa-cloud-upload-alt"></i>
+        <span>{{importLabel}}</span>
+      </button>
+    {{/if}}
+  </div>
+</header>
+<p class="notes">Review the generated JSON below or revisit previous generations from the history tab.</p>
+<textarea class="handy-dandy-workbench-json" rows="16" readonly>{{json}}</textarea>

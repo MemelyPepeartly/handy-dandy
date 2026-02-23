@@ -1,0 +1,227 @@
+    <div class="handy-dandy-workbench-request">
+      <nav class="handy-dandy-workbench-tabs">
+        <button type="button" class="handy-dandy-workbench-tab active" data-tab="prompt">Create</button>
+        <button type="button" class="handy-dandy-workbench-tab" data-tab="history">History</button>
+      </nav>
+      <section class="handy-dandy-workbench-panel active" data-panel="prompt">
+        <div class="handy-dandy-workbench-quickstart">
+          <p class="handy-dandy-workbench-quickstart-title">Workflow</p>
+          <div class="handy-dandy-workbench-steps">
+            <div class="handy-dandy-workbench-step">
+              <span class="handy-dandy-workbench-step-index">1</span>
+              <span class="handy-dandy-workbench-step-text">Select entity type, subtype, and title.</span>
+            </div>
+            <div class="handy-dandy-workbench-step">
+              <span class="handy-dandy-workbench-step-index">2</span>
+              <span class="handy-dandy-workbench-step-text">Paste source text and choose art mode.</span>
+            </div>
+            <div class="handy-dandy-workbench-step">
+              <span class="handy-dandy-workbench-step-index">3</span>
+              <span class="handy-dandy-workbench-step-text">Generate, review JSON, then import.</span>
+            </div>
+          </div>
+        </div>
+        <fieldset class="form-group">
+          <legend>Generation Setup</legend>
+          {{{generationSetupMarkup}}}
+          <p class="notes">
+            Models and sampling settings come from Module Settings.
+            Use OpenRouter Account to connect or switch model presets.
+          </p>
+        </fieldset>
+        <form class="handy-dandy-workbench-form">
+          <fieldset class="form-group">
+            <legend>Entry Setup</legend>
+            <div class="form-fields">
+              <div>
+                <label for="handy-dandy-workbench-entity-type">Entity Type</label>
+                <select id="handy-dandy-workbench-entity-type" name="entityType">
+                  <option value="actor">Actor</option>
+                  <option value="action">Action</option>
+                  <option value="item">Item</option>
+                </select>
+              </div>
+              <div>
+                <label for="handy-dandy-workbench-system-display">Game System</label>
+                <input id="handy-dandy-workbench-system-display" type="text" value="PF2E" disabled />
+                <input type="hidden" name="systemId" value="{{systemId}}" />
+                <p class="notes">Locked to PF2E for prompt workbench generation.</p>
+              </div>
+              <div data-entity-scope="item">
+                <label for="handy-dandy-workbench-item-type">Item Type</label>
+                <select id="handy-dandy-workbench-item-type" name="itemType">
+                  <option value="">Select a type</option>
+                  {{#each itemTypeOptions}}
+                    <option value="{{value}}">{{label}}</option>
+                  {{/each}}
+                </select>
+                <p class="notes">Match the Foundry item category for the generated entry.</p>
+              </div>
+              <div data-entity-scope="actor">
+                <label for="handy-dandy-workbench-actor-type">Actor Type</label>
+                <select id="handy-dandy-workbench-actor-type" name="actorType">
+                  {{#each actorTypeOptions}}
+                    <option value="{{value}}"{{#if selected}} selected{{/if}}>{{label}}</option>
+                  {{/each}}
+                </select>
+                <p class="notes">Select the PF2E actor category the generator should target.</p>
+              </div>
+              <div>
+                <label for="handy-dandy-workbench-title">Title</label>
+                <input
+                  id="handy-dandy-workbench-title"
+                  type="text"
+                  name="entryName"
+                  placeholder="e.g. Clockwork Exarch"
+                  required
+                />
+              </div>
+              <div>
+                <label for="handy-dandy-workbench-slug">Slug (optional)</label>
+                <input id="handy-dandy-workbench-slug" type="text" name="slug" />
+              </div>
+              <div data-entity-scope="actor">
+                <label for="handy-dandy-workbench-level">Actor Level (optional)</label>
+                <input id="handy-dandy-workbench-level" type="number" name="level" min="0" />
+              </div>
+            </div>
+            <p class="notes">Define what to generate before supplying the prompt text.</p>
+          </fieldset>
+
+          <fieldset class="form-group">
+            <legend>Source Material</legend>
+            <label for="handy-dandy-workbench-prompt">Reference Text / Prompt</label>
+            <textarea id="handy-dandy-workbench-prompt" name="referenceText" required></textarea>
+            <p class="notes">Paste stat blocks, raw notes, or structured direction for generation.</p>
+          </fieldset>
+
+          <fieldset class="form-group" data-entity-scope="action">
+            <legend>Action Art</legend>
+            <label for="handy-dandy-workbench-image">Image Path</label>
+            <input id="handy-dandy-workbench-image" type="text" name="img" value="{{defaultImagePath}}" />
+            <p class="notes">Used as the generated action image path.</p>
+          </fieldset>
+
+          <fieldset class="form-group" data-entity-scope="item">
+            <legend>Item Art</legend>
+            <div class="handy-dandy-workbench-art-mode">
+              <label class="handy-dandy-workbench-art-choice">
+                <input type="radio" name="itemArtMode" value="path" checked />
+                <span>Use image path</span>
+              </label>
+              <label class="handy-dandy-workbench-art-choice">
+                <input type="radio" name="itemArtMode" value="generate" />
+                <span>Generate transparent item icon</span>
+              </label>
+            </div>
+            <div class="form-group" data-item-art-mode="path">
+              <label for="handy-dandy-workbench-item-image">Item Image Path</label>
+              <input
+                id="handy-dandy-workbench-item-image"
+                type="text"
+                name="itemImagePath"
+                value="{{defaultImagePath}}"
+              />
+              <p class="notes">Used when image-path mode is selected.</p>
+            </div>
+            <div class="form-group" data-item-art-mode="generate">
+              <label for="handy-dandy-workbench-item-image-prompt">Item Image Prompt Override (optional)</label>
+              <input
+                id="handy-dandy-workbench-item-image-prompt"
+                type="text"
+                name="itemImagePrompt"
+                placeholder="Optional art direction for generated item icon"
+              />
+              <p class="notes">Leave blank to derive icon direction from the generated item description.</p>
+            </div>
+            <p class="notes">Choose one art mode for items to avoid conflicting image instructions.</p>
+          </fieldset>
+
+          <fieldset class="form-group" data-entity-scope="actor">
+            <legend>Actor Art</legend>
+            <div class="handy-dandy-workbench-art-mode">
+              <label class="handy-dandy-workbench-art-choice">
+                <input type="radio" name="actorArtMode" value="path" checked />
+                <span>Use image path</span>
+              </label>
+              <label class="handy-dandy-workbench-art-choice">
+                <input type="radio" name="actorArtMode" value="token" />
+                <span>Generate transparent token</span>
+              </label>
+            </div>
+            <div class="form-group" data-actor-art-mode="path">
+              <label for="handy-dandy-workbench-actor-image">Actor Image Path</label>
+              <input
+                id="handy-dandy-workbench-actor-image"
+                type="text"
+                name="actorImagePath"
+                value="{{defaultImagePath}}"
+              />
+              <p class="notes">Used when image-path mode is selected.</p>
+            </div>
+            <div class="form-group" data-actor-art-mode="token">
+              <label for="handy-dandy-workbench-token-prompt">Token Prompt Override (optional)</label>
+              <input
+                id="handy-dandy-workbench-token-prompt"
+                type="text"
+                name="tokenPrompt"
+                placeholder="Optional art direction for the generated transparent token"
+              />
+              <p class="notes">Leave blank to derive token style from the actor description.</p>
+            </div>
+            <p class="notes">Choose one art mode for actors to avoid conflicting image instructions.</p>
+          </fieldset>
+
+          <fieldset class="form-group" data-entity-scope="actor">
+            <legend>Actor Content</legend>
+            <div class="form-fields" data-actor-type-scope="npc">
+              <label><input type="checkbox" name="includeSpellcasting" /> Spellcasting?</label>
+              <label><input type="checkbox" name="includeInventory" /> Inventory?</label>
+            </div>
+            <p class="notes" data-actor-type-scope="npc">Enable extra NPC sections in the generated sheet data.</p>
+            <div class="form-fields" data-actor-type-scope="loot hazard">
+              <label><input type="checkbox" name="includeOfficialContent" checked /> Official content</label>
+              <label><input type="checkbox" name="includeGeneratedContent" checked /> Generated content</label>
+            </div>
+            <p class="notes" data-actor-type-scope="loot hazard">
+              Select whether loot/hazard content should prefer official PF2E imports, generated content, or both.
+            </p>
+          </fieldset>
+          <fieldset class="form-group">
+            <legend>Publication Details</legend>
+            <div class="form-fields">
+              <label>Title <input type="text" name="publicationTitle" value="" /></label>
+              <label>Authors <input type="text" name="publicationAuthors" value="" /></label>
+              <label>License <input type="text" name="publicationLicense" value="OGL" /></label>
+              <label><input type="checkbox" name="publicationRemaster" /> Remaster</label>
+            </div>
+          </fieldset>
+          <details class="handy-dandy-workbench-advanced">
+            <summary>Advanced Options</summary>
+            <div class="handy-dandy-workbench-advanced-fields">
+              <label>Seed <input type="number" name="seed" value="{{defaultSeedValue}}" /></label>
+              <label>Max Attempts <input type="number" name="maxAttempts" min="1" value="3" /></label>
+              <label>Compendium Pack ID <input type="text" name="packId" /></label>
+              <label>Folder ID <input type="text" name="folderId" /></label>
+            </div>
+          </details>
+        </form>
+      </section>
+      <section class="handy-dandy-workbench-panel" data-panel="history">
+        <div class="handy-dandy-workbench-history-toolbar">
+          <label class="handy-dandy-workbench-history-search">
+            <i class="fas fa-search"></i>
+            <input type="search" placeholder="Filter by name, type, or system" data-history-filter />
+          </label>
+          <span class="handy-dandy-workbench-history-summary" data-history-summary></span>
+        </div>
+        <div class="handy-dandy-workbench-history">
+          <aside class="handy-dandy-workbench-history-list" data-history-list>
+            {{{historyListMarkup}}}
+          </aside>
+          <div class="handy-dandy-workbench-history-view" data-history-view>{{{historyPlaceholder}}}</div>
+        </div>
+        <p class="notes">History entries persist locally in this browser. Remove any that you no longer need.</p>
+      </section>
+    </div>
+  

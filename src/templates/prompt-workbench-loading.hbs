@@ -1,0 +1,10 @@
+<div class="handy-dandy-workbench-loading" data-loading-root>
+  <p><i class="fas fa-spinner fa-spin"></i> Generating {{safeEntryName}}...</p>
+  <p data-loading-message class="notes">Preparing prompt...</p>
+  <ol class="handy-dandy-workbench-loading-steps">
+    {{#each loadingSteps}}
+      <li data-loading-step data-step-index="{{index}}">{{label}}</li>
+    {{/each}}
+  </ol>
+  <p data-loading-elapsed class="notes">Elapsed: 0s</p>
+</div>
