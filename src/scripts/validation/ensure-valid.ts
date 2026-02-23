@@ -20,7 +20,7 @@ import {
   type ValidatorKey,
 } from "../schemas";
 import { formatError } from "../helpers/validation";
-import type { JsonSchemaDefinition, GPTClient } from "../gpt/client";
+import type { JsonSchemaDefinition, OpenRouterClient } from "../openrouter/client";
 import { getTraitSlugSet } from "../data/trait-dictionaries";
 
 export type { SchemaDataFor, ValidatorKey } from "../schemas";
@@ -46,7 +46,7 @@ export interface EnsureValidOptions<K extends ValidatorKey> {
   type: K;
   payload: unknown;
   maxAttempts?: number;
-  gptClient?: Pick<GPTClient, "generateWithSchema">;
+  openRouterClient?: Pick<OpenRouterClient, "generateWithSchema">;
   promptBuilder?: (context: EnsureValidPromptContext<K>) => string;
   schema?: JsonSchemaDefinition;
 }
@@ -54,7 +54,7 @@ export interface EnsureValidOptions<K extends ValidatorKey> {
 export interface EnsureValidRepairOptions<K extends ValidatorKey> {
   payload?: unknown;
   maxAttempts?: number;
-  gptClient?: Pick<GPTClient, "generateWithSchema">;
+  openRouterClient?: Pick<OpenRouterClient, "generateWithSchema">;
   promptBuilder?: (context: EnsureValidPromptContext<K>) => string;
   schema?: JsonSchemaDefinition;
 }
@@ -114,7 +114,7 @@ const ENTITY_TYPE_LOOKUP = createEnumLookup(ENTITY_TYPES);
 export async function ensureValid<K extends ValidatorKey>(
   options: EnsureValidOptions<K>,
 ): Promise<SchemaDataFor<K>> {
-  const { type, payload, gptClient, promptBuilder } = options;
+  const { type, payload, openRouterClient, promptBuilder } = options;
   const maxAttempts = Math.max(1, options.maxAttempts ?? DEFAULT_MAX_ATTEMPTS);
   const validator = validators[type];
   const schemaDefinition =
@@ -144,7 +144,7 @@ export async function ensureValid<K extends ValidatorKey>(
 
     lastNormalized = clone(candidate);
 
-    if (!gptClient || attempt === maxAttempts) {
+    if (!openRouterClient || attempt === maxAttempts) {
       break;
     }
 
@@ -162,7 +162,7 @@ export async function ensureValid<K extends ValidatorKey>(
       ? promptBuilder(context)
       : buildDefaultPrompt(context);
 
-    attemptPayload = await gptClient.generateWithSchema<Record<string, unknown>>(
+    attemptPayload = await openRouterClient.generateWithSchema<Record<string, unknown>>(
       prompt,
       schemaDefinition,
     );
@@ -211,7 +211,7 @@ export async function ensureValid<K extends ValidatorKey>(
           type,
           payload: retryPayload,
           maxAttempts: overrides.maxAttempts ?? maxAttempts,
-          gptClient: overrides.gptClient ?? gptClient,
+          openRouterClient: overrides.openRouterClient ?? openRouterClient,
           promptBuilder: overrides.promptBuilder ?? promptBuilder,
           schema: overrides.schema ?? schemaDefinition,
         });
