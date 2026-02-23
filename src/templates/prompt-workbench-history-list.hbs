@@ -1,7 +1,7 @@
 {{#if hasEntries}}
   {{#each entries}}
     <div class="handy-dandy-workbench-history-item{{#if isActive}} active{{/if}}" data-entry-id="{{id}}">
-      <button type="button" class="handy-dandy-workbench-history-select" data-entry-id="{{id}}">
+      <button type="button" class="handy-dandy-workbench-history-select" data-entry-id="{{id}}" title="{{name}}">
         <span class="handy-dandy-workbench-history-chip">{{typeLabel}}</span>
         <span class="handy-dandy-workbench-history-name">{{name}}</span>
         <span class="handy-dandy-workbench-history-meta">{{meta}}</span>

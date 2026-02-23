@@ -793,3 +793,58 @@
   .handy-dandy-workbench-loading-steps li.is-complete {
     opacity: 0.7;
   }
+
+/* History List Usability Overrides */
+.handy-dandy-workbench-history-list .handy-dandy-workbench-history-item {
+  display: flex;
+  align-items: stretch;
+  min-height: 4rem;
+  width: 100%;
+}
+
+.handy-dandy-workbench-history-list .handy-dandy-workbench-history-select {
+  display: flex !important;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 4rem;
+  width: auto;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0.2rem;
+  line-height: 1.2;
+  white-space: normal !important;
+  overflow: visible;
+  text-transform: none;
+}
+
+.handy-dandy-workbench-history-list .handy-dandy-workbench-history-name {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.handy-dandy-workbench-history-list .handy-dandy-workbench-history-meta {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.handy-dandy-workbench-history-list .handy-dandy-workbench-history-delete {
+  flex: 0 0 2.1rem;
+  width: 2.1rem;
+  min-width: 2.1rem;
+  max-width: 2.1rem;
+  padding: 0;
+  margin: 0;
+  border-radius: 0;
+}
+
+.handy-dandy-workbench-history-list .handy-dandy-workbench-history-delete i {
+  pointer-events: none;
+}
