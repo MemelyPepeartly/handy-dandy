@@ -2,6 +2,7 @@ import { CONSTANTS } from "../constants";
 import { DEFAULT_GPT_IMAGE_MODEL, DEFAULT_GPT_MODEL } from "../gpt/models";
 import { updateGPTClientFromSettings } from "../gpt/client";
 import { initializeAIClientFromSettings } from "../gpt/runtime";
+import { loadOpenRouterModelChoiceCatalog } from "../openrouter/model-catalog";
 import { ToolOverview } from "../ui/tool-overview";
 import { OpenRouterAccountSettings } from "./openrouter-account";
 
@@ -9,8 +10,9 @@ import { OpenRouterAccountSettings } from "./openrouter-account";
 // V12, so we cast to keep strict TypeScript while using runtime-correct scope.
 const USER_SCOPE = "user" as unknown as "client";
 
-export function registerSettings(): void {
+export async function registerSettings(): Promise<void> {
   const settings = game.settings!;
+  const modelCatalog = await loadOpenRouterModelChoiceCatalog();
 
   settings.register(CONSTANTS.MODULE_ID, "OpenRouterApiKey", {
     name: "OpenRouter API Key",
@@ -44,10 +46,11 @@ export function registerSettings(): void {
 
   settings.register(CONSTANTS.MODULE_ID, "OpenRouterModel", {
     name: "OpenRouter Text Model",
-    hint: "Model ID for structured text generation (example: openai/gpt-5-mini).",
+    hint: "Model used for structured text generation. List is loaded from OpenRouter model catalog at startup.",
     scope: USER_SCOPE,
     config: true,
     type: String,
+    choices: modelCatalog.textChoices,
     default: DEFAULT_GPT_MODEL,
     onChange: () => {
       updateGPTClientFromSettings();
@@ -56,10 +59,11 @@ export function registerSettings(): void {
 
   settings.register(CONSTANTS.MODULE_ID, "OpenRouterImageModel", {
     name: "OpenRouter Image Model",
-    hint: "Model ID for image generation (example: openai/gpt-image-1).",
+    hint: "Model used for image generation. List is loaded from OpenRouter model catalog at startup.",
     scope: USER_SCOPE,
     config: true,
     type: String,
+    choices: modelCatalog.imageChoices,
     default: DEFAULT_GPT_IMAGE_MODEL,
     onChange: () => {
       updateGPTClientFromSettings();
