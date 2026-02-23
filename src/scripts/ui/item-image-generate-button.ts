@@ -86,8 +86,8 @@ export function registerItemImageGenerateButton(): void {
       event.preventDefault();
       event.stopPropagation();
 
-      const gptClient = game.handyDandy?.gptClient;
-      if (!gptClient || typeof gptClient.generateImage !== "function") {
+      const openRouterClient = game.handyDandy?.openRouterClient;
+      if (!openRouterClient || typeof openRouterClient.generateImage !== "function") {
         ui.notifications?.error(`${CONSTANTS.MODULE_NAME} | AI image generation is unavailable.`);
         return;
       }
@@ -101,7 +101,7 @@ export function registerItemImageGenerateButton(): void {
             ? slugCandidate.trim()
             : toSlug(itemName) || `item-${Date.now().toString(36)}`;
 
-          const imagePath = await generateItemImage(gptClient, {
+          const imagePath = await generateItemImage(openRouterClient, {
             itemName,
             itemSlug,
             itemDescription: resolveItemDescription(item),
