@@ -5,12 +5,11 @@ It is written in TypeScript and built with Webpack.
 
 ## Features
 
-- **Schema Tool**: Inspect the data model of any Foundry document.
-- **Data Entry Tool**: Reformat Pathfinder 2e / Starfinder 2e text into Foundry-ready rich text.
-- **Trait Browser Tool**: Browse PF2e trait dictionaries and copy trait slugs quickly.
+- **Prompt Workbench**: Generate PF2e action, item, and actor JSON with import-ready workflows.
+- **Map Notes controls**: Drop and manage map markers directly from scene controls.
 - **OpenRouter integration**: Connect each user account with OpenRouter OAuth, then use that account for generation and image workflows.
 
-Both tools are available from a *Handy Dandy Tools* control group in scene controls (GM only).
+Prompt Workbench is available from the *Handy Dandy Tools* control group in scene controls (GM only).
 
 ## Installation
 
@@ -42,7 +41,7 @@ Model dropdown choices are loaded from OpenRouter during startup; restart Foundr
 ## Usage
 
 1. Open any scene as GM and use the *Handy Dandy Tools* control group.
-2. Open tools like Schema Tool, Data Entry Tool, Export Selection, or Prompt Workbench.
+2. Open Prompt Workbench from Handy Dandy Tools.
 3. AI features use the current user's OpenRouter-connected account.
 
 ## Developer Helpers
