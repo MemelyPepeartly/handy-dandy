@@ -25,9 +25,8 @@ class StubResponses {
   }
 }
 
-class StubImages {
-  public generateCalls: ResponsesCall[] = [];
-  public editCalls: ResponsesCall[] = [];
+class StubChatCompletions {
+  public calls: ResponsesCall[] = [];
   private readonly queue: Array<() => Promise<unknown>> = [];
 
   enqueue(response: unknown | Error): void {
@@ -38,24 +37,21 @@ class StubImages {
     }
   }
 
-  async generate(input: ResponsesCall): Promise<unknown> {
-    this.generateCalls.push(input);
+  async create(input: ResponsesCall): Promise<unknown> {
+    this.calls.push(input);
     const task = this.queue.shift();
-    if (!task) throw new Error("No stubbed image response available");
-    return task();
-  }
-
-  async edit(input: ResponsesCall): Promise<unknown> {
-    this.editCalls.push(input);
-    const task = this.queue.shift();
-    if (!task) throw new Error("No stubbed image response available");
+    if (!task) throw new Error("No stubbed chat completion response available");
     return task();
   }
 }
 
+class StubChat {
+  public completions = new StubChatCompletions();
+}
+
 class StubOpenAI {
   public responses = new StubResponses();
-  public images = new StubImages();
+  public chat = new StubChat();
 }
 
 const schema = {
@@ -239,10 +235,23 @@ test("generateWithSchema falls back to tool calls when response_format unsupport
   assert.equal(fallbackCall.tool_choice?.name, schema.name);
 });
 
-test("generateImage requests output_format without deprecated response_format", async () => {
+test("generateImage uses chat completions image modalities and parses data URLs", async () => {
   const stub = new StubOpenAI();
-  stub.images.enqueue({
-    data: [{ b64_json: "Zm9v" }],
+  stub.chat.completions.enqueue({
+    choices: [
+      {
+        message: {
+          content: "Updated prompt",
+          images: [
+            {
+              image_url: {
+                url: "data:image/png;base64,Zm9v",
+              },
+            },
+          ],
+        },
+      },
+    ],
   });
 
   const client = GPTClient.fromSettings(stub as unknown as OpenAI);
@@ -250,24 +259,42 @@ test("generateImage requests output_format without deprecated response_format", 
 
   assert.equal(result.base64, "Zm9v");
   assert.equal(result.mimeType, "image/png");
-  assert.equal(stub.images.generateCalls.length, 1);
-  assert.equal(stub.images.editCalls.length, 0);
-  assert.equal(stub.images.generateCalls[0]?.output_format, "png");
-  assert.equal(Object.hasOwn(stub.images.generateCalls[0] ?? {}, "response_format"), false);
+  assert.equal(result.revisedPrompt, "Updated prompt");
+  assert.equal(stub.chat.completions.calls.length, 1);
+  assert.deepEqual(stub.chat.completions.calls[0]?.modalities, ["image", "text"]);
 });
 
-test("generateImage uses images.edit when reference images are provided", async () => {
+test("generateImage includes reference images in chat content blocks", async () => {
   const stub = new StubOpenAI();
-  stub.images.enqueue({
-    data: [{ b64_json: "Zm9v" }],
+  stub.chat.completions.enqueue({
+    choices: [
+      {
+        message: {
+          images: [
+            {
+              image_url: {
+                url: "data:image/png;base64,Zm9v",
+              },
+            },
+          ],
+        },
+      },
+    ],
   });
 
   const client = GPTClient.fromSettings(stub as unknown as OpenAI);
   const referenceImage = new File([Buffer.from("image")], "reference.png", { type: "image/png" });
   await client.generateImage("Edit token art", { referenceImages: [referenceImage] });
 
-  assert.equal(stub.images.editCalls.length, 1);
-  assert.equal(stub.images.generateCalls.length, 0);
-  assert.equal(stub.images.editCalls[0]?.prompt, "Edit token art");
-  assert.equal(stub.images.editCalls[0]?.image, referenceImage);
+  assert.equal(stub.chat.completions.calls.length, 1);
+  const [call] = stub.chat.completions.calls;
+  const message = call?.messages?.[0];
+  assert.equal(message?.role, "user");
+  assert.equal(Array.isArray(message?.content), true);
+  const content = message?.content as Array<Record<string, unknown>>;
+  assert.equal(content[0]?.type, "text");
+  assert.equal(content[0]?.text, "Edit token art");
+  assert.equal(content[1]?.type, "image_url");
+  const imageUrl = (content[1]?.image_url as { url?: string })?.url ?? "";
+  assert.match(imageUrl, /^data:image\/png;base64,/);
 });

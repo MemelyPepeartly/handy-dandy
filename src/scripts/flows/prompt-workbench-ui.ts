@@ -7,7 +7,8 @@ import {
   type PromptWorkbenchRequest,
   type PromptWorkbenchResult,
 } from "./prompt-workbench";
-import type { GenerationProgressUpdate } from "../generation";
+import { DEFAULT_GENERATION_SEED, type GenerationProgressUpdate } from "../generation";
+import { readGPTSettings } from "../gpt/client";
 import {
   ITEM_CATEGORIES,
   SYSTEM_IDS,
@@ -75,6 +76,15 @@ type WorkbenchFormResponse = {
   readonly includeGeneratedContent: string | null;
   readonly tokenPrompt: string;
 };
+
+interface PromptWorkbenchGenerationSetup {
+  readonly connected: boolean;
+  readonly textModel: string;
+  readonly imageModel: string;
+  readonly temperature: number;
+  readonly topP: number;
+  readonly configuredSeed?: number;
+}
 
 const workbenchHistory: WorkbenchHistoryEntry[] = [];
 const WORKBENCH_ACTOR_TYPES = ["npc", "loot", "hazard"] as const satisfies readonly ActorCategory[];
@@ -150,6 +160,10 @@ export async function runExportSelectionFlow(): Promise<void> {
 }
 
 export async function runPromptWorkbenchFlow(): Promise<void> {
+  if (!ensureWorkbenchGenerationReady()) {
+    return;
+  }
+
   const request = await promptWorkbenchRequest();
   if (!request) {
     return;
@@ -176,6 +190,11 @@ export async function runPromptWorkbenchFlow(): Promise<void> {
 
 async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityType> | null> {
   const fixedSystemId: SystemId = "pf2e";
+  const generationSetup = readPromptWorkbenchGenerationSetup();
+  const generationSetupMarkup = buildGenerationSetupMarkup(generationSetup);
+  const defaultSeedValue = typeof generationSetup.configuredSeed === "number"
+    ? generationSetup.configuredSeed
+    : DEFAULT_GENERATION_SEED;
   const itemTypeOptions = ITEM_CATEGORIES.map(
     (category) => `<option value="${category}">${formatItemTypeLabel(category)}</option>`
   ).join("");
@@ -268,6 +287,42 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
         font-size: 0.84rem;
         color: var(--color-text-light-6, #bbb);
         line-height: 1.25;
+      }
+
+      .handy-dandy-workbench-setup-grid {
+        display: grid;
+        gap: 0.5rem;
+        grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      }
+
+      .handy-dandy-workbench-setup-card {
+        border: 1px solid var(--color-border-dark, #333);
+        border-radius: 6px;
+        padding: 0.45rem 0.55rem;
+        background: rgba(255, 255, 255, 0.03);
+        display: grid;
+        gap: 0.2rem;
+      }
+
+      .handy-dandy-workbench-setup-label {
+        font-size: 0.75rem;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        color: var(--color-text-light-6, #bbb);
+      }
+
+      .handy-dandy-workbench-setup-value {
+        font-size: 0.9rem;
+        font-weight: 600;
+        word-break: break-word;
+      }
+
+      .handy-dandy-workbench-setup-value.is-disconnected {
+        color: var(--color-level-error, #ff6a6a);
+      }
+
+      .handy-dandy-workbench-setup-value.is-connected {
+        color: var(--color-level-success, #86d38d);
       }
 
       .handy-dandy-workbench-panel {
@@ -569,6 +624,14 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
             </div>
           </div>
         </div>
+        <fieldset class="form-group">
+          <legend>Generation Setup</legend>
+          ${generationSetupMarkup}
+          <p class="notes">
+            Models and sampling settings come from Module Settings.
+            Use OpenRouter Account to connect or switch model presets.
+          </p>
+        </fieldset>
         <form class="handy-dandy-workbench-form">
           <fieldset class="form-group">
             <legend>Entry Setup</legend>
@@ -735,8 +798,8 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
           <details class="handy-dandy-workbench-advanced">
             <summary>Advanced Options</summary>
             <div class="handy-dandy-workbench-advanced-fields">
-              <label>Seed <input type="number" name="seed" /></label>
-              <label>Max Attempts <input type="number" name="maxAttempts" min="1" /></label>
+              <label>Seed <input type="number" name="seed" value="${defaultSeedValue}" /></label>
+              <label>Max Attempts <input type="number" name="maxAttempts" min="1" value="3" /></label>
               <label>Compendium Pack ID <input type="text" name="packId" /></label>
               <label>Folder ID <input type="text" name="folderId" /></label>
             </div>
@@ -930,6 +993,23 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
       : (response.img.trim() || DEFAULT_IMAGE_PATH);
   const tokenPrompt = generateTokenImage ? response.tokenPrompt.trim() || undefined : undefined;
   const itemImagePrompt = generateItemImage ? response.itemImagePrompt.trim() || undefined : undefined;
+  const level = parseOptionalInteger(response.level);
+  if (response.level.trim() && level === undefined) {
+    ui.notifications?.error(`${CONSTANTS.MODULE_NAME} | Actor level must be a whole number.`);
+    return null;
+  }
+
+  const seed = parseOptionalInteger(response.seed);
+  if (response.seed.trim() && seed === undefined) {
+    ui.notifications?.error(`${CONSTANTS.MODULE_NAME} | Seed must be a whole number.`);
+    return null;
+  }
+
+  const maxAttempts = parseOptionalPositiveInteger(response.maxAttempts);
+  if (response.maxAttempts.trim() && maxAttempts === undefined) {
+    ui.notifications?.error(`${CONSTANTS.MODULE_NAME} | Max Attempts must be a whole number greater than 0.`);
+    return null;
+  }
 
   return {
     type,
@@ -939,9 +1019,9 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
     slug: response.slug.trim() || undefined,
     itemType,
     actorType,
-    level: parseOptionalNumber(response.level),
-    seed: parseOptionalNumber(response.seed),
-    maxAttempts: parseOptionalNumber(response.maxAttempts),
+    level,
+    seed,
+    maxAttempts,
     packId: response.packId.trim() || undefined,
     folderId: response.folderId.trim() || undefined,
     publication,
@@ -957,14 +1037,95 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
   } satisfies PromptWorkbenchRequest<EntityType>;
 }
 
-function parseOptionalNumber(value: string): number | undefined {
+function parseOptionalInteger(value: string): number | undefined {
   const trimmed = value.trim();
   if (!trimmed) {
     return undefined;
   }
 
   const parsed = Number(trimmed);
-  return Number.isFinite(parsed) ? parsed : undefined;
+  if (!Number.isFinite(parsed) || !Number.isInteger(parsed)) {
+    return undefined;
+  }
+
+  return parsed;
+}
+
+function parseOptionalPositiveInteger(value: string): number | undefined {
+  const parsed = parseOptionalInteger(value);
+  if (parsed === undefined || parsed < 1) {
+    return undefined;
+  }
+
+  return parsed;
+}
+
+function ensureWorkbenchGenerationReady(): boolean {
+  const namespace = game.handyDandy;
+  if (!namespace?.generation) {
+    ui.notifications?.error(`${CONSTANTS.MODULE_NAME} | Generation helpers are unavailable.`);
+    return false;
+  }
+
+  namespace.refreshAIClient?.();
+  if (!namespace.gptClient) {
+    ui.notifications?.error(
+      `${CONSTANTS.MODULE_NAME} | OpenRouter is not connected for this user. ` +
+        `Open Module Settings -> OpenRouter Account and connect before running Prompt Workbench.`,
+    );
+    return false;
+  }
+
+  return true;
+}
+
+function readPromptWorkbenchGenerationSetup(): PromptWorkbenchGenerationSetup {
+  const configured = readGPTSettings();
+  const seed = typeof configured.seed === "number" && Number.isFinite(configured.seed)
+    ? configured.seed
+    : undefined;
+
+  return {
+    connected: Boolean(game.handyDandy?.gptClient),
+    textModel: configured.model,
+    imageModel: configured.imageModel,
+    temperature: configured.temperature,
+    topP: configured.top_p,
+    configuredSeed: seed,
+  };
+}
+
+function buildGenerationSetupMarkup(setup: PromptWorkbenchGenerationSetup): string {
+  const connectionClass = setup.connected ? "is-connected" : "is-disconnected";
+  const connectionLabel = setup.connected ? "Connected" : "Not connected";
+  const seedLabel = typeof setup.configuredSeed === "number"
+    ? String(setup.configuredSeed)
+    : `Default (${DEFAULT_GENERATION_SEED})`;
+
+  return `
+    <div class="handy-dandy-workbench-setup-grid">
+      <div class="handy-dandy-workbench-setup-card">
+        <span class="handy-dandy-workbench-setup-label">Status</span>
+        <span class="handy-dandy-workbench-setup-value ${connectionClass}">${escapeHtml(connectionLabel)}</span>
+      </div>
+      <div class="handy-dandy-workbench-setup-card">
+        <span class="handy-dandy-workbench-setup-label">Text Model</span>
+        <span class="handy-dandy-workbench-setup-value">${escapeHtml(setup.textModel)}</span>
+      </div>
+      <div class="handy-dandy-workbench-setup-card">
+        <span class="handy-dandy-workbench-setup-label">Image Model</span>
+        <span class="handy-dandy-workbench-setup-value">${escapeHtml(setup.imageModel)}</span>
+      </div>
+      <div class="handy-dandy-workbench-setup-card">
+        <span class="handy-dandy-workbench-setup-label">Temperature / Top P</span>
+        <span class="handy-dandy-workbench-setup-value">${setup.temperature} / ${setup.topP}</span>
+      </div>
+      <div class="handy-dandy-workbench-setup-card">
+        <span class="handy-dandy-workbench-setup-label">Seed</span>
+        <span class="handy-dandy-workbench-setup-value">${escapeHtml(seedLabel)}</span>
+      </div>
+    </div>
+  `;
 }
 
 function sanitizeItemType(value: string): ItemCategory | null {

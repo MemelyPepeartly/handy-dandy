@@ -37,6 +37,7 @@ type JsonValue =
   | { [key: string]: JsonValue };
 
 type ResponseCreateParams = Parameters<OpenAI["responses"]["create"]>[0];
+type ChatCompletionCreateParams = Parameters<OpenAI["chat"]["completions"]["create"]>[0];
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -179,6 +180,239 @@ async function fetchImageAsBase64(url: string): Promise<{ base64: string; mimeTy
   return { base64, mimeType };
 }
 
+interface ParsedDataUrl {
+  base64: string;
+  mimeType: string;
+}
+
+function parseDataUrl(value: string): ParsedDataUrl | null {
+  const trimmed = value.trim();
+  const match = /^data:([^;,]+)?(?:;[^,]*)?,(.*)$/i.exec(trimmed);
+  if (!match) {
+    return null;
+  }
+
+  const mimeType = match[1]?.trim() || "image/png";
+  const payload = match[2] ?? "";
+
+  // If the payload is not marked as base64, encode it so callers always
+  // receive canonical base64 bytes.
+  const isBase64 = /;base64,/i.test(trimmed);
+  const base64 = isBase64
+    ? payload
+    : bytesToBase64(new TextEncoder().encode(decodeURIComponent(payload)));
+
+  return {
+    base64,
+    mimeType,
+  };
+}
+
+function mapImageSizeToAspectRatio(size: GenerateImageOptions["size"]): "1:1" | "3:2" | "2:3" | undefined {
+  switch (size) {
+    case "1536x1024":
+      return "3:2";
+    case "1024x1536":
+      return "2:3";
+    case "1024x1024":
+      return "1:1";
+    default:
+      return undefined;
+  }
+}
+
+async function fileToDataUrl(file: File): Promise<string> {
+  const buffer = await file.arrayBuffer();
+  const base64 = bytesToBase64(new Uint8Array(buffer));
+  const mimeType = file.type?.trim() || "application/octet-stream";
+  return `data:${mimeType};base64,${base64}`;
+}
+
+function extractMessageText(content: unknown): string | undefined {
+  if (typeof content === "string") {
+    const trimmed = content.trim();
+    return trimmed || undefined;
+  }
+
+  if (!Array.isArray(content)) {
+    return undefined;
+  }
+
+  const parts: string[] = [];
+  for (const block of content) {
+    if (!isRecord(block)) {
+      continue;
+    }
+
+    const text = block.text;
+    if (typeof text === "string" && text.trim()) {
+      parts.push(text.trim());
+    }
+  }
+
+  if (!parts.length) {
+    return undefined;
+  }
+
+  return parts.join("\n");
+}
+
+function extractImageUrl(value: unknown): string | null {
+  if (typeof value === "string" && value.trim()) {
+    return value.trim();
+  }
+
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const directUrl = value.url;
+  if (typeof directUrl === "string" && directUrl.trim()) {
+    return directUrl.trim();
+  }
+
+  const snake = value.image_url;
+  if (typeof snake === "string" && snake.trim()) {
+    return snake.trim();
+  }
+  if (isRecord(snake) && typeof snake.url === "string" && snake.url.trim()) {
+    return snake.url.trim();
+  }
+
+  const camel = value.imageUrl;
+  if (typeof camel === "string" && camel.trim()) {
+    return camel.trim();
+  }
+  if (isRecord(camel) && typeof camel.url === "string" && camel.url.trim()) {
+    return camel.url.trim();
+  }
+
+  return null;
+}
+
+function extractBase64Payload(value: unknown): string | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const snake = value.b64_json;
+  if (typeof snake === "string" && snake.trim()) {
+    return snake.trim();
+  }
+
+  const camel = value.b64Json;
+  if (typeof camel === "string" && camel.trim()) {
+    return camel.trim();
+  }
+
+  return null;
+}
+
+function extractImageMimeType(value: unknown): string | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const snake = value.mime_type;
+  if (typeof snake === "string" && snake.trim().startsWith("image/")) {
+    return snake.trim();
+  }
+
+  const camel = value.mimeType;
+  if (typeof camel === "string" && camel.trim().startsWith("image/")) {
+    return camel.trim();
+  }
+
+  return null;
+}
+
+interface ParsedChatImage {
+  base64: string;
+  mimeType: string;
+  revisedPrompt?: string;
+}
+
+async function parseImageFromChatResponse(
+  response: unknown,
+  fallbackMimeType: string,
+): Promise<ParsedChatImage | null> {
+  if (!isRecord(response)) {
+    return null;
+  }
+
+  const choices = Array.isArray(response.choices) ? response.choices : [];
+  for (const choice of choices) {
+    if (!isRecord(choice)) {
+      continue;
+    }
+
+    const message = isRecord(choice.message) ? choice.message : null;
+    if (!message) {
+      continue;
+    }
+
+    const revisedPrompt = extractMessageText(message.content);
+    const imageEntries: unknown[] = [];
+
+    if (Array.isArray(message.images)) {
+      imageEntries.push(...message.images);
+    }
+
+    if (Array.isArray(message.content)) {
+      for (const block of message.content) {
+        if (!isRecord(block)) {
+          continue;
+        }
+
+        const blockType = typeof block.type === "string" ? block.type : "";
+        if (blockType === "image_url" || blockType === "image") {
+          imageEntries.push(block);
+          continue;
+        }
+
+        if (extractImageUrl(block) || extractBase64Payload(block)) {
+          imageEntries.push(block);
+        }
+      }
+    }
+
+    for (const entry of imageEntries) {
+      const base64 = extractBase64Payload(entry);
+      const mimeType = extractImageMimeType(entry) ?? fallbackMimeType;
+      if (base64) {
+        return {
+          base64,
+          mimeType,
+          revisedPrompt,
+        };
+      }
+
+      const imageUrl = extractImageUrl(entry);
+      if (!imageUrl) {
+        continue;
+      }
+
+      const parsedDataUrl = parseDataUrl(imageUrl);
+      if (parsedDataUrl) {
+        return {
+          base64: parsedDataUrl.base64,
+          mimeType: parsedDataUrl.mimeType,
+          revisedPrompt,
+        };
+      }
+
+      const fetched = await fetchImageAsBase64(imageUrl);
+      return {
+        base64: fetched.base64,
+        mimeType: fetched.mimeType?.startsWith("image/") ? fetched.mimeType : mimeType,
+        revisedPrompt,
+      };
+    }
+  }
+
+  return null;
+}
+
 const performanceNow = typeof performance !== "undefined" && typeof performance.now === "function"
   ? () => performance.now()
   : () => Date.now();
@@ -262,90 +496,68 @@ export class GPTClient {
       throw new Error("OpenRouter image edits support up to 16 reference images.");
     }
 
+    const fallbackMimeType = format === "webp" ? "image/webp" : "image/png";
+    const referenceImageDataUrls = await Promise.all(referenceImages.map((entry) => fileToDataUrl(entry)));
+    const content = referenceImageDataUrls.length > 0
+      ? [
+        { type: "text", text: prompt },
+        ...referenceImageDataUrls.map((url) => ({
+          type: "image_url",
+          image_url: { url },
+        })),
+      ]
+      : prompt;
+
+    const aspectRatio = mapImageSizeToAspectRatio(options.size);
     const requestBase: Record<string, unknown> = {
       model,
-      prompt,
-      size: options.size ?? "1024x1024",
-      background: options.background ?? "transparent",
-      quality: options.quality ?? "high",
+      stream: false,
+      messages: [
+        {
+          role: "user",
+          content,
+        },
+      ],
     };
 
-    const images = this.#openai.images as unknown as {
-      generate: (input: unknown) => Promise<unknown>;
-      edit?: (input: unknown) => Promise<unknown>;
-    };
-
-    const usesImageEdit = referenceImages.length > 0;
-    const response = usesImageEdit
-      ? await (() => {
-        if (typeof images.edit !== "function") {
-          throw new Error("OpenRouter image edit API is unavailable.");
-        }
-
-        const editRequest: Record<string, unknown> = {
-          ...requestBase,
-          image: referenceImages.length === 1 ? referenceImages[0] : referenceImages,
-        };
-        return images.edit(editRequest);
-      })()
-      : await images.generate({
-        ...requestBase,
-        output_format: format,
-      });
-
-    const payload = response as {
-      data?: Array<{
-        b64_json?: unknown;
-        b64Json?: unknown;
-        url?: unknown;
-        revised_prompt?: unknown;
-        revisedPrompt?: unknown;
-        mime_type?: unknown;
-        mimeType?: unknown;
-      }>;
-    };
-
-    const first = Array.isArray(payload.data) ? payload.data[0] : undefined;
-    let base64 = typeof first?.b64_json === "string"
-      ? first.b64_json
-      : typeof first?.b64Json === "string"
-        ? first.b64Json
-        : null;
-
-    let mimeType = usesImageEdit ? "image/png" : format === "webp" ? "image/webp" : "image/png";
-    const modelMimeType = typeof first?.mime_type === "string"
-      ? first.mime_type
-      : typeof first?.mimeType === "string"
-        ? first.mimeType
-        : null;
-    if (modelMimeType?.startsWith("image/")) {
-      mimeType = modelMimeType;
+    if (aspectRatio) {
+      requestBase.image_config = {
+        aspect_ratio: aspectRatio,
+      };
     }
 
-    const url = typeof first?.url === "string" ? first.url.trim() : "";
-    if (!base64 && url) {
-      const fetched = await fetchImageAsBase64(url);
-      base64 = fetched.base64;
-      if (fetched.mimeType?.startsWith("image/")) {
-        mimeType = fetched.mimeType;
+    // OpenRouter image generation now routes through chat/completions with
+    // image modalities. Some models are image-only; others output text+image.
+    const modalityAttempts: Array<readonly ["image", "text"] | readonly ["image"]> = [
+      ["image", "text"],
+      ["image"],
+    ];
+
+    let lastError: unknown = null;
+    for (const modalities of modalityAttempts) {
+      const request: Record<string, unknown> = {
+        ...requestBase,
+        modalities,
+      };
+
+      try {
+        const response = await this.#openai.chat.completions.create(
+          request as unknown as ChatCompletionCreateParams,
+        );
+        const parsed = await parseImageFromChatResponse(response, fallbackMimeType);
+        if (parsed) {
+          return parsed;
+        }
+      } catch (error) {
+        lastError = error;
+        continue;
       }
     }
 
-    if (!base64) {
-      throw new Error("OpenRouter image generation did not return base64 image data.");
+    if (lastError instanceof Error) {
+      throw lastError;
     }
-
-    const revisedPrompt = typeof first?.revised_prompt === "string"
-      ? first.revised_prompt
-      : typeof first?.revisedPrompt === "string"
-        ? first.revisedPrompt
-        : undefined;
-
-    return {
-      base64,
-      mimeType,
-      revisedPrompt,
-    };
+    throw new Error("OpenRouter image generation did not return image data.");
   }
 
   async #generateStructured<T>(
