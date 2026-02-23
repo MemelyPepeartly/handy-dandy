@@ -1048,6 +1048,42 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
+function toDisplayLabel(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  return trimmed
+    .split(/[-_\s]+/g)
+    .filter((segment) => segment.length > 0)
+    .map((segment) => `${segment[0]?.toUpperCase() ?? ""}${segment.slice(1).toLowerCase()}`)
+    .join(" ");
+}
+
+function localizeMaybe(keyOrLabel: string): string {
+  const trimmed = keyOrLabel.trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  const localize = (globalThis as { game?: { i18n?: { localize?: (value: string) => string } } }).game?.i18n?.localize;
+  if (typeof localize !== "function") {
+    return trimmed;
+  }
+
+  try {
+    const localized = localize(trimmed);
+    if (typeof localized === "string" && localized.trim().length > 0) {
+      return localized;
+    }
+  } catch (_error) {
+    // Ignore localization errors and fall back to the raw label.
+  }
+
+  return trimmed;
+}
+
 type IwrCategory = "immunities" | "weaknesses" | "resistances";
 
 const IWR_DICTIONARY_KEYS: Record<IwrCategory, "immunityTypes" | "weaknessTypes" | "resistanceTypes"> = {
@@ -1121,6 +1157,20 @@ function resolveIwrKey(value: unknown, category: IwrCategory): string | null {
   );
 }
 
+function resolveIwrLabel(type: string, category: IwrCategory): string {
+  const dictionaryKey = IWR_DICTIONARY_KEYS[category];
+  const dictionary = (
+    globalThis as { CONFIG?: { PF2E?: Record<string, unknown> } }
+  ).CONFIG?.PF2E?.[dictionaryKey];
+
+  const direct = isRecord(dictionary) ? dictionary[type] : undefined;
+  if (typeof direct === "string" && direct.trim().length > 0) {
+    return localizeMaybe(direct);
+  }
+
+  return toDisplayLabel(type);
+}
+
 function sanitizeIwrStringList(values: unknown, category: IwrCategory): string[] {
   if (!Array.isArray(values)) {
     return [];
@@ -1152,9 +1202,9 @@ function sanitizeIwrStringList(values: unknown, category: IwrCategory): string[]
 
 function sanitizeCanonicalImmunities(
   values: ActorSchemaData["attributes"]["immunities"] | null | undefined,
-): Array<{ type: string; exceptions: string[]; notes: string }> {
+): Array<{ type: string; label: string; exceptions: string[]; notes: string }> {
   const entries = values ?? [];
-  const sanitized: Array<{ type: string; exceptions: string[]; notes: string }> = [];
+  const sanitized: Array<{ type: string; label: string; exceptions: string[]; notes: string }> = [];
 
   for (const entry of entries) {
     const type = resolveIwrKey(entry.type, "immunities");
@@ -1164,6 +1214,7 @@ function sanitizeCanonicalImmunities(
 
     sanitized.push({
       type,
+      label: resolveIwrLabel(type, "immunities"),
       exceptions: sanitizeIwrStringList(entry.exceptions, "immunities"),
       notes: sanitizeText(entry.details),
     });
@@ -1174,9 +1225,9 @@ function sanitizeCanonicalImmunities(
 
 function sanitizeCanonicalWeaknesses(
   values: ActorSchemaData["attributes"]["weaknesses"] | null | undefined,
-): Array<{ type: string; value: number; exceptions: string[]; notes: string }> {
+): Array<{ type: string; label: string; value: number; exceptions: string[]; notes: string }> {
   const entries = values ?? [];
-  const sanitized: Array<{ type: string; value: number; exceptions: string[]; notes: string }> = [];
+  const sanitized: Array<{ type: string; label: string; value: number; exceptions: string[]; notes: string }> = [];
 
   for (const entry of entries) {
     const type = resolveIwrKey(entry.type, "weaknesses");
@@ -1186,6 +1237,7 @@ function sanitizeCanonicalWeaknesses(
 
     sanitized.push({
       type,
+      label: resolveIwrLabel(type, "weaknesses"),
       value: Number.isFinite(entry.value) ? Math.trunc(entry.value) : 0,
       exceptions: sanitizeIwrStringList(entry.exceptions, "weaknesses"),
       notes: sanitizeText(entry.details),
@@ -1197,9 +1249,9 @@ function sanitizeCanonicalWeaknesses(
 
 function sanitizeCanonicalResistances(
   values: ActorSchemaData["attributes"]["resistances"] | null | undefined,
-): Array<{ type: string; value: number; exceptions: string[]; doubleVs: string[]; notes: string }> {
+): Array<{ type: string; label: string; value: number; exceptions: string[]; doubleVs: string[]; notes: string }> {
   const entries = values ?? [];
-  const sanitized: Array<{ type: string; value: number; exceptions: string[]; doubleVs: string[]; notes: string }> = [];
+  const sanitized: Array<{ type: string; label: string; value: number; exceptions: string[]; doubleVs: string[]; notes: string }> = [];
 
   for (const entry of entries) {
     const type = resolveIwrKey(entry.type, "resistances");
@@ -1209,6 +1261,7 @@ function sanitizeCanonicalResistances(
 
     sanitized.push({
       type,
+      label: resolveIwrLabel(type, "resistances"),
       value: Number.isFinite(entry.value) ? Math.trunc(entry.value) : 0,
       exceptions: sanitizeIwrStringList(entry.exceptions, "resistances"),
       doubleVs: sanitizeIwrStringList(entry.doubleVs, "resistances"),
@@ -1244,6 +1297,7 @@ function sanitizeGeneratedIwrEntries(
     if (category === "immunities") {
       sanitized.push({
         type,
+        label: resolveIwrLabel(type, category),
         exceptions,
         notes,
       });
@@ -1256,6 +1310,7 @@ function sanitizeGeneratedIwrEntries(
     if (category === "weaknesses") {
       sanitized.push({
         type,
+        label: resolveIwrLabel(type, category),
         value,
         exceptions,
         notes,
@@ -1265,6 +1320,7 @@ function sanitizeGeneratedIwrEntries(
 
     sanitized.push({
       type,
+      label: resolveIwrLabel(type, category),
       value,
       exceptions,
       doubleVs: sanitizeIwrStringList(entry.doubleVs, category),
@@ -1599,15 +1655,17 @@ async function resolveItemFromCompendium(
 ): Promise<FoundryActorItemSource> {
   const lookup = buildOfficialLookup(item);
   if (!lookup) {
-    return ensureEmbeddedItemImage(item);
+    return ensureEmbeddedItemImage(remapGeneratedFeatureItemForImport(item));
   }
 
   const resolved = await resolveOfficialItem(lookup);
   if (!resolved) {
-    return ensureEmbeddedItemImage(item);
+    return ensureEmbeddedItemImage(remapGeneratedFeatureItemForImport(item));
   }
 
-  return ensureEmbeddedItemImage(mergeCompendiumActorItem(item, resolved));
+  const merged = mergeCompendiumActorItem(item, resolved);
+  const remapped = remapGeneratedFeatureItemForImport(merged);
+  return ensureEmbeddedItemImage(remapped);
 }
 
 function prepareActionSource(action: ActionSchemaData): FoundryActionSource {
@@ -2002,18 +2060,20 @@ function normalizeHazardSave(save: ActorSchemaData["attributes"]["saves"]["forti
 
 function sanitizeHazardImmunities(
   values: ActorSchemaData["attributes"]["immunities"] | null | undefined,
-): Array<{ type: string; exceptions: string[] }> {
+): Array<{ type: string; label: string; exceptions: string[] }> {
   if (!values?.length) {
     return [];
   }
 
-  const sanitized: Array<{ type: string; exceptions: string[] }> = [];
+  const sanitized: Array<{ type: string; label: string; exceptions: string[] }> = [];
   for (const entry of values) {
-    if (!entry?.type) {
+    const type = resolveIwrKey(entry?.type, "immunities");
+    if (!type) {
       continue;
     }
     sanitized.push({
-      type: entry.type,
+      type,
+      label: resolveIwrLabel(type, "immunities"),
       exceptions: sanitizeIwrStringList(entry.exceptions, "immunities"),
     });
   }
@@ -2023,18 +2083,20 @@ function sanitizeHazardImmunities(
 
 function sanitizeHazardWeaknesses(
   values: ActorSchemaData["attributes"]["weaknesses"] | null | undefined,
-): Array<{ type: string; value: number; exceptions: string[] }> {
+): Array<{ type: string; label: string; value: number; exceptions: string[] }> {
   if (!values?.length) {
     return [];
   }
 
-  const sanitized: Array<{ type: string; value: number; exceptions: string[] }> = [];
+  const sanitized: Array<{ type: string; label: string; value: number; exceptions: string[] }> = [];
   for (const entry of values) {
-    if (!entry?.type) {
+    const type = resolveIwrKey(entry?.type, "weaknesses");
+    if (!type) {
       continue;
     }
     sanitized.push({
-      type: entry.type,
+      type,
+      label: resolveIwrLabel(type, "weaknesses"),
       value: Number.isFinite(entry.value) ? Math.max(1, Math.trunc(entry.value)) : 1,
       exceptions: sanitizeIwrStringList(entry.exceptions, "weaknesses"),
     });
@@ -2045,18 +2107,20 @@ function sanitizeHazardWeaknesses(
 
 function sanitizeHazardResistances(
   values: ActorSchemaData["attributes"]["resistances"] | null | undefined,
-): Array<{ type: string; value: number; exceptions: string[]; doubleVs: string[] }> {
+): Array<{ type: string; label: string; value: number; exceptions: string[]; doubleVs: string[] }> {
   if (!values?.length) {
     return [];
   }
 
-  const sanitized: Array<{ type: string; value: number; exceptions: string[]; doubleVs: string[] }> = [];
+  const sanitized: Array<{ type: string; label: string; value: number; exceptions: string[]; doubleVs: string[] }> = [];
   for (const entry of values) {
-    if (!entry?.type) {
+    const type = resolveIwrKey(entry?.type, "resistances");
+    if (!type) {
       continue;
     }
     sanitized.push({
-      type: entry.type,
+      type,
+      label: resolveIwrLabel(type, "resistances"),
       value: Number.isFinite(entry.value) ? Math.max(1, Math.trunc(entry.value)) : 1,
       exceptions: sanitizeIwrStringList(entry.exceptions, "resistances"),
       doubleVs: sanitizeIwrStringList(entry.doubleVs, "resistances"),
@@ -2071,6 +2135,7 @@ function prepareGeneratedActorSource(actor: ActorGenerationResult): FoundryActor
   const system = clone((actor.system ?? {}) as FoundryActorSource["system"]);
   system.slug = actor.slug;
   sanitizeGeneratedActorIwr(system);
+  sanitizeGeneratedActorSkills(system);
 
   return {
     name: actor.name,
@@ -2904,18 +2969,155 @@ function createInventoryItem(
   };
 }
 
-type FoundryActorSkillMap = Record<string, { value: number; base: number; details: string }>;
+type FoundryActorSkillMap = Record<string, FoundryActorSkillEntry>;
+
+type FoundryActorSkillEntry = {
+  value: number;
+  base: number;
+  mod: number;
+  details: string;
+  label: string;
+  visible: boolean;
+  lore: boolean;
+  special: Array<{ label: string; base: number }>;
+};
+
+function normalizeSkillSlug(value: string): string {
+  const normalized = normalizeLookupKey(value);
+  return normalized || "";
+}
+
+function isLoreSkillSlug(slug: string): boolean {
+  return slug === "lore" || slug.startsWith("lore-") || slug.endsWith("-lore");
+}
+
+function resolveSkillLabel(slug: string): string {
+  const skills = (
+    globalThis as { CONFIG?: { PF2E?: Record<string, unknown> } }
+  ).CONFIG?.PF2E?.skills;
+  const entry = isRecord(skills) ? skills[slug] : undefined;
+
+  if (typeof entry === "string" && entry.trim().length > 0) {
+    return localizeMaybe(entry);
+  }
+
+  if (isRecord(entry) && typeof entry.label === "string" && entry.label.trim().length > 0) {
+    return localizeMaybe(entry.label);
+  }
+
+  if (slug.startsWith("lore-")) {
+    const topic = toDisplayLabel(slug.slice("lore-".length));
+    return topic ? `${topic} Lore` : "Lore";
+  }
+
+  return toDisplayLabel(slug);
+}
+
+function sanitizeSkillModifier(value: unknown, fallback = 0): number {
+  const numeric = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(numeric)) {
+    return fallback;
+  }
+  return Math.trunc(numeric);
+}
+
+function sanitizeSkillSpecials(value: unknown): Array<{ label: string; base: number }> {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const specials: Array<{ label: string; base: number }> = [];
+  for (const entry of value) {
+    if (!isRecord(entry)) {
+      continue;
+    }
+    const label = typeof entry.label === "string" ? entry.label.trim() : "";
+    if (!label) {
+      continue;
+    }
+    specials.push({
+      label,
+      base: sanitizeSkillModifier(entry.base, 0),
+    });
+  }
+
+  return specials;
+}
+
+function createGeneratedSkillEntry(
+  slug: string,
+  modifier: unknown,
+  details: unknown,
+  overrides: Partial<FoundryActorSkillEntry> = {},
+): FoundryActorSkillEntry {
+  const normalizedModifier = sanitizeSkillModifier(modifier, 0);
+  const normalizedDetails = typeof details === "string" ? details.trim() : "";
+  const normalizedLabel = typeof overrides.label === "string" && overrides.label.trim()
+    ? overrides.label.trim()
+    : resolveSkillLabel(slug);
+  const lore = typeof overrides.lore === "boolean" ? overrides.lore : isLoreSkillSlug(slug);
+  const visible = typeof overrides.visible === "boolean" ? overrides.visible : true;
+  const specials = Array.isArray(overrides.special) ? overrides.special : [];
+
+  return {
+    value: normalizedModifier,
+    base: normalizedModifier,
+    mod: normalizedModifier,
+    details: normalizedDetails,
+    label: normalizedLabel,
+    visible,
+    lore,
+    special: specials,
+  };
+}
+
+function sanitizeGeneratedActorSkills(system: FoundryActorSource["system"]): void {
+  if (!isRecord(system.skills)) {
+    system.skills = {};
+    return;
+  }
+
+  const sanitized: Record<string, FoundryActorSkillEntry> = {};
+  for (const [rawSlug, rawSkill] of Object.entries(system.skills)) {
+    const slug = normalizeSkillSlug(rawSlug);
+    if (!slug) {
+      continue;
+    }
+
+    if (!isRecord(rawSkill)) {
+      sanitized[slug] = createGeneratedSkillEntry(slug, rawSkill, null);
+      continue;
+    }
+
+    const modifier = sanitizeSkillModifier(rawSkill.base ?? rawSkill.value ?? rawSkill.mod, 0);
+    const details = rawSkill.details ?? rawSkill.note;
+    const label = typeof rawSkill.label === "string" ? rawSkill.label : undefined;
+    const lore = typeof rawSkill.lore === "boolean" ? rawSkill.lore : undefined;
+    const visible = typeof rawSkill.visible === "boolean" ? rawSkill.visible : undefined;
+    const special = sanitizeSkillSpecials(rawSkill.special);
+
+    sanitized[slug] = createGeneratedSkillEntry(slug, modifier, details, {
+      label,
+      lore,
+      visible,
+      special,
+    });
+  }
+
+  system.skills = sanitized;
+}
 
 function buildSkillMap(
   skills: ActorSchemaData["skills"],
 ): FoundryActorSkillMap {
   const result: FoundryActorSkillMap = {};
   for (const skill of skills) {
-    result[skill.slug] = {
-      value: skill.modifier,
-      base: skill.modifier,
-      details: sanitizeText(skill.details),
-    };
+    const slug = normalizeSkillSlug(skill.slug);
+    if (!slug) {
+      continue;
+    }
+
+    result[slug] = createGeneratedSkillEntry(slug, skill.modifier, skill.details);
   }
   return result;
 }

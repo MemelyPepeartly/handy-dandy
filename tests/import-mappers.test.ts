@@ -727,6 +727,27 @@ test("toFoundryActorData maps staff inventory entries to weapon item documents",
   assert.equal(staff!.img, "systems/pf2e/icons/default-icons/staff.svg");
 });
 
+test("toFoundryActorData emits label-safe skill entries for standard and lore-like slugs", () => {
+  const actor = createActor();
+  actor.skills = [
+    { slug: "athletics", modifier: 16, details: null },
+    { slug: "lore-science", modifier: 35, details: "Stone-age chemistry and engineering." },
+  ];
+
+  const result = toFoundryActorData(actor);
+  const skills = ((result.system as { skills?: Record<string, Record<string, unknown>> }).skills ?? {});
+
+  assert.ok(skills["athletics"], "expected athletics skill entry");
+  assert.equal(skills["athletics"].label, "Athletics");
+  assert.equal(skills["athletics"].base, 16);
+  assert.equal(skills["athletics"].value, 16);
+
+  assert.ok(skills["lore-science"], "expected lore-like skill entry");
+  assert.equal(skills["lore-science"].label, "Science Lore");
+  assert.equal(skills["lore-science"].lore, true);
+  assert.equal(skills["lore-science"].visible, true);
+});
+
 test("importActor sanitizes malformed melee attack effects in generated actor payloads", async () => {
   const actor = createActor();
   actor.slug = "malformed-effects-test";
@@ -783,6 +804,56 @@ test("importActor sanitizes malformed melee attack effects in generated actor pa
   assert.match(importedStrike.system.description.value, /homebrew-stagger/);
 });
 
+test("importActor normalizes malformed generated skill entries to locale-safe records", async () => {
+  const actor = createActor();
+  actor.slug = "generated-skill-sanitization-test";
+  actor.name = "Generated Skill Sanitization Test";
+  actor.actions = [];
+  actor.strikes = [];
+  actor.spellcasting = null;
+  actor.inventory = null;
+
+  const foundry = toFoundryActorData(actor);
+  (foundry.system as { skills?: Record<string, unknown> }).skills = {
+    athletics: { base: "12", value: "12", label: null },
+    "lore science": { mod: "14", details: "Applied chemistry." },
+    "": { base: 99 },
+  };
+
+  const generated: ActorGenerationResult = {
+    schema_version: actor.schema_version,
+    systemId: actor.systemId,
+    slug: actor.slug,
+    name: foundry.name,
+    type: foundry.type as ActorGenerationResult["type"],
+    img: foundry.img,
+    system: foundry.system as Record<string, unknown>,
+    prototypeToken: foundry.prototypeToken as Record<string, unknown>,
+    items: foundry.items as Record<string, unknown>[],
+    effects: foundry.effects,
+    folder: foundry.folder ?? null,
+    flags: foundry.flags ?? {},
+  };
+
+  const imported = await importActor(generated);
+  const importedSkills = (
+    (imported as unknown as MockActor).system as { skills?: Record<string, Record<string, unknown>> }
+  ).skills ?? {};
+
+  assert.ok(importedSkills["athletics"], "expected athletics skill entry");
+  assert.equal(importedSkills["athletics"].label, "Athletics");
+  assert.equal(importedSkills["athletics"].base, 12);
+  assert.equal(importedSkills["athletics"].value, 12);
+
+  assert.ok(importedSkills["lore-science"], "expected normalized lore skill slug");
+  assert.equal(importedSkills["lore-science"].label, "Science Lore");
+  assert.equal(importedSkills["lore-science"].lore, true);
+  assert.equal(importedSkills["lore-science"].base, 14);
+  assert.equal(importedSkills["lore-science"].value, 14);
+
+  assert.equal(Object.hasOwn(importedSkills, ""), false);
+});
+
 test("importActor remaps generated feat/feature items before NPC item replacement", async () => {
   const actor = createActor();
   actor.slug = "generated-feature-remap-test";
@@ -830,6 +901,68 @@ test("importActor remaps generated feat/feature items before NPC item replacemen
   );
 
   assert.ok(importedFeatureItem, "expected imported remapped feature item");
+  assert.equal(importedFeatureItem.type, "equipment");
+});
+
+test("importActor keeps inventory entry type safe when compendium resolution returns a feat", async () => {
+  const actor = createActor();
+  actor.slug = "compendium-feature-remap-test";
+  actor.name = "Compendium Feature Remap Test";
+  actor.actions = [];
+  actor.spellcasting = null;
+  actor.inventory = [
+    {
+      name: "Tactical Feature",
+      itemType: "equipment",
+      quantity: 1,
+      level: 2,
+      description: "A generated equipment entry that may match a feat by slug.",
+      img: null,
+    },
+  ];
+
+  const pack = new MockPack("pf2e.feats-srd");
+  const featEntry = new MockItem({
+    name: "Tactical Feature",
+    type: "feat",
+    img: "systems/pf2e/icons/default-icons/feat.svg",
+    system: {
+      slug: "tactical-feature",
+      description: { value: "<p>Compendium feat details.</p>", gm: "" },
+      traits: { value: [], otherTags: [], rarity: "common" },
+      level: { value: 2 },
+      rules: [],
+    },
+    effects: [],
+    folder: null,
+    sort: 0,
+    flags: {},
+  });
+  pack.addDocument(featEntry);
+  (game.packs as Map<string, MockPack>).set("pf2e.feats-srd", pack);
+
+  const foundry = toFoundryActorData(actor);
+  const generated: ActorGenerationResult = {
+    schema_version: actor.schema_version,
+    systemId: actor.systemId,
+    slug: actor.slug,
+    name: foundry.name,
+    type: foundry.type as ActorGenerationResult["type"],
+    img: foundry.img,
+    system: foundry.system as Record<string, unknown>,
+    prototypeToken: foundry.prototypeToken as Record<string, unknown>,
+    items: foundry.items as Record<string, unknown>[],
+    effects: foundry.effects,
+    folder: foundry.folder ?? null,
+    flags: foundry.flags ?? {},
+  };
+
+  const imported = await importActor(generated);
+  const importedFeatureItem = (imported as unknown as MockActor).items.find(
+    (item: any) => item.name === "Tactical Feature",
+  );
+
+  assert.ok(importedFeatureItem, "expected imported inventory item");
   assert.equal(importedFeatureItem.type, "equipment");
 });
 
@@ -882,6 +1015,7 @@ test("importActor sanitizes unknown IWR exception slugs in generated actor paylo
   assert.ok(Array.isArray(importedWeaknesses), "expected imported weaknesses array");
   assert.ok(importedWeaknesses.length > 0, "expected imported weakness");
   assert.deepEqual(importedWeaknesses[0].exceptions, ["salt-water"]);
+  assert.equal(importedWeaknesses[0].label, "Water");
 });
 
 test("importAction rejects payloads for the wrong system", async () => {
