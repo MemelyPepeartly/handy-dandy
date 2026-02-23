@@ -31,6 +31,13 @@ interface WorkbenchHistoryEntry {
 
 const WORKBENCH_HISTORY_LIMIT = 12;
 const WORKBENCH_HISTORY_FLAG_KEY = "workbenchHistory" as const;
+const PROMPT_WORKBENCH_LOADING_TEMPLATE = `${CONSTANTS.TEMPLATE_PATH}/prompt-workbench-loading.hbs`;
+const PROMPT_WORKBENCH_GENERATION_SETUP_TEMPLATE = `${CONSTANTS.TEMPLATE_PATH}/prompt-workbench-generation-setup.hbs`;
+const PROMPT_WORKBENCH_HISTORY_LIST_TEMPLATE = `${CONSTANTS.TEMPLATE_PATH}/prompt-workbench-history-list.hbs`;
+const PROMPT_WORKBENCH_HISTORY_PLACEHOLDER_TEMPLATE = `${CONSTANTS.TEMPLATE_PATH}/prompt-workbench-history-placeholder.hbs`;
+const PROMPT_WORKBENCH_ENTRY_DETAIL_TEMPLATE = `${CONSTANTS.TEMPLATE_PATH}/prompt-workbench-entry-detail.hbs`;
+const PROMPT_WORKBENCH_REQUEST_TEMPLATE = `${CONSTANTS.TEMPLATE_PATH}/prompt-workbench-request.hbs`;
+const PROMPT_WORKBENCH_RESULT_TEMPLATE = `${CONSTANTS.TEMPLATE_PATH}/prompt-workbench-result.hbs`;
 
 type SerializableWorkbenchResult = Pick<
   PromptWorkbenchResult<EntityType>,
@@ -132,7 +139,7 @@ export async function runPromptWorkbenchFlow(): Promise<void> {
 
   let loading: WorkbenchLoadingController | null = null;
   try {
-    loading = showGeneratingDialog(request);
+    loading = await showGeneratingDialog(request);
     const result = await generateWorkbenchEntry({
       ...request,
       onProgress: (update) => loading?.update(update),
@@ -152,721 +159,39 @@ export async function runPromptWorkbenchFlow(): Promise<void> {
 async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityType> | null> {
   const fixedSystemId: SystemId = "pf2e";
   const generationSetup = readPromptWorkbenchGenerationSetup();
-  const generationSetupMarkup = buildGenerationSetupMarkup(generationSetup);
+  const generationSetupMarkup = await buildGenerationSetupMarkup(generationSetup);
   const defaultSeedValue = typeof generationSetup.configuredSeed === "number"
     ? generationSetup.configuredSeed
     : DEFAULT_GENERATION_SEED;
   const itemTypeOptions = ITEM_CATEGORIES.map(
-    (category) => `<option value="${category}">${formatItemTypeLabel(category)}</option>`
-  ).join("");
+    (category) => ({
+      value: category,
+      label: formatItemTypeLabel(category),
+    }),
+  );
   const actorTypeOptions = resolveAvailableActorCategories().map(
-    (category) => `<option value="${category}"${category === "npc" ? " selected" : ""}>${formatActorTypeLabel(category)}</option>`
-  ).join("");
+    (category) => ({
+      value: category,
+      label: formatActorTypeLabel(category),
+      selected: category === "npc",
+    }),
+  );
   const initialHistoryId = workbenchHistory[0]?.id;
-  const historyListMarkup = buildHistoryListMarkup(initialHistoryId);
-  const historyPlaceholder = buildHistoryViewPlaceholder();
-
-  const content = `
-    <style>
-      .handy-dandy-workbench-request {
-        display: flex;
-        flex-direction: column;
-        gap: 0.75rem;
-        min-width: 760px;
-      }
-
-      .handy-dandy-workbench-tabs {
-        display: flex;
-        gap: 0.5rem;
-        border-bottom: 1px solid var(--color-border-dark, #333);
-        padding-bottom: 0.25rem;
-      }
-
-      .handy-dandy-workbench-tab {
-        appearance: none;
-        background: var(--color-bg-alt, rgba(255, 255, 255, 0.05));
-        border: 1px solid var(--color-border-dark, #333);
-        border-bottom: none;
-        border-radius: 6px 6px 0 0;
-        color: inherit;
-        cursor: pointer;
-        font-weight: 600;
-        padding: 0.35rem 0.9rem;
-        transition: background 0.2s ease, color 0.2s ease;
-      }
-
-      .handy-dandy-workbench-tab.active {
-        background: var(--color-border-light-1, rgba(255, 255, 255, 0.12));
-        color: var(--color-text-bright, #f0f0f0);
-      }
-
-      .handy-dandy-workbench-quickstart {
-        border: 1px solid var(--color-border-dark, #333);
-        border-radius: 6px;
-        padding: 0.6rem 0.75rem;
-        background: linear-gradient(
-          140deg,
-          rgba(255, 255, 255, 0.06),
-          rgba(255, 255, 255, 0.02)
-        );
-      }
-
-      .handy-dandy-workbench-quickstart-title {
-        margin: 0 0 0.45rem;
-        font-size: 0.78rem;
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
-        color: var(--color-text-light-6, #bbb);
-      }
-
-      .handy-dandy-workbench-steps {
-        display: grid;
-        gap: 0.45rem;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-      }
-
-      .handy-dandy-workbench-step {
-        display: flex;
-        gap: 0.45rem;
-        align-items: flex-start;
-      }
-
-      .handy-dandy-workbench-step-index {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 1.2rem;
-        height: 1.2rem;
-        border-radius: 999px;
-        font-size: 0.72rem;
-        font-weight: 700;
-        background: rgba(255, 255, 255, 0.14);
-        color: var(--color-text-bright, #f0f0f0);
-      }
-
-      .handy-dandy-workbench-step-text {
-        font-size: 0.84rem;
-        color: var(--color-text-light-6, #bbb);
-        line-height: 1.25;
-      }
-
-      .handy-dandy-workbench-setup-grid {
-        display: grid;
-        gap: 0.5rem;
-        grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-      }
-
-      .handy-dandy-workbench-setup-card {
-        border: 1px solid var(--color-border-dark, #333);
-        border-radius: 6px;
-        padding: 0.45rem 0.55rem;
-        background: rgba(255, 255, 255, 0.03);
-        display: grid;
-        gap: 0.2rem;
-      }
-
-      .handy-dandy-workbench-setup-label {
-        font-size: 0.75rem;
-        letter-spacing: 0.03em;
-        text-transform: uppercase;
-        color: var(--color-text-light-6, #bbb);
-      }
-
-      .handy-dandy-workbench-setup-value {
-        font-size: 0.9rem;
-        font-weight: 600;
-        word-break: break-word;
-      }
-
-      .handy-dandy-workbench-setup-value.is-disconnected {
-        color: var(--color-level-error, #ff6a6a);
-      }
-
-      .handy-dandy-workbench-setup-value.is-connected {
-        color: var(--color-level-success, #86d38d);
-      }
-
-      .handy-dandy-workbench-panel {
-        display: none;
-        flex-direction: column;
-        gap: 0.75rem;
-      }
-
-      .handy-dandy-workbench-panel.active {
-        display: flex;
-      }
-
-      .handy-dandy-workbench-form {
-        display: flex;
-        flex-direction: column;
-        gap: 1rem;
-      }
-
-      .handy-dandy-workbench-form .form-group {
-        display: flex;
-        flex-direction: column;
-        gap: 0.35rem;
-      }
-
-      .handy-dandy-workbench-grid {
-        display: grid;
-        gap: 1rem;
-        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      }
-
-      .handy-dandy-workbench-form fieldset {
-        margin: 0;
-        border: 1px solid var(--color-border-dark, #333);
-        border-radius: 6px;
-        padding: 0.75rem;
-      }
-
-      .handy-dandy-workbench-form fieldset > legend {
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.03em;
-        font-size: 0.78rem;
-        padding: 0 0.25rem;
-      }
-
-      .handy-dandy-workbench-form .notes {
-        margin: 0.25rem 0 0;
-        font-size: 0.85em;
-        color: var(--color-text-light-6, #bbb);
-      }
-
-      .handy-dandy-workbench-form textarea {
-        min-height: 13rem;
-        resize: vertical;
-        width: 100%;
-      }
-
-      .handy-dandy-workbench-form .form-fields {
-        display: grid;
-        gap: 0.5rem;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        align-items: center;
-      }
-
-      .handy-dandy-workbench-form [data-actor-art-mode] {
-        margin-top: 0.5rem;
-      }
-
-      .handy-dandy-workbench-art-mode {
-        display: grid;
-        gap: 0.45rem;
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      }
-
-      .handy-dandy-workbench-art-choice {
-        position: relative;
-        display: block;
-      }
-
-      .handy-dandy-workbench-art-choice input {
-        position: absolute;
-        opacity: 0;
-        pointer-events: none;
-      }
-
-      .handy-dandy-workbench-art-choice span {
-        display: block;
-        border: 1px solid var(--color-border-dark, #333);
-        border-radius: 6px;
-        padding: 0.5rem 0.65rem;
-        background: rgba(255, 255, 255, 0.03);
-        font-size: 0.88rem;
-        font-weight: 600;
-        cursor: pointer;
-        transition: border-color 0.2s ease, background 0.2s ease;
-      }
-
-      .handy-dandy-workbench-art-choice input:checked + span {
-        border-color: var(--color-border-highlight, #ff8c00);
-        background: rgba(255, 140, 0, 0.18);
-      }
-
-      .handy-dandy-workbench-inline {
-        display: flex;
-        gap: 0.5rem;
-        align-items: center;
-        flex-wrap: wrap;
-        margin-top: 0.5rem;
-      }
-
-      .handy-dandy-workbench-inline label {
-        font-weight: 600;
-      }
-
-      .handy-dandy-workbench-inline input {
-        max-width: 120px;
-      }
-
-      .handy-dandy-workbench-advanced {
-        border: 1px solid var(--color-border-dark, #333);
-        border-radius: 6px;
-        padding: 0.75rem;
-        background: var(--color-bg-alt, rgba(255, 255, 255, 0.04));
-      }
-
-      .handy-dandy-workbench-advanced > summary {
-        cursor: pointer;
-        font-weight: 600;
-        list-style: none;
-        margin: -0.75rem -0.75rem 0;
-        padding: 0.75rem;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-      }
-
-      .handy-dandy-workbench-advanced > summary::-webkit-details-marker {
-        display: none;
-      }
-
-      .handy-dandy-workbench-advanced > summary::after {
-        content: "\\25BC";
-        font-size: 0.85em;
-        transition: transform 0.2s ease;
-      }
-
-      .handy-dandy-workbench-advanced[open] > summary {
-        border-bottom: 1px solid var(--color-border-dark, #333);
-        margin-bottom: 0.75rem;
-      }
-
-      .handy-dandy-workbench-advanced[open] > summary::after {
-        transform: rotate(-180deg);
-      }
-
-      .handy-dandy-workbench-advanced-fields {
-        display: grid;
-        gap: 0.5rem;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      }
-
-      .handy-dandy-workbench-history-toolbar {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        justify-content: space-between;
-      }
-
-      .handy-dandy-workbench-history-search {
-        align-items: center;
-        background: var(--color-bg-alt, rgba(255, 255, 255, 0.06));
-        border: 1px solid var(--color-border-dark, #333);
-        border-radius: 8px;
-        display: inline-flex;
-        flex: 1;
-        gap: 0.4rem;
-        max-width: 360px;
-        padding: 0.35rem 0.55rem;
-      }
-
-      .handy-dandy-workbench-history-search i {
-        color: var(--color-text-light-6, #bbb);
-        font-size: 0.8rem;
-      }
-
-      .handy-dandy-workbench-history-search input {
-        background: transparent;
-        border: none;
-        color: inherit;
-        flex: 1;
-        font-size: 0.85rem;
-        min-width: 0;
-      }
-
-      .handy-dandy-workbench-history-search input:focus {
-        outline: none;
-      }
-
-      .handy-dandy-workbench-history-summary {
-        color: var(--color-text-light-6, #bbb);
-        font-size: 0.78rem;
-        letter-spacing: 0.02em;
-        text-transform: uppercase;
-        white-space: nowrap;
-      }
-
-      .handy-dandy-workbench-history {
-        display: grid;
-        gap: 0.75rem;
-        grid-template-columns: minmax(220px, 280px) 1fr;
-        align-items: start;
-      }
-
-      .handy-dandy-workbench-history-list {
-        display: flex;
-        flex-direction: column;
-        gap: 0.45rem;
-        max-height: 24rem;
-        overflow-y: auto;
-        border: 1px solid var(--color-border-dark, #333);
-        border-radius: 8px;
-        padding: 0.5rem;
-        background: var(--color-bg-alt, rgba(255, 255, 255, 0.04));
-      }
-
-      .handy-dandy-workbench-history-item {
-        align-items: stretch;
-        border-radius: 7px;
-        border: 1px solid var(--color-border-dark, rgba(255, 255, 255, 0.12));
-        display: flex;
-        overflow: hidden;
-        transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
-      }
-
-      .handy-dandy-workbench-history-item.active {
-        border-color: var(--color-border-highlight, #ff8c00);
-        background: linear-gradient(140deg, rgba(255, 140, 0, 0.2), rgba(255, 255, 255, 0.06));
-      }
-
-      .handy-dandy-workbench-history-item:not(.active):hover,
-      .handy-dandy-workbench-history-item:not(.active):focus-within {
-        border-color: var(--color-border-light-2, rgba(255, 255, 255, 0.2));
-        background: rgba(255, 255, 255, 0.08);
-        transform: translateY(-1px);
-      }
-
-      .handy-dandy-workbench-history-select {
-        appearance: none;
-        background: transparent;
-        border: none;
-        color: inherit;
-        cursor: pointer;
-        flex: 1;
-        padding: 0.45rem 0.55rem;
-        text-align: left;
-        display: flex;
-        flex-direction: column;
-        gap: 0.25rem;
-      }
-
-      .handy-dandy-workbench-history-select:focus {
-        outline: none;
-      }
-
-      .handy-dandy-workbench-history-chip {
-        align-self: flex-start;
-        border: 1px solid rgba(255, 255, 255, 0.25);
-        border-radius: 999px;
-        color: var(--color-text-light-5, #c8c8c8);
-        font-size: 0.68rem;
-        font-weight: 700;
-        letter-spacing: 0.04em;
-        line-height: 1;
-        margin-bottom: 0.05rem;
-        padding: 0.17rem 0.42rem;
-        text-transform: uppercase;
-      }
-
-      .handy-dandy-workbench-history-select .handy-dandy-workbench-history-name {
-        font-weight: 600;
-        font-size: 0.92rem;
-        line-height: 1.25;
-      }
-
-      .handy-dandy-workbench-history-select .handy-dandy-workbench-history-meta {
-        color: var(--color-text-light-6, #bbb);
-        font-size: 0.77rem;
-        line-height: 1.2;
-      }
-
-      .handy-dandy-workbench-history-delete {
-        appearance: none;
-        background: rgba(0, 0, 0, 0.1);
-        border: none;
-        border-left: 1px solid rgba(255, 255, 255, 0.08);
-        color: var(--color-text-light-6, #bbb);
-        cursor: pointer;
-        min-width: 2rem;
-        padding: 0.35rem;
-        transition: color 0.2s ease, background 0.2s ease;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
-
-      .handy-dandy-workbench-history-delete:hover,
-      .handy-dandy-workbench-history-delete:focus-visible {
-        color: var(--color-text-bright, #f0f0f0);
-        background: rgba(220, 53, 69, 0.28);
-        outline: none;
-      }
-
-      .handy-dandy-workbench-history-view {
-        border: 1px solid var(--color-border-dark, #333);
-        border-radius: 8px;
-        min-height: 18rem;
-        padding: 0.75rem;
-        overflow: auto;
-        background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.03));
-        display: flex;
-        flex-direction: column;
-        gap: 0.75rem;
-      }
-
-      .handy-dandy-workbench-history-empty {
-        color: var(--color-text-light-6, #bbb);
-        font-size: 0.92rem;
-        margin: 0;
-        padding: 0.5rem 0;
-      }
-
-      .handy-dandy-workbench-request .notes {
-        color: var(--color-text-light-6, #bbb);
-        font-size: 0.9rem;
-        margin: 0;
-      }
-
-      @media (max-width: 900px) {
-        .handy-dandy-workbench-steps {
-          grid-template-columns: 1fr;
-        }
-
-        .handy-dandy-workbench-history {
-          grid-template-columns: 1fr;
-        }
-
-        .handy-dandy-workbench-history-list {
-          max-height: 15rem;
-        }
-
-        .handy-dandy-workbench-history-toolbar {
-          align-items: stretch;
-          flex-direction: column;
-        }
-
-        .handy-dandy-workbench-history-search {
-          max-width: none;
-        }
-      }
-    </style>
-    <div class="handy-dandy-workbench-request">
-      <nav class="handy-dandy-workbench-tabs">
-        <button type="button" class="handy-dandy-workbench-tab active" data-tab="prompt">Create</button>
-        <button type="button" class="handy-dandy-workbench-tab" data-tab="history">History</button>
-      </nav>
-      <section class="handy-dandy-workbench-panel active" data-panel="prompt">
-        <div class="handy-dandy-workbench-quickstart">
-          <p class="handy-dandy-workbench-quickstart-title">Workflow</p>
-          <div class="handy-dandy-workbench-steps">
-            <div class="handy-dandy-workbench-step">
-              <span class="handy-dandy-workbench-step-index">1</span>
-              <span class="handy-dandy-workbench-step-text">Select entity type, subtype, and title.</span>
-            </div>
-            <div class="handy-dandy-workbench-step">
-              <span class="handy-dandy-workbench-step-index">2</span>
-              <span class="handy-dandy-workbench-step-text">Paste source text and choose art mode.</span>
-            </div>
-            <div class="handy-dandy-workbench-step">
-              <span class="handy-dandy-workbench-step-index">3</span>
-              <span class="handy-dandy-workbench-step-text">Generate, review JSON, then import.</span>
-            </div>
-          </div>
-        </div>
-        <fieldset class="form-group">
-          <legend>Generation Setup</legend>
-          ${generationSetupMarkup}
-          <p class="notes">
-            Models and sampling settings come from Module Settings.
-            Use OpenRouter Account to connect or switch model presets.
-          </p>
-        </fieldset>
-        <form class="handy-dandy-workbench-form">
-          <fieldset class="form-group">
-            <legend>Entry Setup</legend>
-            <div class="form-fields">
-              <div>
-                <label for="handy-dandy-workbench-entity-type">Entity Type</label>
-                <select id="handy-dandy-workbench-entity-type" name="entityType">
-                  <option value="actor">Actor</option>
-                  <option value="action">Action</option>
-                  <option value="item">Item</option>
-                </select>
-              </div>
-              <div>
-                <label for="handy-dandy-workbench-system-display">Game System</label>
-                <input id="handy-dandy-workbench-system-display" type="text" value="PF2E" disabled />
-                <input type="hidden" name="systemId" value="${fixedSystemId}" />
-                <p class="notes">Locked to PF2E for prompt workbench generation.</p>
-              </div>
-              <div data-entity-scope="item">
-                <label for="handy-dandy-workbench-item-type">Item Type</label>
-                <select id="handy-dandy-workbench-item-type" name="itemType">
-                  <option value="">Select a type</option>
-                  ${itemTypeOptions}
-                </select>
-                <p class="notes">Match the Foundry item category for the generated entry.</p>
-              </div>
-              <div data-entity-scope="actor">
-                <label for="handy-dandy-workbench-actor-type">Actor Type</label>
-                <select id="handy-dandy-workbench-actor-type" name="actorType">
-                  ${actorTypeOptions}
-                </select>
-                <p class="notes">Select the PF2E actor category the generator should target.</p>
-              </div>
-              <div>
-                <label for="handy-dandy-workbench-title">Title</label>
-                <input
-                  id="handy-dandy-workbench-title"
-                  type="text"
-                  name="entryName"
-                  placeholder="e.g. Clockwork Exarch"
-                  required
-                />
-              </div>
-              <div>
-                <label for="handy-dandy-workbench-slug">Slug (optional)</label>
-                <input id="handy-dandy-workbench-slug" type="text" name="slug" />
-              </div>
-              <div data-entity-scope="actor">
-                <label for="handy-dandy-workbench-level">Actor Level (optional)</label>
-                <input id="handy-dandy-workbench-level" type="number" name="level" min="0" />
-              </div>
-            </div>
-            <p class="notes">Define what to generate before supplying the prompt text.</p>
-          </fieldset>
-
-          <fieldset class="form-group">
-            <legend>Source Material</legend>
-            <label for="handy-dandy-workbench-prompt">Reference Text / Prompt</label>
-            <textarea id="handy-dandy-workbench-prompt" name="referenceText" required></textarea>
-            <p class="notes">Paste stat blocks, raw notes, or structured direction for generation.</p>
-          </fieldset>
-
-          <fieldset class="form-group" data-entity-scope="action">
-            <legend>Action Art</legend>
-            <label for="handy-dandy-workbench-image">Image Path</label>
-            <input id="handy-dandy-workbench-image" type="text" name="img" value="${DEFAULT_IMAGE_PATH}" />
-            <p class="notes">Used as the generated action image path.</p>
-          </fieldset>
-
-          <fieldset class="form-group" data-entity-scope="item">
-            <legend>Item Art</legend>
-            <div class="handy-dandy-workbench-art-mode">
-              <label class="handy-dandy-workbench-art-choice">
-                <input type="radio" name="itemArtMode" value="path" checked />
-                <span>Use image path</span>
-              </label>
-              <label class="handy-dandy-workbench-art-choice">
-                <input type="radio" name="itemArtMode" value="generate" />
-                <span>Generate transparent item icon</span>
-              </label>
-            </div>
-            <div class="form-group" data-item-art-mode="path">
-              <label for="handy-dandy-workbench-item-image">Item Image Path</label>
-              <input
-                id="handy-dandy-workbench-item-image"
-                type="text"
-                name="itemImagePath"
-                value="${DEFAULT_IMAGE_PATH}"
-              />
-              <p class="notes">Used when image-path mode is selected.</p>
-            </div>
-            <div class="form-group" data-item-art-mode="generate">
-              <label for="handy-dandy-workbench-item-image-prompt">Item Image Prompt Override (optional)</label>
-              <input
-                id="handy-dandy-workbench-item-image-prompt"
-                type="text"
-                name="itemImagePrompt"
-                placeholder="Optional art direction for generated item icon"
-              />
-              <p class="notes">Leave blank to derive icon direction from the generated item description.</p>
-            </div>
-            <p class="notes">Choose one art mode for items to avoid conflicting image instructions.</p>
-          </fieldset>
-
-          <fieldset class="form-group" data-entity-scope="actor">
-            <legend>Actor Art</legend>
-            <div class="handy-dandy-workbench-art-mode">
-              <label class="handy-dandy-workbench-art-choice">
-                <input type="radio" name="actorArtMode" value="path" checked />
-                <span>Use image path</span>
-              </label>
-              <label class="handy-dandy-workbench-art-choice">
-                <input type="radio" name="actorArtMode" value="token" />
-                <span>Generate transparent token</span>
-              </label>
-            </div>
-            <div class="form-group" data-actor-art-mode="path">
-              <label for="handy-dandy-workbench-actor-image">Actor Image Path</label>
-              <input
-                id="handy-dandy-workbench-actor-image"
-                type="text"
-                name="actorImagePath"
-                value="${DEFAULT_IMAGE_PATH}"
-              />
-              <p class="notes">Used when image-path mode is selected.</p>
-            </div>
-            <div class="form-group" data-actor-art-mode="token">
-              <label for="handy-dandy-workbench-token-prompt">Token Prompt Override (optional)</label>
-              <input
-                id="handy-dandy-workbench-token-prompt"
-                type="text"
-                name="tokenPrompt"
-                placeholder="Optional art direction for the generated transparent token"
-              />
-              <p class="notes">Leave blank to derive token style from the actor description.</p>
-            </div>
-            <p class="notes">Choose one art mode for actors to avoid conflicting image instructions.</p>
-          </fieldset>
-
-          <fieldset class="form-group" data-entity-scope="actor">
-            <legend>Actor Content</legend>
-            <div class="form-fields" data-actor-type-scope="npc">
-              <label><input type="checkbox" name="includeSpellcasting" /> Spellcasting?</label>
-              <label><input type="checkbox" name="includeInventory" /> Inventory?</label>
-            </div>
-            <p class="notes" data-actor-type-scope="npc">Enable extra NPC sections in the generated sheet data.</p>
-            <div class="form-fields" data-actor-type-scope="loot hazard">
-              <label><input type="checkbox" name="includeOfficialContent" checked /> Official content</label>
-              <label><input type="checkbox" name="includeGeneratedContent" checked /> Generated content</label>
-            </div>
-            <p class="notes" data-actor-type-scope="loot hazard">
-              Select whether loot/hazard content should prefer official PF2E imports, generated content, or both.
-            </p>
-          </fieldset>
-          <fieldset class="form-group">
-            <legend>Publication Details</legend>
-            <div class="form-fields">
-              <label>Title <input type="text" name="publicationTitle" value="" /></label>
-              <label>Authors <input type="text" name="publicationAuthors" value="" /></label>
-              <label>License <input type="text" name="publicationLicense" value="OGL" /></label>
-              <label><input type="checkbox" name="publicationRemaster" /> Remaster</label>
-            </div>
-          </fieldset>
-          <details class="handy-dandy-workbench-advanced">
-            <summary>Advanced Options</summary>
-            <div class="handy-dandy-workbench-advanced-fields">
-              <label>Seed <input type="number" name="seed" value="${defaultSeedValue}" /></label>
-              <label>Max Attempts <input type="number" name="maxAttempts" min="1" value="3" /></label>
-              <label>Compendium Pack ID <input type="text" name="packId" /></label>
-              <label>Folder ID <input type="text" name="folderId" /></label>
-            </div>
-          </details>
-        </form>
-      </section>
-      <section class="handy-dandy-workbench-panel" data-panel="history">
-        <div class="handy-dandy-workbench-history-toolbar">
-          <label class="handy-dandy-workbench-history-search">
-            <i class="fas fa-search"></i>
-            <input type="search" placeholder="Filter by name, type, or system" data-history-filter />
-          </label>
-          <span class="handy-dandy-workbench-history-summary" data-history-summary></span>
-        </div>
-        <div class="handy-dandy-workbench-history">
-          <aside class="handy-dandy-workbench-history-list" data-history-list>
-            ${historyListMarkup}
-          </aside>
-          <div class="handy-dandy-workbench-history-view" data-history-view>${historyPlaceholder}</div>
-        </div>
-        <p class="notes">History entries persist locally in this browser. Remove any that you no longer need.</p>
-      </section>
-    </div>
-  `;
+  const [historyListMarkup, historyPlaceholder] = await Promise.all([
+    buildHistoryListMarkup(initialHistoryId),
+    buildHistoryViewPlaceholder(),
+  ]);
+
+  const content = await renderTemplate(PROMPT_WORKBENCH_REQUEST_TEMPLATE, {
+    generationSetupMarkup,
+    itemTypeOptions,
+    actorTypeOptions,
+    defaultImagePath: DEFAULT_IMAGE_PATH,
+    defaultSeedValue,
+    systemId: fixedSystemId,
+    historyListMarkup,
+    historyPlaceholder,
+  });
 
   const response = await new Promise<WorkbenchFormResponse | null>((resolve) => {
     let settled = false;
@@ -883,7 +208,6 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
         content,
         buttons: {
           generate: {
-            icon: '<i class="fas fa-magic"></i>',
             label: "Generate",
             callback: (html) => {
               const form = html[0]?.querySelector("form");
@@ -925,7 +249,6 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
             },
           },
           cancel: {
-            icon: '<i class="fas fa-times"></i>',
             label: "Cancel",
             callback: () => finish(null),
           },
@@ -1145,37 +468,22 @@ function readPromptWorkbenchGenerationSetup(): PromptWorkbenchGenerationSetup {
   };
 }
 
-function buildGenerationSetupMarkup(setup: PromptWorkbenchGenerationSetup): string {
+async function buildGenerationSetupMarkup(setup: PromptWorkbenchGenerationSetup): Promise<string> {
   const connectionClass = setup.connected ? "is-connected" : "is-disconnected";
   const connectionLabel = setup.connected ? "Connected" : "Not connected";
   const seedLabel = typeof setup.configuredSeed === "number"
     ? String(setup.configuredSeed)
     : `Default (${DEFAULT_GENERATION_SEED})`;
 
-  return `
-    <div class="handy-dandy-workbench-setup-grid">
-      <div class="handy-dandy-workbench-setup-card">
-        <span class="handy-dandy-workbench-setup-label">Status</span>
-        <span class="handy-dandy-workbench-setup-value ${connectionClass}">${escapeHtml(connectionLabel)}</span>
-      </div>
-      <div class="handy-dandy-workbench-setup-card">
-        <span class="handy-dandy-workbench-setup-label">Text Model</span>
-        <span class="handy-dandy-workbench-setup-value">${escapeHtml(setup.textModel)}</span>
-      </div>
-      <div class="handy-dandy-workbench-setup-card">
-        <span class="handy-dandy-workbench-setup-label">Image Model</span>
-        <span class="handy-dandy-workbench-setup-value">${escapeHtml(setup.imageModel)}</span>
-      </div>
-      <div class="handy-dandy-workbench-setup-card">
-        <span class="handy-dandy-workbench-setup-label">Temperature / Top P</span>
-        <span class="handy-dandy-workbench-setup-value">${setup.temperature} / ${setup.topP}</span>
-      </div>
-      <div class="handy-dandy-workbench-setup-card">
-        <span class="handy-dandy-workbench-setup-label">Seed</span>
-        <span class="handy-dandy-workbench-setup-value">${escapeHtml(seedLabel)}</span>
-      </div>
-    </div>
-  `;
+  return renderTemplate(PROMPT_WORKBENCH_GENERATION_SETUP_TEMPLATE, {
+    connectionClass,
+    connectionLabel,
+    textModel: setup.textModel,
+    imageModel: setup.imageModel,
+    temperature: setup.temperature,
+    topP: setup.topP,
+    seedLabel,
+  });
 }
 
 function sanitizeItemType(value: string): ItemCategory | null {
@@ -1321,35 +629,16 @@ function applyLoadingProgress(
   }
 }
 
-function showGeneratingDialog(request: PromptWorkbenchRequest<EntityType>): WorkbenchLoadingController {
+async function showGeneratingDialog(request: PromptWorkbenchRequest<EntityType>): Promise<WorkbenchLoadingController> {
   const entryName = request.entryName.trim() || "entry";
-  const safeEntryName = escapeHtml(entryName);
   const loadingSteps = buildLoadingSteps(request);
-  const loadingList = loadingSteps
-    .map((step, index) => `<li data-loading-step data-step-index="${index}">${escapeHtml(step.label)}</li>`)
-    .join("");
-  const content = `
-    <style>
-      .handy-dandy-workbench-loading-steps {
-        margin: 0.35rem 0 0.5rem 1.25rem;
-        padding: 0;
-        display: grid;
-        gap: 0.15rem;
-      }
-      .handy-dandy-workbench-loading-steps li.is-active {
-        font-weight: 700;
-      }
-      .handy-dandy-workbench-loading-steps li.is-complete {
-        opacity: 0.7;
-      }
-    </style>
-    <div class="handy-dandy-workbench-loading" data-loading-root>
-      <p><i class="fas fa-spinner fa-spin"></i> Generating ${safeEntryName}...</p>
-      <p data-loading-message class="notes">Preparing prompt...</p>
-      <ol class="handy-dandy-workbench-loading-steps">${loadingList}</ol>
-      <p data-loading-elapsed class="notes">Elapsed: 0s</p>
-    </div>
-  `;
+  const content = await renderTemplate(PROMPT_WORKBENCH_LOADING_TEMPLATE, {
+    safeEntryName: entryName,
+    loadingSteps: loadingSteps.map((step, index) => ({
+      index,
+      label: step.label,
+    })),
+  });
 
   let root: HTMLElement | null = null;
   let intervalId: number | null = null;
@@ -1422,7 +711,7 @@ async function showWorkbenchResult(result: PromptWorkbenchResult<EntityType>): P
   const importerAvailable = typeof result.importer === "function";
   const currentEntry = recordHistoryEntry(result, json, importerAvailable);
 
-  const content = buildWorkbenchDialogContent(currentEntry);
+  const content = await buildWorkbenchDialogContent(currentEntry);
 
   return new Promise((resolve) => {
     const dialog = new Dialog({
@@ -1430,7 +719,6 @@ async function showWorkbenchResult(result: PromptWorkbenchResult<EntityType>): P
       content,
       buttons: {
         close: {
-          icon: '<i class="fas fa-check"></i>',
           label: "Close",
         },
       },
@@ -1449,10 +737,6 @@ async function showWorkbenchResult(result: PromptWorkbenchResult<EntityType>): P
 
     dialog.render(true);
   });
-}
-
-function escapeJsonForTextarea(json: string): string {
-  return escapeHtml(json);
 }
 
 function initialiseWorkbenchHistory(): void {
@@ -1718,342 +1002,19 @@ function createHistoryId(): string {
   return `history-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function buildWorkbenchDialogContent(currentEntry: WorkbenchHistoryEntry): string {
-  const latestMarkup = buildEntryDetailMarkup(currentEntry);
-  const historyListMarkup = buildHistoryListMarkup(currentEntry.id);
-  const historyPlaceholder = buildHistoryViewPlaceholder();
+async function buildWorkbenchDialogContent(currentEntry: WorkbenchHistoryEntry): Promise<string> {
+  const [latestMarkup, historyListMarkup, historyPlaceholder] = await Promise.all([
+    buildEntryDetailMarkup(currentEntry),
+    buildHistoryListMarkup(currentEntry.id),
+    buildHistoryViewPlaceholder(),
+  ]);
 
-  return `
-    <style>
-      .handy-dandy-workbench-dialog {
-        display: flex;
-        flex-direction: column;
-        gap: 0.75rem;
-      }
-
-      .handy-dandy-workbench-tabs {
-        display: flex;
-        gap: 0.5rem;
-        border-bottom: 1px solid var(--color-border-dark, #333);
-        padding-bottom: 0.25rem;
-      }
-
-      .handy-dandy-workbench-tab {
-        appearance: none;
-        background: var(--color-bg-alt, rgba(255, 255, 255, 0.05));
-        border: 1px solid var(--color-border-dark, #333);
-        border-bottom: none;
-        border-radius: 6px 6px 0 0;
-        color: inherit;
-        cursor: pointer;
-        font-weight: 600;
-        padding: 0.35rem 0.9rem;
-        transition: background 0.2s ease, color 0.2s ease;
-      }
-
-      .handy-dandy-workbench-tab.active {
-        background: var(--color-border-light-1, rgba(255, 255, 255, 0.12));
-        color: var(--color-text-bright, #f0f0f0);
-      }
-
-      .handy-dandy-workbench-panel {
-        display: none;
-        flex-direction: column;
-        gap: 0.75rem;
-      }
-
-      .handy-dandy-workbench-panel.active {
-        display: flex;
-      }
-
-      .handy-dandy-workbench-header {
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        flex-wrap: wrap;
-        gap: 0.75rem;
-      }
-
-      .handy-dandy-workbench-heading {
-        display: flex;
-        flex-direction: column;
-        gap: 0.25rem;
-      }
-
-      .handy-dandy-workbench-name {
-        margin: 0;
-        font-size: 1.35rem;
-      }
-
-      .handy-dandy-workbench-meta {
-        margin: 0;
-        color: var(--color-text-light-6, #bbb);
-        font-size: 0.9rem;
-      }
-
-      .handy-dandy-workbench-actions {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.5rem;
-      }
-
-      .handy-dandy-workbench-action {
-        align-items: center;
-        appearance: none;
-        background: var(--color-border-light-1, rgba(255, 255, 255, 0.12));
-        border: 1px solid var(--color-border-dark, #333);
-        border-radius: 4px;
-        color: inherit;
-        cursor: pointer;
-        display: inline-flex;
-        font-weight: 600;
-        gap: 0.4rem;
-        padding: 0.35rem 0.75rem;
-        text-decoration: none;
-        transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
-      }
-
-      .handy-dandy-workbench-action[disabled] {
-        cursor: not-allowed;
-        opacity: 0.55;
-      }
-
-      .handy-dandy-workbench-json {
-        width: 100%;
-        min-height: 16rem;
-        resize: vertical;
-      }
-
-      .handy-dandy-workbench-history-toolbar {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        justify-content: space-between;
-      }
-
-      .handy-dandy-workbench-history-search {
-        align-items: center;
-        background: var(--color-bg-alt, rgba(255, 255, 255, 0.06));
-        border: 1px solid var(--color-border-dark, #333);
-        border-radius: 8px;
-        display: inline-flex;
-        flex: 1;
-        gap: 0.4rem;
-        max-width: 360px;
-        padding: 0.35rem 0.55rem;
-      }
-
-      .handy-dandy-workbench-history-search i {
-        color: var(--color-text-light-6, #bbb);
-        font-size: 0.8rem;
-      }
-
-      .handy-dandy-workbench-history-search input {
-        background: transparent;
-        border: none;
-        color: inherit;
-        flex: 1;
-        font-size: 0.85rem;
-        min-width: 0;
-      }
-
-      .handy-dandy-workbench-history-search input:focus {
-        outline: none;
-      }
-
-      .handy-dandy-workbench-history-summary {
-        color: var(--color-text-light-6, #bbb);
-        font-size: 0.78rem;
-        letter-spacing: 0.02em;
-        text-transform: uppercase;
-        white-space: nowrap;
-      }
-
-      .handy-dandy-workbench-history {
-        display: grid;
-        gap: 0.75rem;
-        grid-template-columns: minmax(220px, 280px) 1fr;
-        align-items: start;
-      }
-
-      .handy-dandy-workbench-history-list {
-        display: flex;
-        flex-direction: column;
-        gap: 0.45rem;
-        max-height: 24rem;
-        overflow-y: auto;
-        border: 1px solid var(--color-border-dark, #333);
-        border-radius: 8px;
-        padding: 0.5rem;
-        background: var(--color-bg-alt, rgba(255, 255, 255, 0.04));
-      }
-
-      .handy-dandy-workbench-history-view {
-        border: 1px solid var(--color-border-dark, #333);
-        border-radius: 8px;
-        min-height: 18rem;
-        padding: 0.75rem;
-        overflow: auto;
-        background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.03));
-        display: flex;
-        flex-direction: column;
-        gap: 0.75rem;
-      }
-
-      .handy-dandy-workbench-history-empty {
-        color: var(--color-text-light-6, #bbb);
-        font-size: 0.92rem;
-        margin: 0;
-        padding: 0.5rem 0;
-      }
-
-      .handy-dandy-workbench-history-view .handy-dandy-workbench-header {
-        padding: 0;
-      }
-
-      .handy-dandy-workbench-history-view .handy-dandy-workbench-json {
-        min-height: 14rem;
-      }
-
-      .handy-dandy-workbench-dialog .notes {
-        margin: 0;
-        color: var(--color-text-light-6, #bbb);
-        font-size: 0.9rem;
-      }
-
-      .handy-dandy-workbench-history-item {
-        align-items: stretch;
-        border-radius: 7px;
-        border: 1px solid var(--color-border-dark, rgba(255, 255, 255, 0.12));
-        display: flex;
-        overflow: hidden;
-        transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
-      }
-
-      .handy-dandy-workbench-history-item.active {
-        border-color: var(--color-border-highlight, #ff8c00);
-        background: linear-gradient(140deg, rgba(255, 140, 0, 0.2), rgba(255, 255, 255, 0.06));
-      }
-
-      .handy-dandy-workbench-history-item:not(.active):hover,
-      .handy-dandy-workbench-history-item:not(.active):focus-within {
-        border-color: var(--color-border-light-2, rgba(255, 255, 255, 0.2));
-        background: rgba(255, 255, 255, 0.08);
-        transform: translateY(-1px);
-      }
-
-      .handy-dandy-workbench-history-select {
-        appearance: none;
-        background: transparent;
-        border: none;
-        color: inherit;
-        cursor: pointer;
-        flex: 1;
-        padding: 0.45rem 0.55rem;
-        text-align: left;
-        display: flex;
-        flex-direction: column;
-        gap: 0.25rem;
-      }
-
-      .handy-dandy-workbench-history-select:focus {
-        outline: none;
-      }
-
-      .handy-dandy-workbench-history-chip {
-        align-self: flex-start;
-        border: 1px solid rgba(255, 255, 255, 0.25);
-        border-radius: 999px;
-        color: var(--color-text-light-5, #c8c8c8);
-        font-size: 0.68rem;
-        font-weight: 700;
-        letter-spacing: 0.04em;
-        line-height: 1;
-        margin-bottom: 0.05rem;
-        padding: 0.17rem 0.42rem;
-        text-transform: uppercase;
-      }
-
-      .handy-dandy-workbench-history-select .handy-dandy-workbench-history-name {
-        font-weight: 600;
-        font-size: 0.92rem;
-        line-height: 1.25;
-      }
-
-      .handy-dandy-workbench-history-select .handy-dandy-workbench-history-meta {
-        color: var(--color-text-light-6, #bbb);
-        font-size: 0.77rem;
-        line-height: 1.2;
-      }
-
-      .handy-dandy-workbench-history-delete {
-        appearance: none;
-        background: rgba(0, 0, 0, 0.1);
-        border: none;
-        border-left: 1px solid rgba(255, 255, 255, 0.08);
-        color: var(--color-text-light-6, #bbb);
-        cursor: pointer;
-        min-width: 2rem;
-        padding: 0.35rem;
-        transition: color 0.2s ease, background 0.2s ease;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
-
-      .handy-dandy-workbench-history-delete:hover,
-      .handy-dandy-workbench-history-delete:focus-visible {
-        color: var(--color-text-bright, #f0f0f0);
-        background: rgba(220, 53, 69, 0.28);
-        outline: none;
-      }
-
-      @media (max-width: 900px) {
-        .handy-dandy-workbench-history {
-          grid-template-columns: 1fr;
-        }
-
-        .handy-dandy-workbench-history-list {
-          max-height: 15rem;
-        }
-
-        .handy-dandy-workbench-history-toolbar {
-          align-items: stretch;
-          flex-direction: column;
-        }
-
-        .handy-dandy-workbench-history-search {
-          max-width: none;
-        }
-      }
-
-    </style>
-
-    <div class="handy-dandy-workbench-dialog" data-current-entry="${currentEntry.id}">
-      <nav class="handy-dandy-workbench-tabs">
-        <button type="button" class="handy-dandy-workbench-tab active" data-tab="latest">Latest</button>
-        <button type="button" class="handy-dandy-workbench-tab" data-tab="history">History</button>
-      </nav>
-      <section class="handy-dandy-workbench-panel active" data-panel="latest">
-        ${latestMarkup}
-      </section>
-      <section class="handy-dandy-workbench-panel" data-panel="history">
-        <div class="handy-dandy-workbench-history-toolbar">
-          <label class="handy-dandy-workbench-history-search">
-            <i class="fas fa-search"></i>
-            <input type="search" placeholder="Filter by name, type, or system" data-history-filter />
-          </label>
-          <span class="handy-dandy-workbench-history-summary" data-history-summary></span>
-        </div>
-        <div class="handy-dandy-workbench-history">
-          <aside class="handy-dandy-workbench-history-list" data-history-list>
-            ${historyListMarkup}
-          </aside>
-          <div class="handy-dandy-workbench-history-view" data-history-view>${historyPlaceholder}</div>
-        </div>
-      </section>
-    </div>
-  `;
+  return renderTemplate(PROMPT_WORKBENCH_RESULT_TEMPLATE, {
+    currentEntryId: currentEntry.id,
+    latestMarkup,
+    historyListMarkup,
+    historyPlaceholder,
+  });
 }
 
 function normalizeHistoryFilter(filterText: string | undefined): string {
@@ -2084,89 +1045,72 @@ function buildHistorySummaryLabel(visibleCount: number, totalCount: number, hasF
   return `${totalCount} entr${totalCount === 1 ? "y" : "ies"}`;
 }
 
-function buildHistoryListMarkup(activeEntryId?: string, filterText?: string): string {
+async function buildHistoryListMarkup(activeEntryId?: string, filterText?: string): Promise<string> {
   if (!workbenchHistory.length) {
-    return '<p class="handy-dandy-workbench-history-empty">No generations yet.</p>';
+    return renderTemplate(PROMPT_WORKBENCH_HISTORY_LIST_TEMPLATE, {
+      hasEntries: false,
+      emptyMessage: "No generations yet.",
+      entries: [],
+    });
   }
 
   const filteredEntries = getFilteredHistoryEntries(filterText);
   if (!filteredEntries.length) {
-    return '<p class="handy-dandy-workbench-history-empty">No entries match this filter.</p>';
+    return renderTemplate(PROMPT_WORKBENCH_HISTORY_LIST_TEMPLATE, {
+      hasEntries: false,
+      emptyMessage: "No entries match this filter.",
+      entries: [],
+    });
   }
 
-  return filteredEntries
-    .map((entry) => {
-      const isActive = entry.id === activeEntryId;
-      const classes = isActive
-        ? "handy-dandy-workbench-history-item active"
-        : "handy-dandy-workbench-history-item";
-      const name = escapeHtml(entry.result.name.trim() || entry.result.data.name || "Generated Entry");
-      const meta = escapeHtml(formatHistoryRowMeta(entry));
-      const typeLabel = escapeHtml(formatTypeLabel(entry.result.type));
-      return `
-        <div class="${classes}" data-entry-id="${entry.id}">
-          <button type="button" class="handy-dandy-workbench-history-select" data-entry-id="${entry.id}">
-            <span class="handy-dandy-workbench-history-chip">${typeLabel}</span>
-            <span class="handy-dandy-workbench-history-name">${name}</span>
-            <span class="handy-dandy-workbench-history-meta">${meta}</span>
-          </button>
-          <button type="button" class="handy-dandy-workbench-history-delete" data-entry-id="${entry.id}" aria-label="Remove from history">
-            <i class="fas fa-times"></i>
-          </button>
-        </div>
-      `;
-    })
-    .join("");
+  return renderTemplate(PROMPT_WORKBENCH_HISTORY_LIST_TEMPLATE, {
+    hasEntries: true,
+    entries: filteredEntries.map((entry) => ({
+      id: entry.id,
+      isActive: entry.id === activeEntryId,
+      typeLabel: formatTypeLabel(entry.result.type),
+      name: entry.result.name.trim() || entry.result.data.name || "Generated Entry",
+      meta: formatHistoryRowMeta(entry),
+    })),
+  });
 }
 
-function buildHistoryViewPlaceholder(filterText?: string): string {
+async function buildHistoryViewPlaceholder(filterText?: string): Promise<string> {
   if (!workbenchHistory.length) {
-    return '<p class="handy-dandy-workbench-history-empty">No generations yet.</p>';
+    return renderTemplate(PROMPT_WORKBENCH_HISTORY_PLACEHOLDER_TEMPLATE, {
+      className: "handy-dandy-workbench-history-empty",
+      message: "No generations yet.",
+    });
   }
 
   if (!getFilteredHistoryEntries(filterText).length) {
-    return '<p class="handy-dandy-workbench-history-empty">No entries match this filter.</p>';
+    return renderTemplate(PROMPT_WORKBENCH_HISTORY_PLACEHOLDER_TEMPLATE, {
+      className: "handy-dandy-workbench-history-empty",
+      message: "No entries match this filter.",
+    });
   }
 
-  return '<p class="notes">Select a previous generation to review its details.</p>';
+  return renderTemplate(PROMPT_WORKBENCH_HISTORY_PLACEHOLDER_TEMPLATE, {
+    className: "notes",
+    message: "Select a previous generation to review its details.",
+  });
 }
 
-function buildEntryDetailMarkup(entry: WorkbenchHistoryEntry): string {
-  const name = escapeHtml(entry.result.name.trim() || entry.result.data.name || "Generated Entry");
-  const typeLabel = escapeHtml(formatTypeLabel(entry.result.type));
-  const systemLabel = escapeHtml(formatSystemLabel(entry.result.input.systemId));
-  const timestamp = escapeHtml(formatTimestamp(entry.timestamp));
+async function buildEntryDetailMarkup(entry: WorkbenchHistoryEntry): Promise<string> {
+  const typeLabel = formatTypeLabel(entry.result.type);
+  const systemLabel = formatSystemLabel(entry.result.input.systemId);
+  const timestamp = formatTimestamp(entry.timestamp);
   const importLabel = entry.result.type === "actor" ? "Create Actor" : "Import to World";
-  const importDisabled = entry.importerAvailable ? "" : " disabled title=\"Import is unavailable for this entry.\"";
+  const meta = `${typeLabel}${systemLabel ? ` - ${systemLabel}` : ""} - ${timestamp}`;
 
-  return `
-    <header class="handy-dandy-workbench-header">
-      <div class="handy-dandy-workbench-heading">
-        <h2 class="handy-dandy-workbench-name">${name}</h2>
-        <p class="handy-dandy-workbench-meta">${typeLabel}${systemLabel ? ` - ${systemLabel}` : ""} - ${timestamp}</p>
-      </div>
-      <div class="handy-dandy-workbench-actions">
-        <button type="button" class="handy-dandy-workbench-action" data-action="copy" data-entry-id="${entry.id}">
-          <i class="fas fa-copy"></i>
-          <span>Copy JSON</span>
-        </button>
-        <button type="button" class="handy-dandy-workbench-action" data-action="download" data-entry-id="${entry.id}">
-          <i class="fas fa-download"></i>
-          <span>Download</span>
-        </button>
-        <button type="button" class="handy-dandy-workbench-action" data-action="repair" data-entry-id="${entry.id}">
-          <i class="fas fa-tools"></i>
-          <span>Repair JSON</span>
-        </button>
-        <button type="button" class="handy-dandy-workbench-action" data-action="import" data-entry-id="${entry.id}"${importDisabled}>
-          <i class="fas fa-cloud-upload-alt"></i>
-          <span>${importLabel}</span>
-        </button>
-      </div>
-    </header>
-    <p class="notes">Review the generated JSON below or revisit previous generations from the history tab.</p>
-    <textarea class="handy-dandy-workbench-json" rows="16" readonly>${escapeJsonForTextarea(entry.json)}</textarea>
-  `;
+  return renderTemplate(PROMPT_WORKBENCH_ENTRY_DETAIL_TEMPLATE, {
+    id: entry.id,
+    name: entry.result.name.trim() || entry.result.data.name || "Generated Entry",
+    meta,
+    importLabel,
+    importerAvailable: entry.importerAvailable,
+    json: entry.json,
+  });
 }
 
 function formatHistoryRowMeta(entry: WorkbenchHistoryEntry): string {
@@ -2344,7 +1288,7 @@ function setupWorkbenchRequestDialog(html: JQuery): void {
   const initialEntryId = initialEntry?.id;
 
   setHistoryFilter(container, historyFilterInput?.value ?? "");
-  refreshHistoryViews(container, initialEntryId);
+  void refreshHistoryViews(container, initialEntryId);
 
   updateDialogButtonsVisibility();
   updateScopedFieldVisibility();
@@ -2358,7 +1302,7 @@ function setupWorkbenchRequestDialog(html: JQuery): void {
   }
   historyFilterInput?.addEventListener("input", () => {
     setHistoryFilter(container, historyFilterInput.value);
-    refreshHistoryViews(container, container.dataset.currentEntry);
+    void refreshHistoryViews(container, container.dataset.currentEntry);
   });
 
   container.addEventListener("click", (event) => {
@@ -2391,7 +1335,7 @@ function setupWorkbenchRequestDialog(html: JQuery): void {
         activeEntry = removal.fallback ?? workbenchHistory[0] ?? null;
       }
 
-      refreshHistoryViews(container, activeEntry?.id);
+      void refreshHistoryViews(container, activeEntry?.id);
       return;
     }
 
@@ -2411,7 +1355,7 @@ function setupWorkbenchRequestDialog(html: JQuery): void {
         return;
       }
 
-      refreshHistoryViews(container, entry.id);
+      void refreshHistoryViews(container, entry.id);
     }
   });
 }
@@ -2429,11 +1373,11 @@ function setupWorkbenchResultDialog(html: JQuery, currentEntry: WorkbenchHistory
 
   const historyFilterInput = container.querySelector<HTMLInputElement>("[data-history-filter]");
   setHistoryFilter(container, historyFilterInput?.value ?? "");
-  refreshHistoryViews(container, currentEntry.id);
+  void refreshHistoryViews(container, currentEntry.id);
 
   historyFilterInput?.addEventListener("input", () => {
     setHistoryFilter(container, historyFilterInput.value);
-    refreshHistoryViews(container, container.dataset.currentEntry);
+    void refreshHistoryViews(container, container.dataset.currentEntry);
   });
 
   container.addEventListener("click", (event) => {
@@ -2465,7 +1409,7 @@ function setupWorkbenchResultDialog(html: JQuery, currentEntry: WorkbenchHistory
         activeEntry = removal.fallback ?? workbenchHistory[0] ?? null;
       }
 
-      refreshHistoryViews(container, activeEntry?.id);
+      void refreshHistoryViews(container, activeEntry?.id);
       return;
     }
 
@@ -2485,7 +1429,7 @@ function setupWorkbenchResultDialog(html: JQuery, currentEntry: WorkbenchHistory
         return;
       }
 
-      refreshHistoryViews(container, entry.id);
+      void refreshHistoryViews(container, entry.id);
       return;
     }
   });
@@ -2538,17 +1482,21 @@ function renderHistorySummary(container: HTMLElement, filterText: string): void 
   summary.textContent = buildHistorySummaryLabel(visibleCount, totalCount, Boolean(normalizeHistoryFilter(filterText)));
 }
 
-function renderHistoryList(target: HTMLElement, activeEntryId?: string, filterText?: string): void {
-  target.innerHTML = buildHistoryListMarkup(activeEntryId, filterText);
+async function renderHistoryList(target: HTMLElement, activeEntryId?: string, filterText?: string): Promise<void> {
+  target.innerHTML = await buildHistoryListMarkup(activeEntryId, filterText);
 }
 
-function renderHistoryEntry(target: HTMLElement, entry: WorkbenchHistoryEntry | null | undefined, filterText?: string): void {
+async function renderHistoryEntry(
+  target: HTMLElement,
+  entry: WorkbenchHistoryEntry | null | undefined,
+  filterText?: string,
+): Promise<void> {
   if (!entry) {
-    target.innerHTML = buildHistoryViewPlaceholder(filterText);
+    target.innerHTML = await buildHistoryViewPlaceholder(filterText);
     return;
   }
 
-  target.innerHTML = buildEntryDetailMarkup(entry);
+  target.innerHTML = await buildEntryDetailMarkup(entry);
 }
 
 function resolveHistoryEntry(entryId: string): WorkbenchHistoryEntry | undefined {
@@ -2616,7 +1564,7 @@ function handleDownloadAction(entry: WorkbenchHistoryEntry): void {
   downloadJson(entry.json, filename);
 }
 
-function refreshHistoryViews(container: HTMLElement, preferredEntryId?: string): void {
+async function refreshHistoryViews(container: HTMLElement, preferredEntryId?: string): Promise<void> {
   const historyList = container.querySelector<HTMLElement>("[data-history-list]");
   const historyView = container.querySelector<HTMLElement>("[data-history-view]");
   const latestPanel = container.querySelector<HTMLElement>("[data-panel=\"latest\"]");
@@ -2636,10 +1584,10 @@ function refreshHistoryViews(container: HTMLElement, preferredEntryId?: string):
   setActiveHistoryItem(container, activeEntryId ?? "");
 
   if (historyList) {
-    renderHistoryList(historyList, activeEntryId, filterText);
+    await renderHistoryList(historyList, activeEntryId, filterText);
   }
   if (historyView) {
-    renderHistoryEntry(historyView, activeEntry, filterText);
+    await renderHistoryEntry(historyView, activeEntry, filterText);
   }
   renderHistorySummary(container, filterText);
   if (latestPanel) {
@@ -2648,7 +1596,7 @@ function refreshHistoryViews(container: HTMLElement, preferredEntryId?: string):
       ?? workbenchHistory[0]
       ?? null;
     if (latestEntry) {
-      latestPanel.innerHTML = buildEntryDetailMarkup(latestEntry);
+      latestPanel.innerHTML = await buildEntryDetailMarkup(latestEntry);
     }
   }
 }
@@ -2658,7 +1606,7 @@ async function handleRepairAction(entry: WorkbenchHistoryEntry, container?: HTML
     const repaired = await repairHistoryEntry(entry);
     ui.notifications?.info(`${CONSTANTS.MODULE_NAME} | Repaired generation JSON for ${repaired.result.name}.`);
     if (container) {
-      refreshHistoryViews(container, repaired.id);
+      await refreshHistoryViews(container, repaired.id);
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -2711,16 +1659,5 @@ function downloadJson(json: string, filename: string): void {
   link.download = filename;
   link.click();
   URL.revokeObjectURL(url);
-}
-
-function escapeHtml(value: string): string {
-  const utils = foundry.utils as { escapeHTML?: (input: string) => string };
-  if (typeof utils.escapeHTML === "function") {
-    return utils.escapeHTML(value);
-  }
-
-  const div = document.createElement("div");
-  div.textContent = value;
-  return div.innerHTML;
 }
 
