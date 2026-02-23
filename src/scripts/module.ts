@@ -3,12 +3,7 @@ import { registerSettings } from "./setup/settings";
 import { CONSTANTS } from "./constants";
 import { OpenAI } from "openai";
 import { insertSidebarButtons, type ControlCollection } from "./setup/sidebarButtons";
-import { SchemaTool } from "./tools/schema-tool";
-import { DataEntryTool } from "./tools/data-entry-tool";
-import { TraitBrowserTool } from "./tools/trait-browser-tool";
 import { GPTClient } from "./gpt/client";
-import { DeveloperConsole } from "./dev/developer-console";
-import { setDeveloperConsole } from "./dev/state";
 import { createDevNamespace, canUseDeveloperTools, type DevNamespace } from "./dev/tools";
 import { ToolOverview } from "./ui/tool-overview";
 import { registerNpcRemixButton } from "./ui/npc-remix-button";
@@ -32,7 +27,7 @@ import type {
   ActorGenerationResult,
   ItemSchemaData,
 } from "./schemas";
-import { exportSelectedEntities, generateWorkbenchEntry } from "./flows/prompt-workbench";
+import { generateWorkbenchEntry } from "./flows/prompt-workbench";
 import { ensureValid } from "./validation/ensure-valid";
 import { importAction } from "./mappers/import";
 import { initialiseMapMarkers } from "./map-markers/controller";
@@ -104,17 +99,10 @@ declare global {
         generateActor: BoundGenerateActor,
       },
       applications: {
-        schemaTool: SchemaTool,
-        dataEntryTool: DataEntryTool,
-        traitBrowserTool: TraitBrowserTool,
         toolOverview: ToolOverview,
-      },
-      developer: {
-        console: DeveloperConsole,
       },
       dev: DevNamespace,
       flows: {
-        exportSelection: typeof exportSelectedEntities;
         promptWorkbench: typeof generateWorkbenchEntry;
       };
     };
@@ -129,11 +117,6 @@ Hooks.once("init", async () => {
 
   // Load and register templates with specific names
   await loadTemplates({
-    "schema-tool": `${CONSTANTS.TEMPLATE_PATH}/schema-tool.hbs`,
-    "schema-node": `${CONSTANTS.TEMPLATE_PATH}/schema-node.hbs`,
-    "data-entry-tool": `${CONSTANTS.TEMPLATE_PATH}/data-entry-tool.hbs`,
-    "trait-browser-tool": `${CONSTANTS.TEMPLATE_PATH}/trait-browser-tool.hbs`,
-    "developer-console": `${CONSTANTS.TEMPLATE_PATH}/developer-console.hbs`,
     "tool-overview": `${CONSTANTS.TEMPLATE_PATH}/tool-overview.hbs`,
     "openrouter-account": `${CONSTANTS.TEMPLATE_PATH}/openrouter-account.hbs`,
   });
@@ -148,8 +131,6 @@ Hooks.once("setup", () => {
     generateItem: bindGenerator(generateItem),
     generateActor: bindGenerator(generateActor),
   } as const;
-
-  const developerConsole = new DeveloperConsole();
 
   const devNamespace = createDevNamespace({
     canAccess: canUseDeveloperTools,
@@ -166,22 +147,14 @@ Hooks.once("setup", () => {
     refreshAIClient: initializeAIClientFromSettings,
     generation,
     applications: {
-      schemaTool: new SchemaTool,
-      dataEntryTool: new DataEntryTool,
-      traitBrowserTool: new TraitBrowserTool,
       toolOverview: new ToolOverview(),
-    },
-    developer: {
-      console: developerConsole,
     },
     dev: devNamespace,
     flows: {
-      exportSelection: exportSelectedEntities,
       promptWorkbench: generateWorkbenchEntry,
     },
   };
 
-  setDeveloperConsole(developerConsole);
   initialiseMapMarkers();
 });
 
