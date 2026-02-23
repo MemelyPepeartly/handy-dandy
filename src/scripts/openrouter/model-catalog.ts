@@ -1,5 +1,5 @@
 import { CONSTANTS } from "../constants";
-import { DEFAULT_GPT_IMAGE_MODEL, DEFAULT_GPT_MODEL } from "../gpt/models";
+import { DEFAULT_OPENROUTER_IMAGE_MODEL, DEFAULT_OPENROUTER_MODEL } from "../openrouter/models";
 
 const OPENROUTER_MODELS_ENDPOINT = "https://openrouter.ai/api/v1/models";
 const OPENROUTER_MODELS_TIMEOUT_MS = 5000;
@@ -71,11 +71,11 @@ function fallbackCatalog(): OpenRouterModelChoiceCatalog {
   const textChoices: Record<string, string> = {};
   const imageChoices: Record<string, string> = {};
 
-  ensureChoice(textChoices, DEFAULT_GPT_MODEL, `OpenAI: GPT-5 Mini (${DEFAULT_GPT_MODEL})`);
+  ensureChoice(textChoices, DEFAULT_OPENROUTER_MODEL, `OpenAI: GPT-5 Mini (${DEFAULT_OPENROUTER_MODEL})`);
   ensureChoice(textChoices, "openrouter/auto", "Auto Router (openrouter/auto)");
   ensureChoice(textChoices, "openai/gpt-5", "OpenAI: GPT-5 (openai/gpt-5)");
 
-  ensureChoice(imageChoices, DEFAULT_GPT_IMAGE_MODEL, `OpenAI: GPT Image 1 (${DEFAULT_GPT_IMAGE_MODEL})`);
+  ensureChoice(imageChoices, DEFAULT_OPENROUTER_IMAGE_MODEL, `OpenAI: GPT Image 1 (${DEFAULT_OPENROUTER_IMAGE_MODEL})`);
   ensureChoice(imageChoices, "openai/gpt-5-image-mini", "OpenAI: GPT-5 Image Mini (openai/gpt-5-image-mini)");
   ensureChoice(imageChoices, "openai/gpt-5-image", "OpenAI: GPT-5 Image (openai/gpt-5-image)");
   ensureChoice(imageChoices, "openrouter/auto", "Auto Router (openrouter/auto)");
@@ -140,8 +140,8 @@ export async function loadOpenRouterModelChoiceCatalog(): Promise<OpenRouterMode
     const textChoices = toChoiceRecord(sortChoicesByLabel(textEntries));
     const imageChoices = toChoiceRecord(sortChoicesByLabel(imageEntries));
 
-    ensureChoice(textChoices, DEFAULT_GPT_MODEL, `OpenAI: GPT-5 Mini (${DEFAULT_GPT_MODEL})`);
-    ensureChoice(imageChoices, DEFAULT_GPT_IMAGE_MODEL, `OpenAI: GPT Image 1 (${DEFAULT_GPT_IMAGE_MODEL})`);
+    ensureChoice(textChoices, DEFAULT_OPENROUTER_MODEL, `OpenAI: GPT-5 Mini (${DEFAULT_OPENROUTER_MODEL})`);
+    ensureChoice(imageChoices, DEFAULT_OPENROUTER_IMAGE_MODEL, `OpenAI: GPT Image 1 (${DEFAULT_OPENROUTER_IMAGE_MODEL})`);
 
     return {
       textChoices: Object.keys(textChoices).length > 0 ? textChoices : fallback.textChoices,
