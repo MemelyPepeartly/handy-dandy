@@ -466,6 +466,39 @@ test("toFoundryActorData maps loot actors to loot-sheet structure", () => {
   assert.equal(barAttribute, null);
 });
 
+test("toFoundryActorData coerces NPC inventory feat/spell entries into creatable item types", () => {
+  const actor = createActor();
+  actor.actorType = "npc";
+  actor.inventory = [
+    {
+      name: "Scroll of Black Tentacles",
+      itemType: "spell",
+      quantity: 1,
+      level: 4,
+      description: "A scroll with an arcane spell.",
+      img: null,
+    },
+    {
+      name: "Martial Trick",
+      itemType: "feat",
+      quantity: 1,
+      level: 2,
+      description: "A combat technique represented as gear for this generator.",
+      img: null,
+    },
+  ];
+
+  const result = toFoundryActorData(actor);
+  const scroll = result.items.find((item) => item.name === "Scroll of Black Tentacles");
+  const trick = result.items.find((item) => item.name === "Martial Trick");
+
+  assert.ok(scroll, "expected generated scroll inventory item");
+  assert.ok(trick, "expected generated feat-like inventory item");
+  assert.equal(scroll!.type, "consumable");
+  assert.equal(trick!.type, "equipment");
+  assert.equal(result.items.some((item) => item.type === "feat"), false);
+});
+
 test("toFoundryActorData maps hazards with hazard metadata and macro-ready text", () => {
   const actor = createActor();
   actor.actorType = "hazard";
@@ -748,6 +781,56 @@ test("importActor sanitizes malformed melee attack effects in generated actor pa
   assert.deepEqual(importedStrike.system.attackEffects.value, ["grab"]);
   assert.match(importedStrike.system.description.value, /Frightened 1/);
   assert.match(importedStrike.system.description.value, /homebrew-stagger/);
+});
+
+test("importActor remaps generated feat/feature items before NPC item replacement", async () => {
+  const actor = createActor();
+  actor.slug = "generated-feature-remap-test";
+  actor.name = "Generated Feature Remap Test";
+  actor.actions = [];
+  actor.spellcasting = null;
+  actor.inventory = null;
+
+  const foundry = toFoundryActorData(actor);
+  (foundry.items as Array<Record<string, unknown>>).push({
+    _id: "generated-feature-item",
+    name: "Tactical Feature",
+    type: "feat",
+    img: "systems/pf2e/icons/default-icons/feat.svg",
+    system: {
+      description: { value: "<p>Generated as a feat-like block.</p>", gm: "" },
+      traits: { value: [], otherTags: [], rarity: "common" },
+      level: { value: 1 },
+      rules: [],
+    },
+    effects: [],
+    folder: null,
+    sort: 0,
+    flags: {},
+  });
+
+  const generated: ActorGenerationResult = {
+    schema_version: actor.schema_version,
+    systemId: actor.systemId,
+    slug: actor.slug,
+    name: foundry.name,
+    type: foundry.type as ActorGenerationResult["type"],
+    img: foundry.img,
+    system: foundry.system as Record<string, unknown>,
+    prototypeToken: foundry.prototypeToken as Record<string, unknown>,
+    items: foundry.items as Record<string, unknown>[],
+    effects: foundry.effects,
+    folder: foundry.folder ?? null,
+    flags: foundry.flags ?? {},
+  };
+
+  const imported = await importActor(generated);
+  const importedFeatureItem = (imported as unknown as MockActor).items.find(
+    (item: any) => item.name === "Tactical Feature",
+  );
+
+  assert.ok(importedFeatureItem, "expected imported remapped feature item");
+  assert.equal(importedFeatureItem.type, "equipment");
 });
 
 test("importActor sanitizes unknown IWR exception slugs in generated actor payloads", async () => {

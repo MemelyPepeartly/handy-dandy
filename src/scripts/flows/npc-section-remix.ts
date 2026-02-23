@@ -33,6 +33,21 @@ type SpellRemixFormResponse = {
   instructions: string;
 };
 
+type MainSheetRemixFormResponse = {
+  targetLevel: string;
+  regenerateCore: string | null;
+  regenerateDefenses: string | null;
+  regenerateSkills: string | null;
+  regenerateStrikes: string | null;
+  regenerateActions: string | null;
+  regenerateInventory: string | null;
+  regenerateSpells: string | null;
+  regenerateNarrative: string | null;
+  generateTokenImage: string | null;
+  tokenPrompt: string;
+  instructions: string;
+};
+
 function escapeHtml(value: string): string {
   const utils = foundry.utils as { escapeHTML?: (input: string) => string };
   if (typeof utils.escapeHTML === "function") {
@@ -102,6 +117,32 @@ function countSpells(canonical: ActorSchemaData): number {
     total += entry.spells.length;
   }
   return total;
+}
+
+function summarizeMainSheetProfile(canonical: ActorSchemaData): string {
+  const saves = canonical.attributes.saves;
+  const hp = canonical.attributes.hp;
+  const ac = canonical.attributes.ac;
+  const perception = canonical.attributes.perception;
+  const skills = canonical.skills?.length ?? 0;
+  const strikes = canonical.strikes?.length ?? 0;
+  const actions = canonical.actions?.length ?? 0;
+  const inventory = canonical.inventory?.length ?? 0;
+  const spellEntries = canonical.spellcasting?.length ?? 0;
+  const spellCount = countSpells(canonical);
+
+  return [
+    `Level ${canonical.level}`,
+    `HP ${hp.value}/${hp.max}`,
+    `AC ${ac.value}`,
+    `Perception +${perception.value}`,
+    `Saves F+${saves.fortitude.value} R+${saves.reflex.value} W+${saves.will.value}`,
+    `${skills} skills`,
+    `${strikes} strikes`,
+    `${actions} actions`,
+    `${inventory} inventory`,
+    `${spellEntries} spell entr${spellEntries === 1 ? "y" : "ies"} (${spellCount} spells)`,
+  ].join(" | ");
 }
 
 function buildInventoryGoalDirective(goal: string): string {
@@ -476,6 +517,221 @@ async function promptSpellRemixRequest(
   };
 }
 
+async function promptMainSheetRemixRequest(
+  canonical: ActorSchemaData,
+): Promise<NpcRemixRequest | null> {
+  const defaultTargetLevel = String(Math.max(0, Math.trunc(canonical.level)));
+  const inventoryCount = canonical.inventory?.length ?? 0;
+  const spellEntryCount = canonical.spellcasting?.length ?? 0;
+  const spellCount = countSpells(canonical);
+  const minimumInventory = Math.max(1, Math.min(inventoryCount || 3, 12));
+  const minimumSpellEntries = Math.max(1, Math.min(spellEntryCount || 1, 4));
+  const minimumSpells = Math.max(3, Math.min(spellCount || 6, 14));
+
+  const content = `
+    <form class="handy-dandy-remix-main-sheet-form" style="display:flex;flex-direction:column;gap:0.75rem;min-width:680px;">
+      <div style="padding:0.5rem 0.65rem;border:1px solid rgba(0,0,0,0.18);border-radius:8px;background:rgba(0,0,0,0.04);">
+        <strong>Main Sheet Remix Planner</strong>
+        <div class="notes">${escapeHtml(summarizeMainSheetProfile(canonical))}</div>
+      </div>
+      <div class="form-group">
+        <label for="handy-dandy-remix-main-target-level">Target Level (optional)</label>
+        <input id="handy-dandy-remix-main-target-level" type="number" name="targetLevel" min="0" value="${escapeHtml(defaultTargetLevel)}" />
+      </div>
+      <fieldset style="border:1px solid rgba(0,0,0,0.2);border-radius:6px;padding:0.5rem 0.65rem;">
+        <legend style="padding:0 0.2rem;">Regenerate Sections</legend>
+        <label style="display:block;"><input type="checkbox" name="regenerateCore" checked /> Core identity and baseline numbers (level, abilities, speed)</label>
+        <label style="display:block;"><input type="checkbox" name="regenerateDefenses" checked /> Defenses (HP, AC, saves, resistances/weaknesses/immunities)</label>
+        <label style="display:block;"><input type="checkbox" name="regenerateSkills" checked /> Perception and skills</label>
+        <label style="display:block;"><input type="checkbox" name="regenerateStrikes" checked /> Strike attacks</label>
+        <label style="display:block;"><input type="checkbox" name="regenerateActions" checked /> Action abilities/reactions/passives</label>
+        <label style="display:block;"><input type="checkbox" name="regenerateInventory" /> Gear and inventory</label>
+        <label style="display:block;"><input type="checkbox" name="regenerateSpells" /> Spellcasting entries and spell lists</label>
+        <label style="display:block;"><input type="checkbox" name="regenerateNarrative" /> Flavor text (public/private notes)</label>
+      </fieldset>
+      <div class="form-group">
+        <label><input type="checkbox" name="generateTokenImage" /> Generate new transparent token portrait</label>
+      </div>
+      <div class="form-group">
+        <label for="handy-dandy-remix-main-token-prompt">Token Prompt Override (optional)</label>
+        <input id="handy-dandy-remix-main-token-prompt" type="text" name="tokenPrompt" placeholder="Optional token art direction" />
+      </div>
+      <div class="form-group">
+        <label for="handy-dandy-remix-main-instructions">Additional Instructions</label>
+        <textarea id="handy-dandy-remix-main-instructions" name="instructions" rows="5" placeholder="Theme, role, and encounter constraints for this remix pass."></textarea>
+      </div>
+    </form>
+  `;
+
+  const response = await new Promise<MainSheetRemixFormResponse | null>((resolve) => {
+    let settled = false;
+    const finish = (value: MainSheetRemixFormResponse | null): void => {
+      if (!settled) {
+        settled = true;
+        resolve(value);
+      }
+    };
+
+    const dialog = new Dialog(
+      {
+        title: `${CONSTANTS.MODULE_NAME} | Main Sheet Remix`,
+        content,
+        buttons: {
+          remix: {
+            icon: '<i class="fas fa-sliders-h"></i>',
+            label: "Run Remix",
+            callback: (html) => {
+              const form = html[0]?.querySelector("form");
+              if (!(form instanceof HTMLFormElement)) {
+                finish(null);
+                return;
+              }
+
+              const formData = new FormData(form);
+              finish({
+                targetLevel: String(formData.get("targetLevel") ?? ""),
+                regenerateCore: formData.get("regenerateCore") as string | null,
+                regenerateDefenses: formData.get("regenerateDefenses") as string | null,
+                regenerateSkills: formData.get("regenerateSkills") as string | null,
+                regenerateStrikes: formData.get("regenerateStrikes") as string | null,
+                regenerateActions: formData.get("regenerateActions") as string | null,
+                regenerateInventory: formData.get("regenerateInventory") as string | null,
+                regenerateSpells: formData.get("regenerateSpells") as string | null,
+                regenerateNarrative: formData.get("regenerateNarrative") as string | null,
+                generateTokenImage: formData.get("generateTokenImage") as string | null,
+                tokenPrompt: String(formData.get("tokenPrompt") ?? ""),
+                instructions: String(formData.get("instructions") ?? ""),
+              });
+            },
+          },
+          cancel: {
+            icon: '<i class="fas fa-times"></i>',
+            label: "Cancel",
+            callback: () => finish(null),
+          },
+        },
+        default: "remix",
+        close: () => finish(null),
+      },
+      { jQuery: true, width: 820 },
+    );
+
+    dialog.render(true);
+  });
+
+  if (!response) {
+    return null;
+  }
+
+  const regenerateCore = Boolean(response.regenerateCore);
+  const regenerateDefenses = Boolean(response.regenerateDefenses);
+  const regenerateSkills = Boolean(response.regenerateSkills);
+  const regenerateStrikes = Boolean(response.regenerateStrikes);
+  const regenerateActions = Boolean(response.regenerateActions);
+  const regenerateInventory = Boolean(response.regenerateInventory);
+  const regenerateSpells = Boolean(response.regenerateSpells);
+  const regenerateNarrative = Boolean(response.regenerateNarrative);
+
+  const selectedSections: string[] = [];
+  if (regenerateCore) selectedSections.push("core identity");
+  if (regenerateDefenses) selectedSections.push("defenses");
+  if (regenerateSkills) selectedSections.push("skills/perception");
+  if (regenerateStrikes) selectedSections.push("strikes");
+  if (regenerateActions) selectedSections.push("action abilities");
+  if (regenerateInventory) selectedSections.push("inventory");
+  if (regenerateSpells) selectedSections.push("spellcasting");
+  if (regenerateNarrative) selectedSections.push("narrative notes");
+
+  if (!selectedSections.length) {
+    ui.notifications?.warn(`${CONSTANTS.MODULE_NAME} | Select at least one section to remix.`);
+    return null;
+  }
+
+  const lockedSections = [
+    !regenerateCore ? "core identity" : null,
+    !regenerateDefenses ? "defenses" : null,
+    !regenerateSkills ? "skills/perception" : null,
+    !regenerateStrikes ? "strikes" : null,
+    !regenerateActions ? "action abilities" : null,
+    !regenerateInventory ? "inventory" : null,
+    !regenerateSpells ? "spellcasting" : null,
+    !regenerateNarrative ? "narrative notes" : null,
+  ].filter((entry): entry is string => typeof entry === "string");
+
+  const selectedCount = selectedSections.length;
+  const mode = regenerateInventory && selectedCount === 1
+    ? "equipment"
+    : (regenerateSpells && selectedCount === 1 ? "spells" : "remake");
+  const extraInstructions = response.instructions.trim();
+
+  const instructionParts = [
+    `Regenerate only these sections: ${selectedSections.join(", ")}.`,
+    lockedSections.length > 0
+      ? `Preserve all unselected sections exactly: ${lockedSections.join(", ")}.`
+      : "All major sections are selected for regeneration.",
+    "Maintain PF2E-valid actor structure and official-content alignment where possible.",
+  ];
+
+  if (regenerateCore) {
+    instructionParts.push(
+      "Rebuild core identity and baseline numbers (level fit, ability mods, movement profile, role coherence).",
+    );
+  }
+  if (regenerateDefenses) {
+    instructionParts.push(
+      "Rebuild HP, AC, saves, and IWR details with level-appropriate balance and internally consistent values.",
+    );
+  }
+  if (regenerateSkills) {
+    instructionParts.push(
+      "Rebuild perception and skills to match concept and challenge profile.",
+    );
+  }
+  if (regenerateStrikes) {
+    instructionParts.push(
+      "Rebuild strike entries with valid attack bonuses, damage formulas, and trait-appropriate design.",
+    );
+  }
+  if (regenerateActions) {
+    instructionParts.push(
+      "Rebuild non-strike action abilities/reactions/passives with correct PF2E-style formatting and encounter utility.",
+    );
+  }
+  if (regenerateInventory) {
+    instructionParts.push(
+      `Rebuild inventory with at least ${minimumInventory} meaningful entries using valid PF2E item categories (armor, weapon, equipment, consumable).`,
+    );
+    instructionParts.push("Do not emit feat/feature documents in inventory.");
+  }
+  if (regenerateSpells) {
+    instructionParts.push(
+      `Rebuild spellcasting with at least ${minimumSpellEntries} entr${minimumSpellEntries === 1 ? "y" : "ies"} and at least ${minimumSpells} total spells.`,
+    );
+  }
+  if (regenerateNarrative) {
+    instructionParts.push(
+      "Refresh public/private notes while preserving mechanical clarity and usability.",
+    );
+  }
+
+  if (extraInstructions) {
+    instructionParts.push(extraInstructions);
+  }
+
+  return {
+    mode,
+    instructions: instructionParts.join("\n"),
+    targetLevel: parseOptionalNumber(response.targetLevel),
+    generateTokenImage: Boolean(response.generateTokenImage) || undefined,
+    tokenPrompt: response.tokenPrompt.trim() || undefined,
+    minimumInventoryItems: regenerateInventory ? minimumInventory : undefined,
+    minimumSpellEntries: regenerateSpells ? minimumSpellEntries : undefined,
+    minimumSpells: regenerateSpells ? minimumSpells : undefined,
+    preserveExistingInventory: regenerateInventory ? true : undefined,
+    preserveExistingSpellcasting: regenerateSpells ? true : undefined,
+  };
+}
+
 export async function runNpcInventoryRemixFlow(actor: Actor): Promise<void> {
   const canonical = fromFoundryActor(actor.toObject() as any);
   const request = await promptInventoryRemixRequest(canonical);
@@ -489,6 +745,16 @@ export async function runNpcInventoryRemixFlow(actor: Actor): Promise<void> {
 export async function runNpcSpellRemixFlow(actor: Actor): Promise<void> {
   const canonical = fromFoundryActor(actor.toObject() as any);
   const request = await promptSpellRemixRequest(canonical);
+  if (!request) {
+    return;
+  }
+
+  await runNpcRemixWithRequest(actor, request);
+}
+
+export async function runNpcMainSheetRemixFlow(actor: Actor): Promise<void> {
+  const canonical = fromFoundryActor(actor.toObject() as any);
+  const request = await promptMainSheetRemixRequest(canonical);
   if (!request) {
     return;
   }

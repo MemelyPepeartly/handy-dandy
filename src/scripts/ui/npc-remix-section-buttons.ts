@@ -1,9 +1,14 @@
-import { runNpcInventoryRemixFlow, runNpcSpellRemixFlow } from "../flows/npc-section-remix";
+import {
+  runNpcInventoryRemixFlow,
+  runNpcMainSheetRemixFlow,
+  runNpcSpellRemixFlow,
+} from "../flows/npc-section-remix";
 
 const BUTTON_BASE_CLASS = "handy-dandy-npc-remix-section-button" as const;
 const BUTTON_ROW_CLASS = "handy-dandy-npc-remix-section-controls" as const;
 const INVENTORY_BUTTON_CLASS = "handy-dandy-npc-remix-inventory-button" as const;
 const SPELLS_BUTTON_CLASS = "handy-dandy-npc-remix-spells-button" as const;
+const MAIN_SHEET_BUTTON_CLASS = "handy-dandy-npc-remix-main-sheet-button" as const;
 
 function appendSectionButton(
   html: JQuery<HTMLElement>,
@@ -73,6 +78,18 @@ export function registerNpcRemixSectionButtons(): void {
     const user = game.user;
     if (!user) return;
     if (!user.isGM && !app.document?.isOwner) return;
+
+    appendSectionButton(
+      html,
+      ".tab.main",
+      MAIN_SHEET_BUTTON_CLASS,
+      "Remix Sections",
+      "Open section remix planner for this NPC",
+      "fas fa-sliders-h",
+      () => {
+        void runNpcMainSheetRemixFlow(actor);
+      },
+    );
 
     appendSectionButton(
       html,

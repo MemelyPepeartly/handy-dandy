@@ -2157,13 +2157,64 @@ function sanitizeGeneratedMeleeItemForImport(item: FoundryActorItemSource): Foun
   };
 }
 
+function remapGeneratedFeatureItemForImport(
+  item: FoundryActorItemSource,
+): FoundryActorItemSource {
+  const type = typeof item.type === "string" ? item.type.trim().toLowerCase() : "";
+  if (!type) {
+    return item;
+  }
+
+  if (type !== "feat" && !type.endsWith("feature")) {
+    return item;
+  }
+
+  const system = isRecord(item.system) ? clone(item.system) as FoundryItemSource["system"] : {
+    slug: "",
+    description: { value: "", gm: "" },
+    rules: [],
+    _migration: { version: ITEM_MIGRATION_VERSION, lastMigration: null },
+    traits: { value: [], otherTags: [], rarity: "common" },
+    publication: { title: "", authors: "", license: "OGL", remaster: false },
+    level: { value: 0 },
+    quantity: 1,
+    baseItem: null,
+    bulk: { value: 0 },
+    hp: { value: 0, max: 0 },
+    hardness: 0,
+    price: { value: { pp: 0, gp: 0, sp: 0, cp: 0 } },
+    source: { value: "" },
+    equipped: { carryType: "worn", invested: null },
+    containerId: null,
+    size: "med",
+    material: { type: null, grade: null },
+    identification: {
+      status: "identified",
+      unidentified: { name: "Unusual Object", img: getDefaultItemImage("equipment"), data: { description: { value: "" } } },
+      misidentified: {},
+    },
+    usage: { value: "held-in-one-hand" },
+    subitems: [],
+  };
+  ensureCoreItemSystemFields(system, "equipment");
+
+  return {
+    ...item,
+    type: "equipment",
+    system: system as FoundryActorItemSource["system"],
+  };
+}
+
 function sanitizeGeneratedActorItemsForImport(items: unknown): FoundryActorItemSource[] {
   if (!Array.isArray(items)) {
     return [];
   }
 
   const clonedItems = clone(items) as FoundryActorItemSource[];
-  return clonedItems.map((item) => sanitizeGeneratedMeleeItemForImport(item));
+  return clonedItems.map((item) => {
+    const normalized = remapGeneratedFeatureItemForImport(item);
+    return sanitizeGeneratedMeleeItemForImport(normalized);
+  });
 }
 
 function toSlug(value: string): string {
@@ -2716,11 +2767,11 @@ function inferInventoryItemTypeFromText(text: string): ItemSchemaData["itemType"
   const normalized = text.toLowerCase();
   if (/\b(wand|magic wand)\b/.test(normalized)) return "wand";
   if (/\b(staff|stave|quarterstaff)\b/.test(normalized)) return "staff";
-  if (/\b(spell|cantrip|ritual)\b/.test(normalized)) return "spell";
-  if (/\b(feat|ability)\b/.test(normalized)) return "feat";
   if (/\b(potion|elixir|bomb|poison|talisman|scroll|mutagen|consumable|ammunition|ammo)\b/.test(normalized)) {
     return "consumable";
   }
+  if (/\b(spell|cantrip|ritual)\b/.test(normalized)) return "spell";
+  if (/\b(feat|ability)\b/.test(normalized)) return "feat";
   if (/\b(weapon|sword|axe|bow|crossbow|spear|dagger|mace|hammer|flail|staff sling)\b/.test(normalized)) {
     return "weapon";
   }
@@ -2795,6 +2846,17 @@ function coerceLootInventoryItemType(itemType: ItemSchemaData["itemType"]): Item
   }
 }
 
+function coerceCreatureInventoryItemType(itemType: ItemSchemaData["itemType"]): ItemSchemaData["itemType"] {
+  switch (itemType) {
+    case "feat":
+      return "equipment";
+    case "spell":
+      return "consumable";
+    default:
+      return itemType;
+  }
+}
+
 function createInventoryItem(
   actor: ActorSchemaData,
   entry: ActorInventoryEntry,
@@ -2802,7 +2864,7 @@ function createInventoryItem(
   options: { lootOnly?: boolean } = {},
 ): FoundryActorGenericItemSource {
   const mappedType = mapInventoryItemType(entry.itemType, entry.name, entry.description);
-  const itemType = options.lootOnly ? coerceLootInventoryItemType(mappedType) : mappedType;
+  const itemType = options.lootOnly ? coerceLootInventoryItemType(mappedType) : coerceCreatureInventoryItemType(mappedType);
   const slug = entry.slug?.trim() || toSlug(entry.name) || toSlug(generateId());
   const normalizedImg = normalizeInventoryEntryImage(entry.img ?? null, itemType);
   const source = prepareItemSource({
