@@ -6,7 +6,9 @@ const OAUTH_TIMEOUT_MS = 3 * 60 * 1000;
 const OAUTH_POLL_MS = 250;
 const BROWSER_RESULT_STORAGE_KEY = `${CONSTANTS.MODULE_ID}:openrouter-oauth-result`;
 const DESKTOP_CALLBACK_PORT = 3000;
-const DESKTOP_CALLBACK_PATH = `/${CONSTANTS.MODULE_ID}-openrouter-callback`;
+const DESKTOP_CALLBACK_PRIMARY_PATH = "/";
+const DESKTOP_CALLBACK_LEGACY_PATH = `/${CONSTANTS.MODULE_ID}-openrouter-callback`;
+const DESKTOP_LAUNCH_QUERY_PARAM = `${CONSTANTS.MODULE_ID.replaceAll("-", "_")}_openrouter_launch`;
 
 type ConnectMode = "auto" | "browser" | "desktop";
 
@@ -34,6 +36,7 @@ interface ConnectWithOpenRouterOptions {
 }
 
 interface DesktopCallbackServer {
+  launcherUrl: string;
   getPayload: () => OAuthCallbackPayload | null;
   close: () => void;
 }
@@ -133,7 +136,8 @@ function buildBrowserCallbackUrl(): string {
 }
 
 function buildDesktopCallbackUrl(): string {
-  return `http://localhost:${DESKTOP_CALLBACK_PORT}${DESKTOP_CALLBACK_PATH}`;
+  // OpenRouter docs specifically recommend localhost:3000 for local callback/referrer.
+  return `http://localhost:${DESKTOP_CALLBACK_PORT}`;
 }
 
 function isValidOpenRouterOAuthUrl(url: URL): boolean {
@@ -240,7 +244,29 @@ function callbackResponseHtml(hasError: boolean): string {
 </html>`;
 }
 
-async function startDesktopCallbackServer(): Promise<DesktopCallbackServer> {
+function desktopLaunchResponseHtml(authUrl: string): string {
+  const serializedUrl = JSON.stringify(authUrl);
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="referrer" content="origin" />
+    <title>OpenRouter Login</title>
+  </head>
+  <body>
+    <p>Opening OpenRouter login...</p>
+    <script>
+      (() => {
+        const authUrl = ${serializedUrl};
+        window.location.replace(authUrl);
+      })();
+    </script>
+  </body>
+</html>`;
+}
+
+async function startDesktopCallbackServer(authUrl: string): Promise<DesktopCallbackServer> {
   const runtime = globalThis as typeof globalThis & {
     require?: (moduleName: string) => unknown;
   };
@@ -276,7 +302,18 @@ async function startDesktopCallbackServer(): Promise<DesktopCallbackServer> {
     const rawUrl = typeof req.url === "string" ? req.url : "/";
     const parsedUrl = new URL(rawUrl, `http://localhost:${DESKTOP_CALLBACK_PORT}`);
 
-    if (parsedUrl.pathname !== DESKTOP_CALLBACK_PATH) {
+    if (parsedUrl.searchParams.get(DESKTOP_LAUNCH_QUERY_PARAM) === "1") {
+      res.statusCode = 200;
+      res.setHeader("content-type", "text/html; charset=utf-8");
+      res.end(desktopLaunchResponseHtml(authUrl));
+      return;
+    }
+
+    const isCallbackPath =
+      parsedUrl.pathname === DESKTOP_CALLBACK_PRIMARY_PATH ||
+      parsedUrl.pathname === DESKTOP_CALLBACK_LEGACY_PATH;
+
+    if (!isCallbackPath) {
       res.statusCode = 404;
       res.setHeader("content-type", "text/plain; charset=utf-8");
       res.end("Not found");
@@ -313,6 +350,7 @@ async function startDesktopCallbackServer(): Promise<DesktopCallbackServer> {
   });
 
   return {
+    launcherUrl: `http://localhost:${DESKTOP_CALLBACK_PORT}/?${DESKTOP_LAUNCH_QUERY_PARAM}=1`,
     getPayload: () => latestPayload,
     close: () => {
       try {
@@ -515,8 +553,9 @@ async function runDesktopFlow(): Promise<string> {
   const preOpenedTab = openAuthTab("about:blank");
   let callbackServer: DesktopCallbackServer | null = null;
   try {
-    callbackServer = await startDesktopCallbackServer();
-    navigateAuthTab(preOpenedTab, request.authUrl);
+    callbackServer = await startDesktopCallbackServer(request.authUrl);
+    // Route through localhost:3000 so OpenRouter sees an allowed local referrer.
+    navigateAuthTab(preOpenedTab, callbackServer.launcherUrl);
     const payload = await waitForDesktopPayload(callbackServer, request.state);
     const code = extractAuthorizationCode(payload, request.state);
     return await exchangeAuthorizationCode(code, request.codeVerifier);
