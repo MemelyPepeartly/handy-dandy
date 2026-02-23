@@ -1,7 +1,5 @@
 import type { OpenAI } from "openai";
 import { CONSTANTS } from "../constants";
-import { getDeveloperConsole } from "../dev/state";
-import type { GPTUsageMetrics } from "../dev/developer-console";
 import {
   DEFAULT_GPT_IMAGE_MODEL,
   DEFAULT_GPT_MODEL,
@@ -12,6 +10,12 @@ export interface JsonSchemaDefinition {
   name: string;
   schema: Record<string, unknown>;
   description?: string;
+}
+
+export interface GPTUsageMetrics {
+  inputTokens?: number;
+  outputTokens?: number;
+  totalTokens?: number;
 }
 
 export function updateGPTClientFromSettings(): void {
@@ -706,12 +710,13 @@ export class GPTClient {
     usage?: GPTUsageMetrics;
     error?: string;
   }): void {
-    const consoleApp = getDeveloperConsole();
-    if (!consoleApp) {
+    const debugHooks = (globalThis as { CONFIG?: { debug?: { hooks?: boolean } } })
+      .CONFIG?.debug?.hooks;
+    if (!debugHooks) {
       return;
     }
 
-    consoleApp.recordGPTInteraction({
+    console.debug(`${CONSTANTS.MODULE_NAME} | AI request`, {
       promptHash: payload.promptHash,
       schemaName: payload.schemaName,
       model: this.#config.model,
