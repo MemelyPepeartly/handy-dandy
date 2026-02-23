@@ -3,7 +3,7 @@ import { registerSettings } from "./setup/settings";
 import { CONSTANTS } from "./constants";
 import { OpenAI } from "openai";
 import { insertSidebarButtons, type ControlCollection } from "./setup/sidebarButtons";
-import { GPTClient } from "./gpt/client";
+import { OpenRouterClient } from "./openrouter/client";
 import { createDevNamespace, canUseDeveloperTools, type DevNamespace } from "./dev/tools";
 import { ToolOverview } from "./ui/tool-overview";
 import { registerNpcRemixButton } from "./ui/npc-remix-button";
@@ -32,7 +32,7 @@ import { ensureValid } from "./validation/ensure-valid";
 import { importAction } from "./mappers/import";
 import { initialiseMapMarkers } from "./map-markers/controller";
 import { registerMapMarkerLayer } from "./map-markers/layer";
-import { initializeAIClientFromSettings } from "./gpt/runtime";
+import { initializeOpenRouterClientFromSettings } from "./openrouter/runtime";
 
 type GeneratorFunction<TInput, TResult> = (
   input: TInput,
@@ -42,7 +42,7 @@ type GeneratorFunction<TInput, TResult> = (
 interface BoundGenerationOptions {
   seed?: number;
   maxAttempts?: number;
-  gptClient?: Pick<GPTClient, "generateWithSchema">;
+  openRouterClient?: Pick<OpenRouterClient, "generateWithSchema">;
   onProgress?: (update: GenerationProgressUpdate) => void;
 }
 
@@ -71,14 +71,14 @@ function bindGenerator<TInput, TResult>(
   fn: GeneratorFunction<TInput, TResult>,
 ): (input: TInput, options?: BoundGenerationOptions) => Promise<TResult> {
   return async (input: TInput, options: BoundGenerationOptions = {}) => {
-    const { gptClient: explicitClient, seed, maxAttempts, onProgress } = options;
-    const gptClient = explicitClient ?? game.handyDandy?.gptClient;
-    if (!gptClient) {
+    const { openRouterClient: explicitClient, seed, maxAttempts, onProgress } = options;
+    const openRouterClient = explicitClient ?? game.handyDandy?.openRouterClient;
+    if (!openRouterClient) {
       throw new Error(`${CONSTANTS.MODULE_NAME} | AI client has not been initialised`);
     }
 
     return fn(input, {
-      gptClient,
+      openRouterClient,
       seed: seed ?? DEFAULT_GENERATION_SEED,
       maxAttempts,
       onProgress,
@@ -90,8 +90,8 @@ function bindGenerator<TInput, TResult>(
 declare global {
   interface Game {
     handyDandy?: {
-      openai: OpenAI | null,
-      gptClient: GPTClient | null,
+      openRouterSdk: OpenAI | null,
+      openRouterClient: OpenRouterClient | null,
       refreshAIClient: () => void,
       generation: {
         generateAction: BoundGenerateAction,
@@ -134,7 +134,7 @@ Hooks.once("setup", () => {
 
   const devNamespace = createDevNamespace({
     canAccess: canUseDeveloperTools,
-    getGptClient: () => game.handyDandy?.gptClient ?? null,
+    getOpenRouterClient: () => game.handyDandy?.openRouterClient ?? null,
     generateAction: generation.generateAction,
     ensureValid,
     importAction,
@@ -142,9 +142,9 @@ Hooks.once("setup", () => {
   });
 
   game.handyDandy = {
-    openai: null,
-    gptClient: null,
-    refreshAIClient: initializeAIClientFromSettings,
+    openRouterSdk: null,
+    openRouterClient: null,
+    refreshAIClient: initializeOpenRouterClientFromSettings,
     generation,
     applications: {
       toolOverview: new ToolOverview(),
@@ -167,8 +167,8 @@ Hooks.once("ready", async () => {
     );
   }
 
-  initializeAIClientFromSettings();
-  if (game.handyDandy?.gptClient) {
+  initializeOpenRouterClientFromSettings();
+  if (game.handyDandy?.openRouterClient) {
     console.log(`${CONSTANTS.MODULE_NAME} | OpenRouter client initialised`);
   } else {
     console.log(`${CONSTANTS.MODULE_NAME} | OpenRouter client not configured for this user`);
