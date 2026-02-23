@@ -1,5 +1,5 @@
 import { CONSTANTS } from "../constants";
-import type { JsonSchemaDefinition } from "../gpt/client";
+import type { JsonSchemaDefinition } from "../openrouter/client";
 import type { MapMarkerData } from "./types";
 
 interface BoxTextGenerationResult {
@@ -118,12 +118,12 @@ export async function generateMapMarkerBoxText(
     | "includeGmNotes"
   >,
 ): Promise<string> {
-  const gptClient = game.handyDandy?.gptClient;
-  if (!gptClient) {
+  const openRouterClient = game.handyDandy?.openRouterClient;
+  if (!openRouterClient) {
     throw new Error(`${CONSTANTS.MODULE_NAME} | AI client has not been initialised`);
   }
 
-  const response = await gptClient.generateWithSchema<BoxTextGenerationResult>(
+  const response = await openRouterClient.generateWithSchema<BoxTextGenerationResult>(
     buildMapMarkerBoxTextPrompt(marker),
     BOXTEXT_GENERATION_SCHEMA,
   );
