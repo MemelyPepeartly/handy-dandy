@@ -132,8 +132,8 @@ async function promptPortraitGenerationRequest(
 }
 
 async function regenerateNpcPortrait(actor: Actor, button: JQuery<HTMLElement>): Promise<void> {
-  const gptClient = game.handyDandy?.gptClient;
-  if (!gptClient || typeof gptClient.generateImage !== "function") {
+  const openRouterClient = game.handyDandy?.openRouterClient;
+  if (!openRouterClient || typeof openRouterClient.generateImage !== "function") {
     ui.notifications?.error(`${CONSTANTS.MODULE_NAME} | AI image generation is unavailable.`);
     return;
   }
@@ -160,7 +160,7 @@ async function regenerateNpcPortrait(actor: Actor, button: JQuery<HTMLElement>):
   try {
     const prompt = request.prompt.trim() || defaultPrompt;
 
-    const imagePath = await generateTransparentTokenImage(gptClient, {
+    const imagePath = await generateTransparentTokenImage(openRouterClient, {
       actorName,
       actorSlug,
       actorDescription,
