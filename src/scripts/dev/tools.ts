@@ -2,7 +2,7 @@ import { CONSTANTS } from "../constants";
 import type { ActionPromptInput } from "../prompts";
 import type { ActionSchemaData, SchemaDataFor, ValidatorKey } from "../schemas";
 import type { ImportOptions } from "../mappers/import";
-import type { GPTClient } from "../gpt/client";
+import type { OpenRouterClient } from "../openrouter/client";
 import type {
   EnsureValidOptions,
   EnsureValidPromptContext,
@@ -27,13 +27,13 @@ type DevConsole = Pick<Console, "groupCollapsed" | "groupEnd" | "info" | "warn" 
 export interface DevGenerateActionOptions {
   seed?: number;
   maxAttempts?: number;
-  gptClient?: Pick<GPTClient, "generateWithSchema">;
+  openRouterClient?: Pick<OpenRouterClient, "generateWithSchema">;
 }
 
 export interface DevValidateOptions<K extends ValidatorKey> {
   maxAttempts?: number;
-  useGPT?: boolean;
-  gptClient?: Pick<GPTClient, "generateWithSchema">;
+  useOpenRouter?: boolean;
+  openRouterClient?: Pick<OpenRouterClient, "generateWithSchema">;
   promptBuilder?: (context: EnsureValidPromptContext<K>) => string;
   schema?: EnsureValidOptions<K>["schema"];
 }
@@ -56,7 +56,7 @@ export interface DevNamespace {
 
 interface DevNamespaceDependencies {
   canAccess: () => boolean;
-  getGptClient: () => Pick<GPTClient, "generateWithSchema"> | null;
+  getOpenRouterClient: () => Pick<OpenRouterClient, "generateWithSchema"> | null;
   generateAction: GenerateActionFn;
   ensureValid: EnsureValidFn;
   importAction: ImportActionFn;
@@ -187,8 +187,8 @@ const summarizeValidateOptions = <K extends ValidatorKey>(
   if (typeof options.maxAttempts === "number") {
     summary.maxAttempts = options.maxAttempts;
   }
-  if (typeof options.useGPT === "boolean") {
-    summary.useGPT = options.useGPT;
+  if (typeof options.useOpenRouter === "boolean") {
+    summary.useOpenRouter = options.useOpenRouter;
   }
   if (options.promptBuilder) {
     summary.promptBuilder = "[function]";
@@ -196,8 +196,8 @@ const summarizeValidateOptions = <K extends ValidatorKey>(
   if (options.schema) {
     summary.schema = "[custom schema]";
   }
-  if (options.gptClient) {
-    summary.gptClient = "[custom client]";
+  if (options.openRouterClient) {
+    summary.openRouterClient = "[custom client]";
   }
 
   return summary;
@@ -235,7 +235,7 @@ export function createDevNamespace(deps: DevNamespaceDependencies): DevNamespace
   return {
     generateAction: async (input, options) => {
       assertDeveloperAccess(deps, "generateAction");
-      const { gptClient: _gptClient, ...optionSnapshot } = options ?? {};
+      const { openRouterClient: _openRouterClient, ...optionSnapshot } = options ?? {};
       return logOperation(
         deps.console,
         "dev.generateAction",
@@ -251,13 +251,13 @@ export function createDevNamespace(deps: DevNamespaceDependencies): DevNamespace
       assertDeveloperAccess(deps, "validate");
       const {
         maxAttempts,
-        useGPT = true,
-        gptClient: explicitClient,
+        useOpenRouter = true,
+        openRouterClient: explicitClient,
         promptBuilder,
         schema,
       } = options ?? {};
 
-      const gptClient = explicitClient ?? (useGPT ? deps.getGptClient() ?? undefined : undefined);
+      const openRouterClient = explicitClient ?? (useOpenRouter ? deps.getOpenRouterClient() ?? undefined : undefined);
 
       return logOperation(
         deps.console,
@@ -271,7 +271,7 @@ export function createDevNamespace(deps: DevNamespaceDependencies): DevNamespace
             type,
             payload,
             maxAttempts,
-            gptClient,
+            openRouterClient,
             promptBuilder,
             schema,
           }),
