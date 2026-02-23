@@ -445,42 +445,89 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
         grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
       }
 
+      .handy-dandy-workbench-history-toolbar {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        justify-content: space-between;
+      }
+
+      .handy-dandy-workbench-history-search {
+        align-items: center;
+        background: var(--color-bg-alt, rgba(255, 255, 255, 0.06));
+        border: 1px solid var(--color-border-dark, #333);
+        border-radius: 8px;
+        display: inline-flex;
+        flex: 1;
+        gap: 0.4rem;
+        max-width: 360px;
+        padding: 0.35rem 0.55rem;
+      }
+
+      .handy-dandy-workbench-history-search i {
+        color: var(--color-text-light-6, #bbb);
+        font-size: 0.8rem;
+      }
+
+      .handy-dandy-workbench-history-search input {
+        background: transparent;
+        border: none;
+        color: inherit;
+        flex: 1;
+        font-size: 0.85rem;
+        min-width: 0;
+      }
+
+      .handy-dandy-workbench-history-search input:focus {
+        outline: none;
+      }
+
+      .handy-dandy-workbench-history-summary {
+        color: var(--color-text-light-6, #bbb);
+        font-size: 0.78rem;
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
+        white-space: nowrap;
+      }
+
       .handy-dandy-workbench-history {
         display: grid;
         gap: 0.75rem;
-        grid-template-columns: minmax(180px, 220px) 1fr;
+        grid-template-columns: minmax(220px, 280px) 1fr;
         align-items: start;
       }
 
       .handy-dandy-workbench-history-list {
         display: flex;
         flex-direction: column;
-        gap: 0.25rem;
+        gap: 0.45rem;
         max-height: 24rem;
         overflow-y: auto;
         border: 1px solid var(--color-border-dark, #333);
-        border-radius: 6px;
-        padding: 0.35rem;
+        border-radius: 8px;
+        padding: 0.5rem;
         background: var(--color-bg-alt, rgba(255, 255, 255, 0.04));
       }
 
       .handy-dandy-workbench-history-item {
-        align-items: center;
-        border-radius: 4px;
-        border: 1px solid transparent;
+        align-items: stretch;
+        border-radius: 7px;
+        border: 1px solid var(--color-border-dark, rgba(255, 255, 255, 0.12));
         display: flex;
-        transition: border-color 0.2s ease, background 0.2s ease;
+        overflow: hidden;
+        transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
       }
 
       .handy-dandy-workbench-history-item.active {
         border-color: var(--color-border-highlight, #ff8c00);
-        background: var(--color-border-light-1, rgba(255, 255, 255, 0.12));
+        background: linear-gradient(140deg, rgba(255, 140, 0, 0.2), rgba(255, 255, 255, 0.06));
       }
 
       .handy-dandy-workbench-history-item:not(.active):hover,
       .handy-dandy-workbench-history-item:not(.active):focus-within {
         border-color: var(--color-border-light-2, rgba(255, 255, 255, 0.2));
-        background: var(--color-border-dark, rgba(255, 255, 255, 0.08));
+        background: rgba(255, 255, 255, 0.08);
+        transform: translateY(-1px);
       }
 
       .handy-dandy-workbench-history-select {
@@ -490,7 +537,7 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
         color: inherit;
         cursor: pointer;
         flex: 1;
-        padding: 0.45rem 0.5rem;
+        padding: 0.45rem 0.55rem;
         text-align: left;
         display: flex;
         flex-direction: column;
@@ -501,23 +548,40 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
         outline: none;
       }
 
+      .handy-dandy-workbench-history-chip {
+        align-self: flex-start;
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        border-radius: 999px;
+        color: var(--color-text-light-5, #c8c8c8);
+        font-size: 0.68rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        line-height: 1;
+        margin-bottom: 0.05rem;
+        padding: 0.17rem 0.42rem;
+        text-transform: uppercase;
+      }
+
       .handy-dandy-workbench-history-select .handy-dandy-workbench-history-name {
         font-weight: 600;
-        font-size: 0.95rem;
+        font-size: 0.92rem;
+        line-height: 1.25;
       }
 
       .handy-dandy-workbench-history-select .handy-dandy-workbench-history-meta {
         color: var(--color-text-light-6, #bbb);
-        font-size: 0.8rem;
+        font-size: 0.77rem;
+        line-height: 1.2;
       }
 
       .handy-dandy-workbench-history-delete {
         appearance: none;
-        background: transparent;
+        background: rgba(0, 0, 0, 0.1);
         border: none;
-        border-radius: 0 4px 4px 0;
+        border-left: 1px solid rgba(255, 255, 255, 0.08);
         color: var(--color-text-light-6, #bbb);
         cursor: pointer;
+        min-width: 2rem;
         padding: 0.35rem;
         transition: color 0.2s ease, background 0.2s ease;
         display: flex;
@@ -528,17 +592,17 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
       .handy-dandy-workbench-history-delete:hover,
       .handy-dandy-workbench-history-delete:focus-visible {
         color: var(--color-text-bright, #f0f0f0);
-        background: var(--color-border-dark, rgba(255, 255, 255, 0.12));
+        background: rgba(220, 53, 69, 0.28);
         outline: none;
       }
 
       .handy-dandy-workbench-history-view {
         border: 1px solid var(--color-border-dark, #333);
-        border-radius: 6px;
+        border-radius: 8px;
         min-height: 18rem;
         padding: 0.75rem;
         overflow: auto;
-        background: var(--color-bg-alt, rgba(255, 255, 255, 0.04));
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.03));
         display: flex;
         flex-direction: column;
         gap: 0.75rem;
@@ -546,7 +610,8 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
 
       .handy-dandy-workbench-history-empty {
         color: var(--color-text-light-6, #bbb);
-        font-size: 0.95rem;
+        font-size: 0.92rem;
+        margin: 0;
         padding: 0.5rem 0;
       }
 
@@ -559,6 +624,23 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
       @media (max-width: 900px) {
         .handy-dandy-workbench-steps {
           grid-template-columns: 1fr;
+        }
+
+        .handy-dandy-workbench-history {
+          grid-template-columns: 1fr;
+        }
+
+        .handy-dandy-workbench-history-list {
+          max-height: 15rem;
+        }
+
+        .handy-dandy-workbench-history-toolbar {
+          align-items: stretch;
+          flex-direction: column;
+        }
+
+        .handy-dandy-workbench-history-search {
+          max-width: none;
         }
       }
     </style>
@@ -768,6 +850,13 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
         </form>
       </section>
       <section class="handy-dandy-workbench-panel" data-panel="history">
+        <div class="handy-dandy-workbench-history-toolbar">
+          <label class="handy-dandy-workbench-history-search">
+            <i class="fas fa-search"></i>
+            <input type="search" placeholder="Filter by name, type, or system" data-history-filter />
+          </label>
+          <span class="handy-dandy-workbench-history-summary" data-history-summary></span>
+        </div>
         <div class="handy-dandy-workbench-history">
           <aside class="handy-dandy-workbench-history-list" data-history-list>
             ${historyListMarkup}
@@ -1735,32 +1824,77 @@ function buildWorkbenchDialogContent(currentEntry: WorkbenchHistoryEntry): strin
         resize: vertical;
       }
 
+      .handy-dandy-workbench-history-toolbar {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        justify-content: space-between;
+      }
+
+      .handy-dandy-workbench-history-search {
+        align-items: center;
+        background: var(--color-bg-alt, rgba(255, 255, 255, 0.06));
+        border: 1px solid var(--color-border-dark, #333);
+        border-radius: 8px;
+        display: inline-flex;
+        flex: 1;
+        gap: 0.4rem;
+        max-width: 360px;
+        padding: 0.35rem 0.55rem;
+      }
+
+      .handy-dandy-workbench-history-search i {
+        color: var(--color-text-light-6, #bbb);
+        font-size: 0.8rem;
+      }
+
+      .handy-dandy-workbench-history-search input {
+        background: transparent;
+        border: none;
+        color: inherit;
+        flex: 1;
+        font-size: 0.85rem;
+        min-width: 0;
+      }
+
+      .handy-dandy-workbench-history-search input:focus {
+        outline: none;
+      }
+
+      .handy-dandy-workbench-history-summary {
+        color: var(--color-text-light-6, #bbb);
+        font-size: 0.78rem;
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
+        white-space: nowrap;
+      }
+
       .handy-dandy-workbench-history {
         display: grid;
         gap: 0.75rem;
-        grid-template-columns: minmax(180px, 220px) 1fr;
+        grid-template-columns: minmax(220px, 280px) 1fr;
         align-items: start;
       }
 
       .handy-dandy-workbench-history-list {
         display: flex;
         flex-direction: column;
-        gap: 0.25rem;
+        gap: 0.45rem;
         max-height: 24rem;
         overflow-y: auto;
         border: 1px solid var(--color-border-dark, #333);
-        border-radius: 6px;
-        padding: 0.35rem;
+        border-radius: 8px;
+        padding: 0.5rem;
         background: var(--color-bg-alt, rgba(255, 255, 255, 0.04));
       }
 
       .handy-dandy-workbench-history-view {
         border: 1px solid var(--color-border-dark, #333);
-        border-radius: 6px;
+        border-radius: 8px;
         min-height: 18rem;
         padding: 0.75rem;
         overflow: auto;
-        background: var(--color-bg-alt, rgba(255, 255, 255, 0.04));
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.03));
         display: flex;
         flex-direction: column;
         gap: 0.75rem;
@@ -1768,7 +1902,8 @@ function buildWorkbenchDialogContent(currentEntry: WorkbenchHistoryEntry): strin
 
       .handy-dandy-workbench-history-empty {
         color: var(--color-text-light-6, #bbb);
-        font-size: 0.95rem;
+        font-size: 0.92rem;
+        margin: 0;
         padding: 0.5rem 0;
       }
 
@@ -1787,22 +1922,24 @@ function buildWorkbenchDialogContent(currentEntry: WorkbenchHistoryEntry): strin
       }
 
       .handy-dandy-workbench-history-item {
-        align-items: center;
-        border-radius: 4px;
-        border: 1px solid transparent;
+        align-items: stretch;
+        border-radius: 7px;
+        border: 1px solid var(--color-border-dark, rgba(255, 255, 255, 0.12));
         display: flex;
-        transition: border-color 0.2s ease, background 0.2s ease;
+        overflow: hidden;
+        transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
       }
 
       .handy-dandy-workbench-history-item.active {
         border-color: var(--color-border-highlight, #ff8c00);
-        background: var(--color-border-light-1, rgba(255, 255, 255, 0.12));
+        background: linear-gradient(140deg, rgba(255, 140, 0, 0.2), rgba(255, 255, 255, 0.06));
       }
 
       .handy-dandy-workbench-history-item:not(.active):hover,
       .handy-dandy-workbench-history-item:not(.active):focus-within {
         border-color: var(--color-border-light-2, rgba(255, 255, 255, 0.2));
-        background: var(--color-border-dark, rgba(255, 255, 255, 0.08));
+        background: rgba(255, 255, 255, 0.08);
+        transform: translateY(-1px);
       }
 
       .handy-dandy-workbench-history-select {
@@ -1812,7 +1949,7 @@ function buildWorkbenchDialogContent(currentEntry: WorkbenchHistoryEntry): strin
         color: inherit;
         cursor: pointer;
         flex: 1;
-        padding: 0.45rem 0.5rem;
+        padding: 0.45rem 0.55rem;
         text-align: left;
         display: flex;
         flex-direction: column;
@@ -1823,23 +1960,40 @@ function buildWorkbenchDialogContent(currentEntry: WorkbenchHistoryEntry): strin
         outline: none;
       }
 
+      .handy-dandy-workbench-history-chip {
+        align-self: flex-start;
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        border-radius: 999px;
+        color: var(--color-text-light-5, #c8c8c8);
+        font-size: 0.68rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        line-height: 1;
+        margin-bottom: 0.05rem;
+        padding: 0.17rem 0.42rem;
+        text-transform: uppercase;
+      }
+
       .handy-dandy-workbench-history-select .handy-dandy-workbench-history-name {
         font-weight: 600;
-        font-size: 0.95rem;
+        font-size: 0.92rem;
+        line-height: 1.25;
       }
 
       .handy-dandy-workbench-history-select .handy-dandy-workbench-history-meta {
         color: var(--color-text-light-6, #bbb);
-        font-size: 0.8rem;
+        font-size: 0.77rem;
+        line-height: 1.2;
       }
 
       .handy-dandy-workbench-history-delete {
         appearance: none;
-        background: transparent;
+        background: rgba(0, 0, 0, 0.1);
         border: none;
-        border-radius: 0 4px 4px 0;
+        border-left: 1px solid rgba(255, 255, 255, 0.08);
         color: var(--color-text-light-6, #bbb);
         cursor: pointer;
+        min-width: 2rem;
         padding: 0.35rem;
         transition: color 0.2s ease, background 0.2s ease;
         display: flex;
@@ -1850,8 +2004,27 @@ function buildWorkbenchDialogContent(currentEntry: WorkbenchHistoryEntry): strin
       .handy-dandy-workbench-history-delete:hover,
       .handy-dandy-workbench-history-delete:focus-visible {
         color: var(--color-text-bright, #f0f0f0);
-        background: var(--color-border-dark, rgba(255, 255, 255, 0.12));
+        background: rgba(220, 53, 69, 0.28);
         outline: none;
+      }
+
+      @media (max-width: 900px) {
+        .handy-dandy-workbench-history {
+          grid-template-columns: 1fr;
+        }
+
+        .handy-dandy-workbench-history-list {
+          max-height: 15rem;
+        }
+
+        .handy-dandy-workbench-history-toolbar {
+          align-items: stretch;
+          flex-direction: column;
+        }
+
+        .handy-dandy-workbench-history-search {
+          max-width: none;
+        }
       }
 
     </style>
@@ -1865,6 +2038,13 @@ function buildWorkbenchDialogContent(currentEntry: WorkbenchHistoryEntry): strin
         ${latestMarkup}
       </section>
       <section class="handy-dandy-workbench-panel" data-panel="history">
+        <div class="handy-dandy-workbench-history-toolbar">
+          <label class="handy-dandy-workbench-history-search">
+            <i class="fas fa-search"></i>
+            <input type="search" placeholder="Filter by name, type, or system" data-history-filter />
+          </label>
+          <span class="handy-dandy-workbench-history-summary" data-history-summary></span>
+        </div>
         <div class="handy-dandy-workbench-history">
           <aside class="handy-dandy-workbench-history-list" data-history-list>
             ${historyListMarkup}
@@ -1876,22 +2056,57 @@ function buildWorkbenchDialogContent(currentEntry: WorkbenchHistoryEntry): strin
   `;
 }
 
-function buildHistoryListMarkup(activeEntryId?: string): string {
+function normalizeHistoryFilter(filterText: string | undefined): string {
+  return (filterText ?? "").trim().toLowerCase();
+}
+
+function getFilteredHistoryEntries(filterText?: string): WorkbenchHistoryEntry[] {
+  const query = normalizeHistoryFilter(filterText);
+  if (!query) {
+    return [...workbenchHistory];
+  }
+
+  return workbenchHistory.filter((entry) => {
+    const name = (entry.result.name.trim() || entry.result.data.name || "").toLowerCase();
+    const type = entry.result.type.toLowerCase();
+    const system = (entry.result.input.systemId ?? "").toLowerCase();
+    return name.includes(query) || type.includes(query) || system.includes(query);
+  });
+}
+
+function buildHistorySummaryLabel(visibleCount: number, totalCount: number, hasFilter: boolean): string {
+  if (totalCount === 0) {
+    return "No entries yet";
+  }
+  if (hasFilter) {
+    return `Showing ${visibleCount} of ${totalCount}`;
+  }
+  return `${totalCount} entr${totalCount === 1 ? "y" : "ies"}`;
+}
+
+function buildHistoryListMarkup(activeEntryId?: string, filterText?: string): string {
   if (!workbenchHistory.length) {
     return '<p class="handy-dandy-workbench-history-empty">No generations yet.</p>';
   }
 
-  return workbenchHistory
+  const filteredEntries = getFilteredHistoryEntries(filterText);
+  if (!filteredEntries.length) {
+    return '<p class="handy-dandy-workbench-history-empty">No entries match this filter.</p>';
+  }
+
+  return filteredEntries
     .map((entry) => {
       const isActive = entry.id === activeEntryId;
       const classes = isActive
         ? "handy-dandy-workbench-history-item active"
         : "handy-dandy-workbench-history-item";
       const name = escapeHtml(entry.result.name.trim() || entry.result.data.name || "Generated Entry");
-      const meta = escapeHtml(formatHistoryMeta(entry));
+      const meta = escapeHtml(formatHistoryRowMeta(entry));
+      const typeLabel = escapeHtml(formatTypeLabel(entry.result.type));
       return `
         <div class="${classes}" data-entry-id="${entry.id}">
           <button type="button" class="handy-dandy-workbench-history-select" data-entry-id="${entry.id}">
+            <span class="handy-dandy-workbench-history-chip">${typeLabel}</span>
             <span class="handy-dandy-workbench-history-name">${name}</span>
             <span class="handy-dandy-workbench-history-meta">${meta}</span>
           </button>
@@ -1904,9 +2119,13 @@ function buildHistoryListMarkup(activeEntryId?: string): string {
     .join("");
 }
 
-function buildHistoryViewPlaceholder(): string {
+function buildHistoryViewPlaceholder(filterText?: string): string {
   if (!workbenchHistory.length) {
     return '<p class="handy-dandy-workbench-history-empty">No generations yet.</p>';
+  }
+
+  if (!getFilteredHistoryEntries(filterText).length) {
+    return '<p class="handy-dandy-workbench-history-empty">No entries match this filter.</p>';
   }
 
   return '<p class="notes">Select a previous generation to review its details.</p>';
@@ -1950,11 +2169,10 @@ function buildEntryDetailMarkup(entry: WorkbenchHistoryEntry): string {
   `;
 }
 
-function formatHistoryMeta(entry: WorkbenchHistoryEntry): string {
-  const type = formatTypeLabel(entry.result.type);
+function formatHistoryRowMeta(entry: WorkbenchHistoryEntry): string {
   const system = formatSystemLabel(entry.result.input.systemId);
   const time = formatTimestamp(entry.timestamp);
-  return [type, system, time].filter(Boolean).join(" - ");
+  return [system, time].filter(Boolean).join(" - ");
 }
 
 function formatTypeLabel(type: EntityType): string {
@@ -2121,18 +2339,12 @@ function setupWorkbenchRequestDialog(html: JQuery): void {
     updateActorTypeScopedVisibility();
   };
 
-  const historyList = container.querySelector<HTMLElement>("[data-history-list]");
-  const historyView = container.querySelector<HTMLElement>("[data-history-view]");
+  const historyFilterInput = container.querySelector<HTMLInputElement>("[data-history-filter]");
   const initialEntry = workbenchHistory[0] ?? null;
   const initialEntryId = initialEntry?.id;
 
-  setCurrentHistoryEntry(container, initialEntryId);
-  if (historyList) {
-    renderHistoryList(historyList, initialEntryId);
-  }
-  if (historyView) {
-    renderHistoryEntry(historyView, initialEntry);
-  }
+  setHistoryFilter(container, historyFilterInput?.value ?? "");
+  refreshHistoryViews(container, initialEntryId);
 
   updateDialogButtonsVisibility();
   updateScopedFieldVisibility();
@@ -2144,6 +2356,10 @@ function setupWorkbenchRequestDialog(html: JQuery): void {
   for (const input of itemArtModeInputs) {
     input.addEventListener("change", updateItemArtModeVisibility);
   }
+  historyFilterInput?.addEventListener("input", () => {
+    setHistoryFilter(container, historyFilterInput.value);
+    refreshHistoryViews(container, container.dataset.currentEntry);
+  });
 
   container.addEventListener("click", (event) => {
     const target = event.target;
@@ -2175,14 +2391,7 @@ function setupWorkbenchRequestDialog(html: JQuery): void {
         activeEntry = removal.fallback ?? workbenchHistory[0] ?? null;
       }
 
-      const activeEntryId = activeEntry?.id;
-      setCurrentHistoryEntry(container, activeEntryId);
-      if (historyList) {
-        renderHistoryList(historyList, activeEntryId);
-      }
-      if (historyView) {
-        renderHistoryEntry(historyView, activeEntry);
-      }
+      refreshHistoryViews(container, activeEntry?.id);
       return;
     }
 
@@ -2196,15 +2405,13 @@ function setupWorkbenchRequestDialog(html: JQuery): void {
     }
 
     const historySelect = target.closest<HTMLButtonElement>(".handy-dandy-workbench-history-select");
-    if (historySelect?.dataset.entryId && historyView) {
+    if (historySelect?.dataset.entryId) {
       const entry = resolveHistoryEntry(historySelect.dataset.entryId);
       if (!entry) {
         return;
       }
 
-      setCurrentHistoryEntry(container, entry.id);
-      setActiveHistoryItem(container, entry.id);
-      renderHistoryEntry(historyView, entry);
+      refreshHistoryViews(container, entry.id);
     }
   });
 }
@@ -2220,15 +2427,14 @@ function setupWorkbenchResultDialog(html: JQuery, currentEntry: WorkbenchHistory
     return;
   }
 
-  const historyList = container.querySelector<HTMLElement>("[data-history-list]");
-  const historyView = container.querySelector<HTMLElement>("[data-history-view]");
-  setCurrentHistoryEntry(container, currentEntry.id);
-  if (historyList) {
-    renderHistoryList(historyList, currentEntry.id);
-  }
-  if (historyView) {
-    renderHistoryEntry(historyView, currentEntry);
-  }
+  const historyFilterInput = container.querySelector<HTMLInputElement>("[data-history-filter]");
+  setHistoryFilter(container, historyFilterInput?.value ?? "");
+  refreshHistoryViews(container, currentEntry.id);
+
+  historyFilterInput?.addEventListener("input", () => {
+    setHistoryFilter(container, historyFilterInput.value);
+    refreshHistoryViews(container, container.dataset.currentEntry);
+  });
 
   container.addEventListener("click", (event) => {
     const target = event.target;
@@ -2259,14 +2465,7 @@ function setupWorkbenchResultDialog(html: JQuery, currentEntry: WorkbenchHistory
         activeEntry = removal.fallback ?? workbenchHistory[0] ?? null;
       }
 
-      const activeEntryId = activeEntry?.id;
-      setCurrentHistoryEntry(container, activeEntryId);
-      if (historyList) {
-        renderHistoryList(historyList, activeEntryId);
-      }
-      if (historyView) {
-        renderHistoryEntry(historyView, activeEntry);
-      }
+      refreshHistoryViews(container, activeEntry?.id);
       return;
     }
 
@@ -2280,15 +2479,13 @@ function setupWorkbenchResultDialog(html: JQuery, currentEntry: WorkbenchHistory
     }
 
     const historySelect = target.closest<HTMLButtonElement>(".handy-dandy-workbench-history-select");
-    if (historySelect?.dataset.entryId && historyView) {
+    if (historySelect?.dataset.entryId) {
       const entry = resolveHistoryEntry(historySelect.dataset.entryId);
       if (!entry) {
         return;
       }
 
-      setCurrentHistoryEntry(container, entry.id);
-      setActiveHistoryItem(container, entry.id);
-      renderHistoryEntry(historyView, entry);
+      refreshHistoryViews(container, entry.id);
       return;
     }
   });
@@ -2313,13 +2510,41 @@ function setActiveHistoryItem(container: HTMLElement, entryId: string): void {
   });
 }
 
-function renderHistoryList(target: HTMLElement, activeEntryId?: string): void {
-  target.innerHTML = buildHistoryListMarkup(activeEntryId);
+function readHistoryFilter(container: HTMLElement): string {
+  const input = container.querySelector<HTMLInputElement>("[data-history-filter]");
+  if (input) {
+    return input.value;
+  }
+  return container.dataset.historyFilter ?? "";
 }
 
-function renderHistoryEntry(target: HTMLElement, entry: WorkbenchHistoryEntry | null | undefined): void {
+function setHistoryFilter(container: HTMLElement, value: string): void {
+  const normalized = value.trim();
+  if (normalized) {
+    container.dataset.historyFilter = normalized;
+  } else {
+    delete container.dataset.historyFilter;
+  }
+}
+
+function renderHistorySummary(container: HTMLElement, filterText: string): void {
+  const summary = container.querySelector<HTMLElement>("[data-history-summary]");
+  if (!summary) {
+    return;
+  }
+
+  const visibleCount = getFilteredHistoryEntries(filterText).length;
+  const totalCount = workbenchHistory.length;
+  summary.textContent = buildHistorySummaryLabel(visibleCount, totalCount, Boolean(normalizeHistoryFilter(filterText)));
+}
+
+function renderHistoryList(target: HTMLElement, activeEntryId?: string, filterText?: string): void {
+  target.innerHTML = buildHistoryListMarkup(activeEntryId, filterText);
+}
+
+function renderHistoryEntry(target: HTMLElement, entry: WorkbenchHistoryEntry | null | undefined, filterText?: string): void {
   if (!entry) {
-    target.innerHTML = buildHistoryViewPlaceholder();
+    target.innerHTML = buildHistoryViewPlaceholder(filterText);
     return;
   }
 
@@ -2391,26 +2616,40 @@ function handleDownloadAction(entry: WorkbenchHistoryEntry): void {
   downloadJson(entry.json, filename);
 }
 
-function refreshHistoryViews(container: HTMLElement, preferredEntryId: string): void {
+function refreshHistoryViews(container: HTMLElement, preferredEntryId?: string): void {
   const historyList = container.querySelector<HTMLElement>("[data-history-list]");
   const historyView = container.querySelector<HTMLElement>("[data-history-view]");
   const latestPanel = container.querySelector<HTMLElement>("[data-panel=\"latest\"]");
-  const activeEntry = resolveHistoryEntry(preferredEntryId) ?? workbenchHistory[0] ?? null;
+  const filterText = readHistoryFilter(container);
+  const filteredEntries = getFilteredHistoryEntries(filterText);
+  const activeEntry = (preferredEntryId
+    ? filteredEntries.find((entry) => entry.id === preferredEntryId)
+    : undefined)
+    ?? (container.dataset.currentEntry
+      ? filteredEntries.find((entry) => entry.id === container.dataset.currentEntry)
+      : undefined)
+    ?? filteredEntries[0]
+    ?? null;
   const activeEntryId = activeEntry?.id;
 
   setCurrentHistoryEntry(container, activeEntryId);
-  if (activeEntryId) {
-    setActiveHistoryItem(container, activeEntryId);
-  }
+  setActiveHistoryItem(container, activeEntryId ?? "");
 
   if (historyList) {
-    renderHistoryList(historyList, activeEntryId);
+    renderHistoryList(historyList, activeEntryId, filterText);
   }
   if (historyView) {
-    renderHistoryEntry(historyView, activeEntry);
+    renderHistoryEntry(historyView, activeEntry, filterText);
   }
-  if (latestPanel && activeEntry) {
-    latestPanel.innerHTML = buildEntryDetailMarkup(activeEntry);
+  renderHistorySummary(container, filterText);
+  if (latestPanel) {
+    const latestEntry = (preferredEntryId ? resolveHistoryEntry(preferredEntryId) : undefined)
+      ?? (container.dataset.currentEntry ? resolveHistoryEntry(container.dataset.currentEntry) : undefined)
+      ?? workbenchHistory[0]
+      ?? null;
+    if (latestEntry) {
+      latestPanel.innerHTML = buildEntryDetailMarkup(latestEntry);
+    }
   }
 }
 
