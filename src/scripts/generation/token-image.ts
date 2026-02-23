@@ -1,4 +1,4 @@
-import type { GenerateImageOptions, GeneratedImageResult } from "../gpt/client";
+import type { GenerateImageOptions, GeneratedImageResult } from "../openrouter/client";
 import { CONSTANTS } from "../constants";
 
 export interface TokenImageGenerator {
