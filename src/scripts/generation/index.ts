@@ -21,20 +21,20 @@ import {
 } from "../schemas";
 import type {
   GenerateWithSchemaOptions,
-  GPTClient,
+  OpenRouterClient,
   JsonSchemaDefinition,
-} from "../gpt/client";
+} from "../openrouter/client";
 
 export interface GenerateOptions extends GenerateWithSchemaOptions {
-  gptClient: Pick<GPTClient, "generateWithSchema"> &
-    Partial<Pick<GPTClient, "generateImage">>;
+  openRouterClient: Pick<OpenRouterClient, "generateWithSchema"> &
+    Partial<Pick<OpenRouterClient, "generateImage">>;
   maxAttempts?: number;
   onProgress?: (update: GenerationProgressUpdate) => void;
 }
 
 function canGenerateImages(
-  client: GenerateOptions["gptClient"],
-): client is GenerateOptions["gptClient"] & Pick<GPTClient, "generateImage"> {
+  client: GenerateOptions["openRouterClient"],
+): client is GenerateOptions["openRouterClient"] & Pick<OpenRouterClient, "generateImage"> {
   return typeof client.generateImage === "function";
 }
 
@@ -91,7 +91,7 @@ export async function generateAction(
   input: ActionPromptInput,
   options: GenerateOptions,
 ): Promise<ActionSchemaData> {
-  const { gptClient, maxAttempts, seed = DEFAULT_GENERATION_SEED } = options;
+  const { openRouterClient, maxAttempts, seed = DEFAULT_GENERATION_SEED } = options;
   reportProgress(options, {
     step: "prompt",
     message: "Preparing action prompt...",
@@ -103,7 +103,7 @@ export async function generateAction(
     message: "Generating action JSON with OpenRouter...",
     percent: 35,
   });
-  const draft = await gptClient.generateWithSchema<ActionSchemaData>(
+  const draft = await openRouterClient.generateWithSchema<ActionSchemaData>(
     prompt,
     ACTION_SCHEMA_DEFINITION,
     { seed },
@@ -117,7 +117,7 @@ export async function generateAction(
   const validated = await ensureValid({
     type: "action",
     payload: draft,
-    gptClient,
+    openRouterClient,
     maxAttempts,
     schema: ACTION_SCHEMA_DEFINITION,
   });
@@ -133,7 +133,7 @@ export async function generateItem(
   input: ItemPromptInput,
   options: GenerateOptions,
 ): Promise<ItemSchemaData> {
-  const { gptClient, maxAttempts, seed = DEFAULT_GENERATION_SEED } = options;
+  const { openRouterClient, maxAttempts, seed = DEFAULT_GENERATION_SEED } = options;
   reportProgress(options, {
     step: "prompt",
     message: "Preparing item prompt...",
@@ -145,7 +145,7 @@ export async function generateItem(
     message: "Generating item JSON with OpenRouter...",
     percent: 35,
   });
-  const draft = await gptClient.generateWithSchema<ItemSchemaData>(
+  const draft = await openRouterClient.generateWithSchema<ItemSchemaData>(
     prompt,
     ITEM_SCHEMA_DEFINITION,
     { seed },
@@ -159,19 +159,19 @@ export async function generateItem(
   const canonical = await ensureValid({
     type: "item",
     payload: draft,
-    gptClient,
+    openRouterClient,
     maxAttempts,
     schema: ITEM_SCHEMA_DEFINITION,
   });
 
-  if (input.generateItemImage && canGenerateImages(gptClient)) {
+  if (input.generateItemImage && canGenerateImages(openRouterClient)) {
     reportProgress(options, {
       step: "image",
       message: "Generating transparent item icon...",
       percent: 85,
     });
     try {
-      const generatedImage = await generateItemImage(gptClient, {
+      const generatedImage = await generateItemImage(openRouterClient, {
         itemName: canonical.name,
         itemSlug: canonical.slug,
         itemDescription: canonical.description ?? input.referenceText,
@@ -203,7 +203,7 @@ export async function generateActor(
   input: ActorPromptInput,
   options: GenerateOptions,
 ): Promise<ActorGenerationResult> {
-  const { gptClient, maxAttempts, seed = DEFAULT_GENERATION_SEED } = options;
+  const { openRouterClient, maxAttempts, seed = DEFAULT_GENERATION_SEED } = options;
   reportProgress(options, {
     step: "prompt",
     message: "Preparing actor prompt...",
@@ -215,7 +215,7 @@ export async function generateActor(
     message: "Generating actor JSON with OpenRouter...",
     percent: 25,
   });
-  const draft = await gptClient.generateWithSchema<ActorSchemaData>(
+  const draft = await openRouterClient.generateWithSchema<ActorSchemaData>(
     prompt,
     ACTOR_SCHEMA_DEFINITION,
     { seed },
@@ -229,7 +229,7 @@ export async function generateActor(
   const canonical = await ensureValid({
     type: "actor",
     payload: draft,
-    gptClient,
+    openRouterClient,
     maxAttempts,
     schema: ACTOR_SCHEMA_DEFINITION,
   });
@@ -238,14 +238,14 @@ export async function generateActor(
     canonical.actorType = input.actorType;
   }
 
-  if (input.generateTokenImage && canGenerateImages(gptClient)) {
+  if (input.generateTokenImage && canGenerateImages(openRouterClient)) {
     reportProgress(options, {
       step: "image",
       message: "Generating transparent token image...",
       percent: 75,
     });
     try {
-      const generatedToken = await generateTransparentTokenImage(gptClient, {
+      const generatedToken = await generateTransparentTokenImage(openRouterClient, {
         actorName: canonical.name,
         actorSlug: canonical.slug,
         actorDescription: canonical.description ?? input.referenceText,
