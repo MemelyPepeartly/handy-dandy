@@ -1,7 +1,7 @@
 import { CONSTANTS } from "../constants";
-import { DEFAULT_GPT_IMAGE_MODEL, DEFAULT_GPT_MODEL } from "../gpt/models";
-import { updateGPTClientFromSettings } from "../gpt/client";
-import { initializeAIClientFromSettings } from "../gpt/runtime";
+import { DEFAULT_OPENROUTER_IMAGE_MODEL, DEFAULT_OPENROUTER_MODEL } from "../openrouter/models";
+import { updateOpenRouterClientFromSettings } from "../openrouter/client";
+import { initializeOpenRouterClientFromSettings } from "../openrouter/runtime";
 import { loadOpenRouterModelChoiceCatalog } from "../openrouter/model-catalog";
 import { ToolOverview } from "../ui/tool-overview";
 import { OpenRouterAccountSettings } from "./openrouter-account";
@@ -22,7 +22,7 @@ export async function registerSettings(): Promise<void> {
     type: String,
     default: "",
     onChange: () => {
-      initializeAIClientFromSettings();
+      initializeOpenRouterClientFromSettings();
     },
   });
 
@@ -51,9 +51,9 @@ export async function registerSettings(): Promise<void> {
     config: true,
     type: String,
     choices: modelCatalog.textChoices,
-    default: DEFAULT_GPT_MODEL,
+    default: DEFAULT_OPENROUTER_MODEL,
     onChange: () => {
-      updateGPTClientFromSettings();
+      updateOpenRouterClientFromSettings();
     },
   });
 
@@ -64,9 +64,9 @@ export async function registerSettings(): Promise<void> {
     config: true,
     type: String,
     choices: modelCatalog.imageChoices,
-    default: DEFAULT_GPT_IMAGE_MODEL,
+    default: DEFAULT_OPENROUTER_IMAGE_MODEL,
     onChange: () => {
-      updateGPTClientFromSettings();
+      updateOpenRouterClientFromSettings();
     },
   });
 
@@ -78,7 +78,7 @@ export async function registerSettings(): Promise<void> {
     type: Number,
     default: 0.2,
     onChange: () => {
-      updateGPTClientFromSettings();
+      updateOpenRouterClientFromSettings();
     },
   });
 
@@ -90,7 +90,7 @@ export async function registerSettings(): Promise<void> {
     type: Number,
     default: 1,
     onChange: () => {
-      updateGPTClientFromSettings();
+      updateOpenRouterClientFromSettings();
     },
   });
 
@@ -102,7 +102,7 @@ export async function registerSettings(): Promise<void> {
     type: Number,
     default: Number.NaN,
     onChange: () => {
-      updateGPTClientFromSettings();
+      updateOpenRouterClientFromSettings();
     },
   });
 
