@@ -1,4 +1,5 @@
 import type { ErrorObject } from "ajv";
+import { CONSTANTS } from "../constants";
 import {
   ACTION_EXECUTIONS,
   ACTOR_CATEGORIES,
@@ -20,8 +21,6 @@ import {
 } from "../schemas";
 import { formatError } from "../helpers/validation";
 import type { JsonSchemaDefinition, GPTClient } from "../gpt/client";
-import { getDeveloperConsole } from "../dev/state";
-import type { ValidationLogPayload } from "../dev/developer-console";
 import { getTraitSlugSet } from "../data/trait-dictionaries";
 
 export type { SchemaDataFor, ValidatorKey } from "../schemas";
@@ -169,23 +168,29 @@ export async function ensureValid<K extends ValidatorKey>(
     );
   }
 
-  const developerConsole = getDeveloperConsole();
-  if (developerConsole) {
-    const payload: ValidationLogPayload = {
+  const dumpInvalidJson = readBooleanSetting("developerDumpInvalidJson");
+  const dumpAjvErrors = readBooleanSetting("developerDumpAjvErrors");
+  if (dumpInvalidJson || dumpAjvErrors) {
+    const logPayload: {
+      type: K;
+      attempts: number;
+      invalidJson?: string;
+      errors?: string[];
+    } = {
       type,
       attempts: diagnostics.length,
     };
 
-    if (developerConsole.shouldDumpInvalidJson()) {
-      payload.invalidJson = stringifyForConsole(lastNormalized ?? originalPayload);
+    if (dumpInvalidJson) {
+      logPayload.invalidJson = stringifyForConsole(lastNormalized ?? originalPayload);
     }
 
-    if (developerConsole.shouldDumpAjvErrors()) {
+    if (dumpAjvErrors) {
       const lastErrors = diagnostics.at(-1)?.errors ?? [];
-      payload.errors = lastErrors.map((error) => formatError(error));
+      logPayload.errors = lastErrors.map((error) => formatError(error));
     }
 
-    developerConsole.recordValidationFailure(payload);
+    console.warn(`${CONSTANTS.MODULE_NAME} | Ensure Valid diagnostics`, logPayload);
   }
 
   throw new EnsureValidError(
@@ -220,6 +225,19 @@ function stringifyForConsole(value: unknown): string {
     return JSON.stringify(value, null, 2);
   } catch (error) {
     return `<<unable to serialise: ${(error as Error).message}>>`;
+  }
+}
+
+function readBooleanSetting(settingKey: "developerDumpInvalidJson" | "developerDumpAjvErrors"): boolean {
+  const settings = (globalThis as { game?: { settings?: Game["settings"] } }).game?.settings;
+  if (!settings || typeof settings.get !== "function") {
+    return false;
+  }
+
+  try {
+    return Boolean(settings.get(CONSTANTS.MODULE_ID as never, settingKey as never));
+  } catch (_error) {
+    return false;
   }
 }
 
