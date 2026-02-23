@@ -1,5 +1,5 @@
 import { CONSTANTS } from "../constants";
-import { initializeAIClientFromSettings } from "../gpt/runtime";
+import { initializeOpenRouterClientFromSettings } from "../openrouter/runtime";
 import { canUseDesktopOpenRouterOAuth, connectWithOpenRouter } from "../openrouter/oauth";
 
 interface OpenRouterAccountViewData {
@@ -140,7 +140,7 @@ export class OpenRouterAccountSettings extends FormApplication {
     await settings.set(CONSTANTS.MODULE_ID, "OpenRouterApiKey", apiKey);
     await settings.set(CONSTANTS.MODULE_ID, "OpenRouterAuthMethod", apiKey ? "manual" : "");
 
-    initializeAIClientFromSettings();
+    initializeOpenRouterClientFromSettings();
 
     if (apiKey) {
       ui.notifications?.info(`${CONSTANTS.MODULE_NAME} | OpenRouter API key saved for your user.`);
@@ -198,7 +198,7 @@ export class OpenRouterAccountSettings extends FormApplication {
       });
       await settings.set(CONSTANTS.MODULE_ID, "OpenRouterApiKey", apiKey);
       await settings.set(CONSTANTS.MODULE_ID, "OpenRouterAuthMethod", "oauth");
-      initializeAIClientFromSettings();
+      initializeOpenRouterClientFromSettings();
       ui.notifications?.info(`${CONSTANTS.MODULE_NAME} | OpenRouter account connected for your user.`);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -255,7 +255,7 @@ export class OpenRouterAccountSettings extends FormApplication {
 
       await settings.set(CONSTANTS.MODULE_ID, "OpenRouterApiKey", "");
       await settings.set(CONSTANTS.MODULE_ID, "OpenRouterAuthMethod", "");
-      initializeAIClientFromSettings();
+      initializeOpenRouterClientFromSettings();
       ui.notifications?.info(`${CONSTANTS.MODULE_NAME} | OpenRouter account disconnected for your user.`);
     } finally {
       this.#isBusy = false;
