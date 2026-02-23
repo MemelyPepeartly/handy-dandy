@@ -1,7 +1,5 @@
 import { CONSTANTS } from "../constants";
 import {
-  collectFailureMessages,
-  exportSelectedEntities,
   generateWorkbenchEntry,
   DEFAULT_IMAGE_PATH,
   type PromptWorkbenchRequest,
@@ -121,43 +119,6 @@ Hooks.on("updateUser", (user: User, changes: Record<string, unknown>) => {
   const value = (moduleFlags as Record<string, unknown>)[WORKBENCH_HISTORY_FLAG_KEY];
   applyStoredWorkbenchHistory(value);
 });
-
-export async function runExportSelectionFlow(): Promise<void> {
-  try {
-    const result = exportSelectedEntities();
-    if (!result.entries.length) {
-      ui.notifications?.warn(`${CONSTANTS.MODULE_NAME} | No controlled tokens or directory selections to export.`);
-      return;
-    }
-
-    const prefix = `${CONSTANTS.MODULE_NAME} |`;
-    const failures = collectFailureMessages(result.entries);
-    const summary = result.summary;
-
-    if (result.successCount > 0) {
-      let message = summary;
-      try {
-        await navigator.clipboard.writeText(result.json);
-        message = `${summary} Copied JSON to clipboard.`;
-      } catch (error) {
-        console.warn(`${CONSTANTS.MODULE_NAME} | Clipboard copy failed`, error);
-      }
-      ui.notifications?.info(`${prefix} ${message}`);
-      console.info(`${CONSTANTS.MODULE_NAME} | Exported canonical JSON`, JSON.parse(result.json));
-    } else {
-      ui.notifications?.warn(`${prefix} ${summary}`);
-    }
-
-    if (failures.length) {
-      ui.notifications?.warn(`${prefix} ${failures.length} selection(s) failed. Check console for details.`);
-      console.warn(`${CONSTANTS.MODULE_NAME} | Export failures`, failures);
-    }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    ui.notifications?.error(`${CONSTANTS.MODULE_NAME} | Export failed: ${message}`);
-    console.error(`${CONSTANTS.MODULE_NAME} | Export selection failed`, error);
-  }
-}
 
 export async function runPromptWorkbenchFlow(): Promise<void> {
   if (!ensureWorkbenchGenerationReady()) {
