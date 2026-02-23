@@ -32,11 +32,12 @@ The build writes compiled files to `dist/` and transforms `src/static/module.jso
 After enabling the module:
 
 1. Each user opens **Connect OpenRouter** in Module Settings and signs in with OAuth.
-2. Each user can choose their own text/image model IDs in Module Settings.
+2. Each user can choose their own text/image models from OpenRouter-powered dropdowns in Module Settings.
 
 There is also an optional manual API key field in the OpenRouter account dialog.
 Desktop Foundry OAuth uses your default browser and a temporary local callback listener on `localhost:3000`.
 If `localhost:3000` is already in use, OAuth login will fail until that port is freed.
+Model dropdown choices are loaded from OpenRouter during startup; restart Foundry to refresh the list.
 
 ## Usage
 
