@@ -6,7 +6,7 @@ import {
   type PromptWorkbenchResult,
 } from "./prompt-workbench";
 import { DEFAULT_GENERATION_SEED, type GenerationProgressUpdate } from "../generation";
-import { readGPTSettings } from "../gpt/client";
+import { readOpenRouterSettings } from "../openrouter/client";
 import {
   ITEM_CATEGORIES,
   SYSTEM_IDS,
@@ -1029,7 +1029,7 @@ function ensureWorkbenchGenerationReady(): boolean {
   }
 
   namespace.refreshAIClient?.();
-  if (!namespace.gptClient) {
+  if (!namespace.openRouterClient) {
     ui.notifications?.error(
       `${CONSTANTS.MODULE_NAME} | OpenRouter is not connected for this user. ` +
         `Open Module Settings -> OpenRouter Account and connect before running Prompt Workbench.`,
@@ -1041,13 +1041,13 @@ function ensureWorkbenchGenerationReady(): boolean {
 }
 
 function readPromptWorkbenchGenerationSetup(): PromptWorkbenchGenerationSetup {
-  const configured = readGPTSettings();
+  const configured = readOpenRouterSettings();
   const seed = typeof configured.seed === "number" && Number.isFinite(configured.seed)
     ? configured.seed
     : undefined;
 
   return {
-    connected: Boolean(game.handyDandy?.gptClient),
+    connected: Boolean(game.handyDandy?.openRouterClient),
     textModel: configured.model,
     imageModel: configured.imageModel,
     temperature: configured.temperature,
@@ -1527,14 +1527,14 @@ async function repairGeneratedData(
   type: EntityType,
   data: GeneratedEntityMap[EntityType],
 ): Promise<GeneratedEntityMap[EntityType]> {
-  const gptClient = game.handyDandy?.gptClient ?? undefined;
+  const openRouterClient = game.handyDandy?.openRouterClient ?? undefined;
 
   switch (type) {
     case "action": {
       const repaired = await ensureValid({
         type: "action",
         payload: data,
-        gptClient,
+        openRouterClient,
       });
       return repaired as GeneratedEntityMap[EntityType];
     }
@@ -1542,7 +1542,7 @@ async function repairGeneratedData(
       const repaired = await ensureValid({
         type: "item",
         payload: data,
-        gptClient,
+        openRouterClient,
       });
       return repaired as GeneratedEntityMap[EntityType];
     }
@@ -1552,7 +1552,7 @@ async function repairGeneratedData(
       const canonical = await ensureValid({
         type: "actor",
         payload: canonicalDraft,
-        gptClient,
+        openRouterClient,
       });
       const foundry = await toFoundryActorDataWithCompendium(canonical);
       return toGeneratedActorResultFromFoundry(actorData, foundry) as GeneratedEntityMap[EntityType];
