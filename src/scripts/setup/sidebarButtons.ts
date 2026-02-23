@@ -1,5 +1,4 @@
-import { CONSTANTS } from "../constants";
-import { runPromptWorkbenchFlow, runExportSelectionFlow } from "../flows/prompt-workbench-ui";
+import { runPromptWorkbenchFlow } from "../flows/prompt-workbench-ui";
 import {
   MAP_MARKER_CONTROL_NAME,
   MAP_MARKER_PLACEMENT_TOOL_NAME,
@@ -226,65 +225,12 @@ export function insertSidebarButtons(controls: ControlCollection): void {
   });
 
   compatibilityAddTool(handyGroup.tools, {
-    name: "schema-tool",
-    title: "Schema Tool",
-    icon: "fa-solid fa-wand-magic-sparkles",
-    button: true,
-    onChange: () => {
-      console.debug(`${CONSTANTS.MODULE_NAME} | Opening Schema Tool`);
-      requireNamespace().applications.schemaTool.render(true);
-    },
-  });
-
-  compatibilityAddTool(handyGroup.tools, {
-    name: "data-entry-tool",
-    title: "Data Entry Tool",
-    icon: "fa-solid fa-pen-to-square",
-    button: true,
-    onChange: () => {
-      console.debug(`${CONSTANTS.MODULE_NAME} | Opening Data Entry Tool`);
-      requireNamespace().applications.dataEntryTool.render(true);
-    },
-  });
-
-  compatibilityAddTool(handyGroup.tools, {
-    name: "trait-browser",
-    title: "Trait Browser",
-    icon: "fa-solid fa-tags",
-    button: true,
-    onChange: () => {
-      console.debug(`${CONSTANTS.MODULE_NAME} | Opening Trait Browser Tool`);
-      requireNamespace().applications.traitBrowserTool.render(true);
-    },
-  });
-
-  compatibilityAddTool(handyGroup.tools, {
-    name: "export-selection",
-    title: "Export Selection",
-    icon: "fa-solid fa-file-export",
-    button: true,
-    onChange: () => {
-      void runExportSelectionFlow();
-    },
-  });
-
-  compatibilityAddTool(handyGroup.tools, {
     name: "prompt-workbench",
     title: "Prompt Workbench",
     icon: "fa-solid fa-hat-wizard",
     button: true,
     onChange: () => {
       void runPromptWorkbenchFlow();
-    },
-  });
-
-  compatibilityAddTool(handyGroup.tools, {
-    name: "developer-console",
-    title: "Developer Console",
-    icon: "fa-solid fa-terminal",
-    button: true,
-    onChange: () => {
-      requireNamespace().developer.console.render(true);
     },
   });
 
