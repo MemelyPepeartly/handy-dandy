@@ -119,6 +119,13 @@ Hooks.once("init", async () => {
   await loadTemplates({
     "tool-overview": `${CONSTANTS.TEMPLATE_PATH}/tool-overview.hbs`,
     "openrouter-account": `${CONSTANTS.TEMPLATE_PATH}/openrouter-account.hbs`,
+    "prompt-workbench-loading": `${CONSTANTS.TEMPLATE_PATH}/prompt-workbench-loading.hbs`,
+    "prompt-workbench-generation-setup": `${CONSTANTS.TEMPLATE_PATH}/prompt-workbench-generation-setup.hbs`,
+    "prompt-workbench-history-list": `${CONSTANTS.TEMPLATE_PATH}/prompt-workbench-history-list.hbs`,
+    "prompt-workbench-history-placeholder": `${CONSTANTS.TEMPLATE_PATH}/prompt-workbench-history-placeholder.hbs`,
+    "prompt-workbench-entry-detail": `${CONSTANTS.TEMPLATE_PATH}/prompt-workbench-entry-detail.hbs`,
+    "prompt-workbench-request": `${CONSTANTS.TEMPLATE_PATH}/prompt-workbench-request.hbs`,
+    "prompt-workbench-result": `${CONSTANTS.TEMPLATE_PATH}/prompt-workbench-result.hbs`,
   });
 });
 
