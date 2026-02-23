@@ -2,8 +2,8 @@
 export {};
 
 declare module "fvtt-types/configuration" {
-  type HandyDandyGPTModel = import("../scripts/gpt/models").GPTModelId;
-  type HandyDandyGPTImageModel = import("../scripts/gpt/models").GPTImageModelId;
+  type HandyDandyOpenRouterModel = import("../scripts/openrouter/models").OpenRouterModelId;
+  type HandyDandyOpenRouterImageModel = import("../scripts/openrouter/models").OpenRouterImageModelId;
 
   interface SettingConfig {
     /**
@@ -11,8 +11,8 @@ declare module "fvtt-types/configuration" {
      */
     "handy-dandy.OpenRouterApiKey": string;
     "handy-dandy.OpenRouterAuthMethod": string;
-    "handy-dandy.OpenRouterModel": HandyDandyGPTModel;
-    "handy-dandy.OpenRouterImageModel": HandyDandyGPTImageModel;
+    "handy-dandy.OpenRouterModel": HandyDandyOpenRouterModel;
+    "handy-dandy.OpenRouterImageModel": HandyDandyOpenRouterImageModel;
     "handy-dandy.OpenRouterTemperature": number;
     "handy-dandy.OpenRouterTopP": number;
     "handy-dandy.OpenRouterSeed": number;
