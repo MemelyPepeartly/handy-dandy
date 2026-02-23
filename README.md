@@ -49,7 +49,7 @@ Model dropdown choices are loaded from OpenRouter during startup; restart Foundr
 GMs and users with developer mode enabled gain access to `game.handyDandy.dev`:
 
 - `generateAction(input, options?)`: Runs the generation pipeline and logs payloads.
-- `validate(type, payload, options?)`: Runs schema validation/repair (can disable GPT fallback with `useGPT: false`).
+- `validate(type, payload, options?)`: Runs schema validation/repair (can disable OpenRouter fallback with `useOpenRouter: false`).
 - `importAction(json, options?)`: Runs import sanity checks and import workflow.
 
 ## Documentation
