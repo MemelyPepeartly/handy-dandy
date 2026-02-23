@@ -125,7 +125,7 @@ declare global {
 Hooks.once("init", async () => {
   console.log(`${CONSTANTS.MODULE_NAME} | init`);
   registerMapMarkerLayer();
-  registerSettings();
+  await registerSettings();
 
   // Load and register templates with specific names
   await loadTemplates({
