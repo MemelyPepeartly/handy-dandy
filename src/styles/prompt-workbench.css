@@ -798,7 +798,7 @@
 .handy-dandy-workbench-history-list .handy-dandy-workbench-history-item {
   display: flex;
   align-items: stretch;
-  min-height: 4rem;
+  min-height: 4.75rem;
   width: 100%;
 }
 
@@ -806,11 +806,12 @@
   display: flex !important;
   flex: 1 1 auto;
   min-width: 0;
-  min-height: 4rem;
+  min-height: 4.75rem;
   width: auto;
   align-items: flex-start;
-  justify-content: center;
-  gap: 0.2rem;
+  justify-content: flex-start;
+  gap: 0.25rem;
+  padding: 0.45rem 0.55rem;
   line-height: 1.2;
   white-space: normal !important;
   overflow: visible;
@@ -821,15 +822,23 @@
   display: block;
   width: 100%;
   max-width: 100%;
+  font-weight: 650;
+  line-height: 1.25;
+  white-space: normal;
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .handy-dandy-workbench-history-list .handy-dandy-workbench-history-meta {
   display: block;
   width: 100%;
   max-width: 100%;
+  font-size: 0.76rem;
+  opacity: 0.9;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -847,4 +856,11 @@
 
 .handy-dandy-workbench-history-list .handy-dandy-workbench-history-delete i {
   pointer-events: none;
+}
+
+.handy-dandy-workbench-json {
+  font-family: "Consolas", "Courier New", monospace;
+  font-size: 0.83rem;
+  line-height: 1.3;
+  tab-size: 2;
 }
