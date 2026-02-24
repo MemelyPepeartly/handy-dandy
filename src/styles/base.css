@@ -1,1 +1,55 @@
-/* Intentionally retained so styles/ is present for build copy patterns. */
+.handy-dandy-item-description-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px 0;
+}
+
+.handy-dandy-item-description-format-fix,
+.handy-dandy-item-description-remix {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 24px;
+  padding: 2px 8px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.handy-dandy-item-description-format-fix {
+  margin-right: 0;
+}
+
+.handy-dandy-item-description-remix {
+  margin-left: 0;
+}
+
+.handy-dandy-item-description-actions > button {
+  flex: 1 1 0;
+  padding: 4px 8px;
+  font-size: 12px;
+  line-height: 1.1;
+}
+
+.sheet-content section.sidebar .inventory-details .handy-dandy-item-description-actions {
+  flex-direction: column;
+  align-items: stretch;
+  margin-top: 6px;
+}
+
+.sheet-content section.sidebar .inventory-details .handy-dandy-item-description-actions > button {
+  width: 100%;
+  flex: 0 0 auto;
+}
+
+.handy-dandy-item-image-generate {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  line-height: 1.1;
+  cursor: pointer;
+}
