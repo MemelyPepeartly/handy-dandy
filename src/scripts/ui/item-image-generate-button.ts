@@ -1,5 +1,6 @@
 import { CONSTANTS } from "../constants";
-import { generateItemImage } from "../generation/token-image";
+import { buildItemImagePrompt, generateItemImage } from "../generation/token-image";
+import { promptImageGenerationRequest } from "./image-generation-dialog";
 
 const BUTTON_CLASS = "handy-dandy-item-image-generate" as const;
 const STACK_CLASS = "handy-dandy-item-image-stack" as const;
@@ -93,18 +94,37 @@ export function registerItemImageGenerateButton(): void {
       }
 
       void (async () => {
+        const itemName = item.name?.trim() || "Unnamed Item";
+        const slugCandidate = (item as Item & { system?: { slug?: unknown } }).system?.slug;
+        const itemSlug = typeof slugCandidate === "string" && slugCandidate.trim().length > 0
+          ? slugCandidate.trim()
+          : toSlug(itemName) || `item-${Date.now().toString(36)}`;
+        const itemDescription = resolveItemDescription(item);
+        const defaultPrompt = buildItemImagePrompt({
+          itemName,
+          itemSlug,
+          itemDescription,
+        });
+        const request = await promptImageGenerationRequest({
+          title: `${CONSTANTS.MODULE_NAME} | Item Image`,
+          modeLabel: "Item Icon Art",
+          subjectName: itemName,
+          defaultPrompt,
+          promptNotes: "This starts with the default icon prompt. Edit only if you need custom direction.",
+        });
+        if (!request) {
+          return;
+        }
+
         setBusy(button, true);
         try {
-          const itemName = item.name?.trim() || "Unnamed Item";
-          const slugCandidate = (item as Item & { system?: { slug?: unknown } }).system?.slug;
-          const itemSlug = typeof slugCandidate === "string" && slugCandidate.trim().length > 0
-            ? slugCandidate.trim()
-            : toSlug(itemName) || `item-${Date.now().toString(36)}`;
-
           const imagePath = await generateItemImage(openRouterClient, {
             itemName,
             itemSlug,
-            itemDescription: resolveItemDescription(item),
+            itemDescription,
+            promptOverride: request.prompt,
+            referenceImage: request.referenceImage,
+            existingImagePath: item.img,
           });
 
           await item.update({ img: imagePath });

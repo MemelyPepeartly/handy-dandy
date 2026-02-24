@@ -1,14 +1,10 @@
 import { CONSTANTS } from "../constants";
 import { buildTransparentTokenPrompt, generateTransparentTokenImage } from "../generation/token-image";
+import { promptImageGenerationRequest } from "./image-generation-dialog";
 
 const BUTTON_CLASS = "handy-dandy-npc-portrait-regenerate" as const;
 const BUTTON_ICON_CLASS = "fas fa-wand-magic-sparkles" as const;
 const BUTTON_TITLE = "Generate portrait image" as const;
-
-type PortraitGenerationRequest = {
-  prompt: string;
-  referenceImage: File | null;
-};
 
 function toSlug(value: string): string {
   return value
@@ -28,20 +24,6 @@ function stripHtml(value: string): string {
     .trim();
 }
 
-function escapeHtml(value: string): string {
-  const utils = foundry.utils as { escapeHTML?: (input: string) => string };
-  if (typeof utils.escapeHTML === "function") {
-    return utils.escapeHTML(value);
-  }
-
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
 function setBusy(button: JQuery<HTMLElement>, busy: boolean): void {
   const icon = button.find("i");
   icon.attr("class", busy ? "fas fa-spinner fa-spin" : BUTTON_ICON_CLASS);
@@ -57,78 +39,6 @@ function getActorDescription(actor: Actor): string | null {
   }
   const text = stripHtml(publicNotes);
   return text.length > 0 ? text : null;
-}
-
-async function promptPortraitGenerationRequest(
-  actorName: string,
-  defaultPrompt: string,
-): Promise<PortraitGenerationRequest | null> {
-  const content = `
-    <form class="handy-dandy-npc-portrait-remix-form" style="display:flex;flex-direction:column;gap:0.75rem;min-width:640px;">
-      <p class="notes">Generate portrait art for <strong>${escapeHtml(actorName)}</strong>.</p>
-      <div class="form-group">
-        <label for="handy-dandy-npc-reference-image">Reference Image (optional)</label>
-        <input id="handy-dandy-npc-reference-image" type="file" name="referenceImage" accept="image/png,image/jpeg,image/webp" />
-        <p class="notes">Provide a reference image to guide style, colors, or creature traits.</p>
-      </div>
-      <div class="form-group">
-        <label for="handy-dandy-npc-image-prompt">Image Prompt</label>
-        <textarea id="handy-dandy-npc-image-prompt" name="prompt" rows="10">${escapeHtml(defaultPrompt)}</textarea>
-        <p class="notes">This is the current default prompt. Edit it only if you want to override behavior.</p>
-      </div>
-    </form>
-  `;
-
-  return await new Promise<PortraitGenerationRequest | null>((resolve) => {
-    let settled = false;
-    const finish = (value: PortraitGenerationRequest | null): void => {
-      if (!settled) {
-        settled = true;
-        resolve(value);
-      }
-    };
-
-    const dialog = new Dialog(
-      {
-        title: `${CONSTANTS.MODULE_NAME} | Portrait Remix`,
-        content,
-        buttons: {
-          generate: {
-            icon: '<i class="fas fa-wand-magic-sparkles"></i>',
-            label: "Generate",
-            callback: (html) => {
-              const form = html[0]?.querySelector("form");
-              if (!(form instanceof HTMLFormElement)) {
-                finish(null);
-                return;
-              }
-
-              const formData = new FormData(form);
-              const input = form.querySelector('input[name="referenceImage"]');
-              const referenceImage = input instanceof HTMLInputElement
-                ? input.files?.[0] ?? null
-                : null;
-
-              finish({
-                prompt: String(formData.get("prompt") ?? defaultPrompt),
-                referenceImage,
-              });
-            },
-          },
-          cancel: {
-            icon: '<i class="fas fa-times"></i>',
-            label: "Cancel",
-            callback: () => finish(null),
-          },
-        },
-        default: "generate",
-        close: () => finish(null),
-      },
-      { jQuery: true, width: 780 },
-    );
-
-    dialog.render(true);
-  });
 }
 
 async function regenerateNpcPortrait(actor: Actor, button: JQuery<HTMLElement>): Promise<void> {
@@ -151,7 +61,13 @@ async function regenerateNpcPortrait(actor: Actor, button: JQuery<HTMLElement>):
     imageCategory: "actor",
   });
 
-  const request = await promptPortraitGenerationRequest(actorName, defaultPrompt);
+  const request = await promptImageGenerationRequest({
+    title: `${CONSTANTS.MODULE_NAME} | Portrait Remix`,
+    modeLabel: "Portrait Art",
+    subjectName: actorName,
+    defaultPrompt,
+    promptNotes: "This is the current default prompt. Edit it only if you want to override behavior.",
+  });
   if (!request) {
     return;
   }

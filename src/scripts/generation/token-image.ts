@@ -21,6 +21,9 @@ export interface GenerateItemImageOptions {
   itemSlug: string;
   itemDescription?: string | null;
   customPrompt?: string | null;
+  promptOverride?: string | null;
+  referenceImage?: File | null;
+  existingImagePath?: string | null;
 }
 
 // Use FilePicker's "data" source (Foundry user-data root) and write into assets/<configured-dir>/...
@@ -407,7 +410,7 @@ export function buildTransparentTokenPrompt(options: GenerateTokenImageOptions):
   return parts.join("\n");
 }
 
-function buildItemPrompt(options: GenerateItemImageOptions): string {
+export function buildItemImagePrompt(options: GenerateItemImageOptions): string {
   const parts: string[] = [
     `Create Pathfinder-style item icon art for "${options.itemName}".`,
     "Transparent background only.",
@@ -493,17 +496,20 @@ export async function generateItemImage(
   generator: TokenImageGenerator,
   options: GenerateItemImageOptions,
 ): Promise<string> {
-  const prompt = buildItemPrompt(options);
+  const prompt = options.promptOverride?.trim() || buildItemImagePrompt(options);
+  const referenceImages = options.referenceImage ? [options.referenceImage] : undefined;
   const image = await generator.generateImage(prompt, {
     background: "transparent",
     size: "1024x1024",
     format: "png",
     quality: "high",
+    referenceImages,
   });
 
   return storeGeneratedImage(
     image,
     `${options.itemSlug || options.itemName}-item`,
     "item",
+    options.existingImagePath,
   );
 }
