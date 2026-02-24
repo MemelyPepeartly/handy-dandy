@@ -166,6 +166,35 @@ test("generateItemImage stores generated item art in the item slug directory", a
   }
 });
 
+test("generateItemImage supports prompt override and reference images", async () => {
+  const referenceImage = new File([Buffer.from("ref")], "item-ref.png", { type: "image/png" });
+  let capturedPrompt = "";
+  let capturedOptions: unknown;
+
+  await generateItemImage(
+    {
+      generateImage: async (prompt, options) => {
+        capturedPrompt = prompt;
+        capturedOptions = options;
+        return { base64: SAMPLE_BASE64, mimeType: "image/png" };
+      },
+    },
+    {
+      itemName: "Prompt Override Item",
+      itemSlug: "prompt-override-item",
+      promptOverride: "Custom item icon prompt",
+      referenceImage,
+    },
+  );
+
+  assert.equal(capturedPrompt, "Custom item icon prompt");
+  assert.equal((capturedOptions as { referenceImages?: File[] }).referenceImages?.length, 1);
+  assert.equal(
+    (capturedOptions as { referenceImages?: File[] }).referenceImages?.[0],
+    referenceImage,
+  );
+});
+
 test("generateTransparentTokenImage supports prompt override and reference images", async () => {
   const referenceImage = new File([Buffer.from("ref")], "ref.png", { type: "image/png" });
   let capturedPrompt = "";
