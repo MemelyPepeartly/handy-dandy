@@ -1109,8 +1109,41 @@ async function buildEntryDetailMarkup(entry: WorkbenchHistoryEntry): Promise<str
     meta,
     importLabel,
     importerAvailable: entry.importerAvailable,
-    json: entry.json,
+    jsonText: formatJsonForDisplay(entry.json),
   });
+}
+
+function formatJsonForDisplay(rawJson: string): string {
+  let current = rawJson;
+
+  for (let index = 0; index < 3; index += 1) {
+    try {
+      const parsed = JSON.parse(current) as unknown;
+
+      if (isObject(parsed)) {
+        const parsedRecord = parsed as Record<string, unknown>;
+        const nestedJson = parsedRecord.json;
+        if (typeof nestedJson === "string" && nestedJson.trim().startsWith("{")) {
+          current = nestedJson;
+          continue;
+        }
+
+        const dataValue = parsedRecord.data;
+        if (isObject(dataValue)) {
+          const rootValue = (dataValue as Record<string, unknown>).root;
+          if (isObject(rootValue)) {
+            return JSON.stringify(rootValue, null, 2);
+          }
+        }
+      }
+
+      return JSON.stringify(parsed, null, 2);
+    } catch {
+      break;
+    }
+  }
+
+  return rawJson;
 }
 
 function formatHistoryRowMeta(entry: WorkbenchHistoryEntry): string {
