@@ -29,3 +29,28 @@ test("repairPf2eInlineMacros links condition text to PF2E UUID macros", () => {
     "The target is @UUID[Compendium.pf2e.conditionitems.Item.AJh5ex99aV6VTggg]{Off-Guard 2} until the start of your next turn.",
   );
 });
+
+test("repairPf2eInlineMacros canonicalizes broken action links in UUID and Compendium syntax", () => {
+  const source =
+    "<p>@uuid[compendium.pf2e.actionspf2e.item.strikes]{Strike} then @Compendium[pf2e.actionspf2e.steps]{Steps}</p>";
+  const repaired = repairPf2eInlineMacros(source);
+
+  assert.equal(
+    repaired,
+    "<p>@UUID[Compendium.pf2e.actionspf2e.Item.VjxZFuUXrCU94MWR]{Strike} then @UUID[Compendium.pf2e.actionspf2e.Item.UHpkTuCtyaPqiCAB]{Steps}</p>",
+  );
+});
+
+test("repairPf2eInlineMacros rewrites action UUID name targets to action IDs", () => {
+  const source = `Frequency once per round
+
+Trigger Immediately after Dr. Stone makes a bomb @UUID[Compendium.pf2e.actionspf2e.Item.Strike]{Strike} (a Strike with a thrown bomb).
+
+Dr. Stone vents a sharp burst of propellant and shifts his footing. He @UUID[Compendium.pf2e.actionspf2e.Item.Step]{Steps}.
+
+If Dr. Stone is currently within smoke or behind cover, he can Step into that smoke or cover, or Step to another space within the same smoke or cover, without triggering reactions that would normally be triggered by movement (such as Reactive Strike).`;
+  const repaired = repairPf2eInlineMacros(source);
+
+  assert.match(repaired, /@UUID\[Compendium\.pf2e\.actionspf2e\.Item\.VjxZFuUXrCU94MWR\]\{Strike\}/);
+  assert.match(repaired, /@UUID\[Compendium\.pf2e\.actionspf2e\.Item\.UHpkTuCtyaPqiCAB\]\{Steps\}/);
+});
