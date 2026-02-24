@@ -295,6 +295,42 @@ test("importItem can target and update a specific world item by itemId", async (
   assert.equal(existing.system.slug, "new-generated-item");
 });
 
+test("importItem updates an embedded actor item when actorId and itemId are provided", async () => {
+  const embedded = new MockItem({
+    name: "Old Embedded Item",
+    type: "feat",
+    img: "old-embedded.png",
+    system: { slug: "old-embedded-item", description: { value: "<p>Old</p>" }, traits: { value: [], rarity: "common" } },
+  });
+
+  const actorItems = new MockCollection<MockItem>();
+  actorItems.set(embedded.id, embedded);
+
+  const actor = {
+    id: "MockActor.embedded",
+    items: actorItems,
+  };
+
+  (game.actors as MockCollection<any>).set(actor.id, actor);
+
+  const payload = {
+    ...createItem(),
+    slug: "remixed-embedded-item",
+    name: "Remixed Embedded Item",
+  } satisfies ItemSchemaData;
+
+  const result = await importItem(payload, {
+    actorId: actor.id,
+    itemId: embedded.id,
+    folderId: "folder-should-not-apply",
+  });
+
+  assert.strictEqual(result, embedded);
+  assert.equal(embedded.name, "Remixed Embedded Item");
+  assert.equal(embedded.system.slug, "remixed-embedded-item");
+  assert.equal(embedded.folder, null);
+});
+
 test("toFoundryActorData filters action traits and normalizes frequency", () => {
   const actor = createActor();
   actor.actions = [

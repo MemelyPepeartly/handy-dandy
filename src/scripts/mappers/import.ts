@@ -1035,6 +1035,41 @@ function findWorldActor(slug: string): Actor | undefined {
   return undefined;
 }
 
+function findActorById(actorId: string): Actor | undefined {
+  const collection = (game as Game).actors as unknown;
+  if (!collection) {
+    return undefined;
+  }
+
+  const getter = (collection as { get?: (id: string) => Actor | undefined }).get;
+  if (typeof getter === "function") {
+    const found = getter.call(collection, actorId);
+    if (found) {
+      return found;
+    }
+  }
+
+  const actors = collectEmbeddedDocuments<Actor>(collection);
+  return actors.find((actor) => actor.id === actorId);
+}
+
+function findEmbeddedItemOnActor(actor: Actor, itemId: string): Item | undefined {
+  const items = collectEmbeddedDocuments<Item>((actor as { items?: unknown }).items);
+  return items.find((item) => item.id === itemId);
+}
+
+function findEmbeddedItemById(itemId: string): Item | undefined {
+  const actors = collectEmbeddedDocuments<Actor>((game as Game).actors as unknown);
+  for (const actor of actors) {
+    const embedded = findEmbeddedItemOnActor(actor, itemId);
+    if (embedded) {
+      return embedded;
+    }
+  }
+
+  return undefined;
+}
+
 function normalizeLookupKey(value: string): string {
   return value
     .trim()
@@ -3357,10 +3392,21 @@ export async function importItem(
   assertSystemCompatibility(json.systemId);
   ensureValidItem(json);
   const source = prepareItemSource(json);
-  const { packId, folderId, itemId } = options;
+  const { packId, folderId, itemId, actorId } = options;
 
   if (folderId) {
     source.folder = folderId;
+  }
+
+  if (actorId && itemId) {
+    const targetedActor = findActorById(actorId);
+    const embedded = targetedActor ? findEmbeddedItemOnActor(targetedActor, itemId) : undefined;
+    if (embedded) {
+      const updateData = { ...source } as Record<string, unknown>;
+      delete updateData.folder;
+      await embedded.update(updateData as any);
+      return embedded;
+    }
   }
 
   if (itemId) {
@@ -3373,6 +3419,14 @@ export async function importItem(
 
       await targeted.update(updateData as any);
       return targeted;
+    }
+
+    const embedded = findEmbeddedItemById(itemId);
+    if (embedded) {
+      const updateData = { ...source } as Record<string, unknown>;
+      delete updateData.folder;
+      await embedded.update(updateData as any);
+      return embedded;
     }
   }
 

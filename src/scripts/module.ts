@@ -11,7 +11,6 @@ import { registerNpcPortraitRegenerateButton } from "./ui/npc-portrait-regenerat
 import { registerNpcRemixSectionButtons } from "./ui/npc-remix-section-buttons";
 import { registerItemImageGenerateButton } from "./ui/item-image-generate-button";
 import { registerItemDescriptionFormatFixButton } from "./ui/item-description-format-fix-button";
-import { registerItemRemixButton } from "./ui/item-remix-button";
 import { registerTokenImagePreviewHudButton } from "./ui/token-image-preview-hud-button";
 import {
   DEFAULT_GENERATION_SEED,
@@ -64,7 +63,6 @@ registerNpcPortraitRegenerateButton();
 registerNpcRemixSectionButtons();
 registerItemImageGenerateButton();
 registerItemDescriptionFormatFixButton();
-registerItemRemixButton();
 registerTokenImagePreviewHudButton();
 
 function bindGenerator<TInput, TResult>(

@@ -2,14 +2,14 @@ import { CONSTANTS } from "../constants";
 import { fromFoundryItem, type FoundryItem } from "../mappers/export";
 import type { JsonSchemaDefinition } from "../openrouter/client";
 import { repairPf2eInlineMacros, toPf2eRichText } from "../text/pf2e-rich-text";
+import { runItemRemixWithRequest } from "../flows/item-remix";
 
-const ACTION_ROW_CLASS = "handy-dandy-item-description-actions" as const;
-const BUTTON_CLASS = "handy-dandy-item-description-format-fix" as const;
-const BUTTON_ICON_FORMAT = "fas fa-wand-magic-sparkles" as const;
-const BUTTON_TEXT_FORMAT = "Fix Format" as const;
-const REMIX_BUTTON_CLASS = "handy-dandy-item-description-remix" as const;
-const BUTTON_ICON_REMIX = "fas fa-feather-pointed" as const;
-const BUTTON_TEXT_REMIX = "Remix Text" as const;
+const BUTTON_CLASS = "handy-dandy-item-remix-button" as const;
+const BUTTON_ICON = "fas fa-random" as const;
+const BUTTON_TEXT = "Remix" as const;
+const BUTTON_TITLE = "Open Handy Dandy item remixer" as const;
+const BUTTON_TEXT_FORMAT = "Repair Links" as const;
+const BUTTON_TEXT_REMIX = "Run Remix" as const;
 
 const DESCRIPTION_REWRITE_SCHEMA: JsonSchemaDefinition = {
   name: "item_description_remix",
@@ -28,9 +28,227 @@ const DESCRIPTION_REWRITE_SCHEMA: JsonSchemaDefinition = {
 };
 
 function setBusy(button: JQuery<HTMLElement>, busy: boolean, idleIcon: string): void {
-  button.prop("disabled", busy);
+  const element = button[0];
+  if (element instanceof HTMLButtonElement) {
+    button.prop("disabled", busy);
+  }
+  button.toggleClass("disabled", busy);
+  button.attr("aria-disabled", busy ? "true" : "false");
   const icon = button.find("i");
   icon.attr("class", busy ? "fas fa-spinner fa-spin" : idleIcon);
+}
+
+type PlannerAction = "repair-links" | "run-remix";
+type DescriptionRemixMode = "preserve" | "retheme";
+
+interface ItemRemixPlannerRequest {
+  action: PlannerAction;
+  remixDescription: boolean;
+  remixMechanics: boolean;
+  remixTraits: boolean;
+  remixIdentity: boolean;
+  remixEconomy: boolean;
+  preserveIdentity: boolean;
+  descriptionMode: DescriptionRemixMode;
+  instructions: string;
+  generateItemImage: boolean;
+  itemImagePrompt?: string;
+}
+
+function escapeHtml(value: string): string {
+  const utils = foundry.utils as { escapeHTML?: (input: string) => string };
+  if (typeof utils.escapeHTML === "function") {
+    return utils.escapeHTML(value);
+  }
+
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function parsePlannerFormRequest(formData: FormData, action: PlannerAction): ItemRemixPlannerRequest {
+  const itemImagePrompt = String(formData.get("itemImagePrompt") ?? "").trim();
+  const descriptionMode = String(formData.get("descriptionMode") ?? "preserve");
+  return {
+    action,
+    remixDescription: Boolean(formData.get("remixDescription")),
+    remixMechanics: Boolean(formData.get("remixMechanics")),
+    remixTraits: Boolean(formData.get("remixTraits")),
+    remixIdentity: Boolean(formData.get("remixIdentity")),
+    remixEconomy: Boolean(formData.get("remixEconomy")),
+    preserveIdentity: Boolean(formData.get("preserveIdentity")),
+    descriptionMode: descriptionMode === "retheme" ? "retheme" : "preserve",
+    instructions: String(formData.get("instructions") ?? "").trim(),
+    generateItemImage: Boolean(formData.get("generateItemImage")),
+    itemImagePrompt: itemImagePrompt || undefined,
+  };
+}
+
+function hasAnyRemixSections(request: ItemRemixPlannerRequest): boolean {
+  return request.remixDescription ||
+    request.remixMechanics ||
+    request.remixTraits ||
+    request.remixIdentity ||
+    request.remixEconomy;
+}
+
+function buildScopedRemixInstructions(request: ItemRemixPlannerRequest): string {
+  const selected: string[] = [];
+  const locked: string[] = [];
+
+  const register = (enabled: boolean, on: string, off: string): void => {
+    if (enabled) {
+      selected.push(on);
+    } else {
+      locked.push(off);
+    }
+  };
+
+  register(request.remixDescription, "description text and formatting", "description text");
+  register(request.remixMechanics, "mechanical rules fields (activation/effects/frequency/requirements)", "mechanical rules fields");
+  register(request.remixTraits, "traits and rarity tags", "traits and rarity");
+  register(request.remixIdentity, "identity fields (name/slug/level/itemType)", "identity fields");
+  register(request.remixEconomy, "economy/value fields (price, quantity, usage context)", "economy/value fields");
+
+  const parts: string[] = [
+    `Remix only these item sections: ${selected.join(", ")}.`,
+    locked.length > 0
+      ? `Preserve these sections exactly unless technically required: ${locked.join(", ")}.`
+      : "All major sections are in remix scope.",
+    request.preserveIdentity
+      ? "Preserve current item identity and role unless explicitly overridden by instructions."
+      : "Identity changes are allowed if they improve coherence with requested goals.",
+  ];
+
+  if (request.remixDescription) {
+    if (request.descriptionMode === "preserve") {
+      parts.push("Keep the existing item vibe/context while improving clarity and PF2E formatting.");
+    } else {
+      parts.push("Retheme description tone/context while keeping PF2E-valid mechanical intent.");
+    }
+  }
+
+  if (request.remixMechanics) {
+    parts.push("Keep mechanics PF2E-valid and consistent with the item's intended role.");
+  }
+
+  if (request.remixTraits) {
+    parts.push("Traits and rarity must use canonical PF2E-compatible tags.");
+  }
+
+  if (request.generateItemImage) {
+    parts.push("Generate a transparent item icon suitable for Foundry item sheets.");
+  }
+
+  if (request.itemImagePrompt) {
+    parts.push(`Item icon direction: ${request.itemImagePrompt}`);
+  }
+
+  if (request.instructions) {
+    parts.push(request.instructions);
+  }
+
+  return parts.join("\n");
+}
+
+async function promptItemToolChoice(item: Item): Promise<ItemRemixPlannerRequest | null> {
+  const content = `
+    <div class="handy-dandy-item-tools-dialog">
+      <form class="handy-dandy-item-remix-planner-form" style="display:flex;flex-direction:column;gap:0.75rem;min-width:700px;">
+        <div style="padding:0.5rem 0.65rem;border:1px solid rgba(0,0,0,0.18);border-radius:8px;background:rgba(0,0,0,0.04);">
+          <strong>Item Remix Planner</strong>
+          <div class="notes">Current item: <strong>${escapeHtml(item.name ?? "Unnamed Item")}</strong></div>
+          <div class="notes">Choose which item sections to remix, then run a scoped remix pass.</div>
+        </div>
+        <fieldset style="border:1px solid rgba(0,0,0,0.2);border-radius:6px;padding:0.5rem 0.65rem;">
+          <legend style="padding:0 0.2rem;">Remix Scope</legend>
+          <label style="display:block;"><input type="checkbox" name="remixDescription" checked /> Description text and formatting</label>
+          <label style="display:block;"><input type="checkbox" name="remixMechanics" checked /> Mechanics (activation, requirements, effects, frequency)</label>
+          <label style="display:block;"><input type="checkbox" name="remixTraits" checked /> Traits and rarity</label>
+          <label style="display:block;"><input type="checkbox" name="remixIdentity" /> Identity (name, slug, level, item type)</label>
+          <label style="display:block;"><input type="checkbox" name="remixEconomy" /> Economy/value fields (price and related details)</label>
+        </fieldset>
+        <fieldset style="border:1px solid rgba(0,0,0,0.2);border-radius:6px;padding:0.5rem 0.65rem;">
+          <legend style="padding:0 0.2rem;">Description Rewrite Style</legend>
+          <label style="display:block;"><input type="radio" name="descriptionMode" value="preserve" checked /> Polish existing text only: keep current theme/context, improve clarity and formatting</label>
+          <label style="display:block;"><input type="radio" name="descriptionMode" value="retheme" /> Rewrite theme/tone: allow creative reframing, but keep mechanics PF2E-valid</label>
+          <label style="display:block;margin-top:0.35rem;"><input type="checkbox" name="preserveIdentity" checked /> Keep item identity locked (name, slug, level, item type) unless I explicitly request changes</label>
+        </fieldset>
+        <fieldset style="border:1px solid rgba(0,0,0,0.2);border-radius:6px;padding:0.5rem 0.65rem;">
+          <legend style="padding:0 0.2rem;">Optional Icon</legend>
+          <label style="display:block;"><input type="checkbox" name="generateItemImage" /> Generate transparent item icon</label>
+          <div class="form-group" style="margin-top:0.35rem;">
+            <label for="handy-dandy-item-remix-image-prompt">Item image prompt override</label>
+            <input id="handy-dandy-item-remix-image-prompt" type="text" name="itemImagePrompt" placeholder="Optional icon art direction" />
+          </div>
+        </fieldset>
+        <div class="form-group">
+          <label for="handy-dandy-item-remix-instructions">Additional Instructions</label>
+          <textarea id="handy-dandy-item-remix-instructions" name="instructions" rows="6" placeholder="Specific directions for this remix pass."></textarea>
+        </div>
+      </form>
+    </div>
+  `;
+
+  const response = await new Promise<ItemRemixPlannerRequest | null>((resolve) => {
+    let settled = false;
+    const finish = (value: ItemRemixPlannerRequest | null): void => {
+      if (!settled) {
+        settled = true;
+        resolve(value);
+      }
+    };
+
+    const dialog = new Dialog(
+      {
+        title: `${CONSTANTS.MODULE_NAME} | Item Remixer`,
+        content,
+        buttons: {
+          repair: {
+            icon: '<i class="fas fa-wand-magic-sparkles"></i>',
+            label: BUTTON_TEXT_FORMAT,
+            callback: (html) => {
+              const form = html[0]?.querySelector("form");
+              if (!(form instanceof HTMLFormElement)) {
+                finish(null);
+                return;
+              }
+              const formData = new FormData(form);
+              finish(parsePlannerFormRequest(formData, "repair-links"));
+            },
+          },
+          remix: {
+            icon: '<i class="fas fa-random"></i>',
+            label: BUTTON_TEXT_REMIX,
+            callback: (html) => {
+              const form = html[0]?.querySelector("form");
+              if (!(form instanceof HTMLFormElement)) {
+                finish(null);
+                return;
+              }
+              const formData = new FormData(form);
+              finish(parsePlannerFormRequest(formData, "run-remix"));
+            },
+          },
+          cancel: {
+            icon: '<i class="fas fa-times"></i>',
+            label: "Cancel",
+            callback: () => finish(null),
+          },
+        },
+        default: "remix",
+        close: () => finish(null),
+      },
+      { jQuery: true, width: 820 },
+    );
+
+    dialog.render(true);
+  });
+
+  return response;
 }
 
 function resolveItemDescriptionValue(item: Item): string | null {
@@ -188,172 +406,6 @@ function buildDescriptionRemixPrompt(item: Item, currentDescription: string, ins
   return sections.join("\n\n");
 }
 
-async function promptDescriptionRemixInstructions(item: Item): Promise<string | null> {
-  const actorName = item.actor?.name?.trim();
-  const actorHint = actorName ? ` in the context of ${actorName}` : "";
-
-  const content = `
-    <form class="handy-dandy-item-description-remix-form" style="display:flex;flex-direction:column;gap:0.75rem;min-width:560px;">
-      <p class="notes">Rewrite <strong>${item.name ?? "item"}</strong>${actorHint} while preserving existing mechanics.</p>
-      <div class="form-group">
-        <label for="handy-dandy-item-description-remix-instructions">Additional Direction (optional)</label>
-        <textarea id="handy-dandy-item-description-remix-instructions" name="instructions" rows="6" placeholder="Example: keep all mechanics intact, tighten wording, and push an eerie alchemical tone."></textarea>
-      </div>
-    </form>
-  `;
-
-  const response = await new Promise<string | null>((resolve) => {
-    let settled = false;
-    const finish = (value: string | null): void => {
-      if (!settled) {
-        settled = true;
-        resolve(value);
-      }
-    };
-
-    const dialog = new Dialog(
-      {
-        title: `${CONSTANTS.MODULE_NAME} | Remix Description`,
-        content,
-        buttons: {
-          remix: {
-            icon: '<i class="fas fa-feather-pointed"></i>',
-            label: "Rewrite",
-            callback: (html) => {
-              const form = html[0]?.querySelector("form");
-              if (!(form instanceof HTMLFormElement)) {
-                finish("");
-                return;
-              }
-
-              const formData = new FormData(form);
-              finish(String(formData.get("instructions") ?? "").trim());
-            },
-          },
-          cancel: {
-            icon: '<i class="fas fa-times"></i>',
-            label: "Cancel",
-            callback: () => finish(null),
-          },
-        },
-        default: "remix",
-        close: () => finish(null),
-      },
-      { jQuery: true, width: 680 },
-    );
-
-    dialog.render(true);
-  });
-
-  return response;
-}
-
-function resolveDescriptionTab(html: JQuery<HTMLElement>): JQuery<HTMLElement> {
-  const candidates = [
-    '.tab[data-tab="description"]',
-    '.sheet-content .tab[data-tab="description"]',
-    'section[data-tab="description"]',
-  ] as const;
-
-  for (const selector of candidates) {
-    const match = html.find(selector).first();
-    if (match.length > 0) {
-      return match;
-    }
-  }
-
-  return $();
-}
-
-type ActionRowPlacement = "before" | "after" | "prepend";
-
-interface ActionRowMountPoint {
-  placement: ActionRowPlacement;
-  target: JQuery<HTMLElement>;
-}
-
-function resolveActionRowMountPoint(html: JQuery<HTMLElement>): ActionRowMountPoint | null {
-  const sidebarInventory = html.find(".sheet-content section.sidebar .inventory-details").first();
-  if (sidebarInventory.length > 0) {
-    const categoryInput = sidebarInventory
-      .find('[name="system.category"], select[name="system.category"], [data-property="system.category"]')
-      .first();
-    if (categoryInput.length > 0) {
-      const categoryGroup = categoryInput.closest(".form-group");
-      if (categoryGroup.length > 0) {
-        return {
-          placement: "after",
-          target: categoryGroup.first(),
-        };
-      }
-    }
-
-    return {
-      placement: "prepend",
-      target: sidebarInventory,
-    };
-  }
-
-  const detailsTab = html.find('.tab[data-tab="details"]').first();
-  if (detailsTab.length > 0) {
-    const detailsDescriptionLink = detailsTab.find('[data-tab="description"]').first();
-    if (detailsDescriptionLink.length > 0) {
-      const navContainer = detailsDescriptionLink.closest("nav, .tabs, .sheet-tabs, .tab-navigation");
-      if (navContainer.length > 0) {
-        return {
-          placement: "after",
-          target: navContainer.first(),
-        };
-      }
-    }
-
-    const detailsDescriptionEditor = detailsTab
-      .find('[data-edit="system.description.value"], [name="system.description.value"], .editor-container.main .editor')
-      .first();
-    if (detailsDescriptionEditor.length > 0) {
-      const editorContainer = detailsDescriptionEditor.closest(".editor-container, .form-group");
-      return {
-        placement: "before",
-        target: (editorContainer.length > 0 ? editorContainer : detailsDescriptionEditor).first(),
-      };
-    }
-
-    return {
-      placement: "prepend",
-      target: detailsTab,
-    };
-  }
-
-  const descriptionTab = resolveDescriptionTab(html);
-  if (descriptionTab.length > 0) {
-    const primaryDescriptionEditor = descriptionTab
-      .find('[data-edit="system.description.value"], [name="system.description.value"], section.main.editor-container, .editor')
-      .first();
-    if (primaryDescriptionEditor.length > 0) {
-      const editorContainer = primaryDescriptionEditor.closest(".editor-container, .form-group");
-      return {
-        placement: "before",
-        target: (editorContainer.length > 0 ? editorContainer : primaryDescriptionEditor).first(),
-      };
-    }
-
-    return {
-      placement: "prepend",
-      target: descriptionTab,
-    };
-  }
-
-  const body = html.find(".sheet-body").first();
-  if (body.length > 0) {
-    return {
-      placement: "prepend",
-      target: body,
-    };
-  }
-
-  return null;
-}
-
 export function registerItemDescriptionFormatFixButton(): void {
   Hooks.on("renderItemSheetPF2e", (app: ItemSheet, html: JQuery<HTMLElement>) => {
     const item = app.item ?? app.document;
@@ -363,81 +415,89 @@ export function registerItemDescriptionFormatFixButton(): void {
     if (!user) return;
     if (!user.isGM && !item.isOwner) return;
 
-    if (html.find(`.${ACTION_ROW_CLASS}`).length > 0) return;
+    const windowHeader = html.find(".window-header").first();
+    if (windowHeader.length === 0) return;
+    if (windowHeader.find(`.${BUTTON_CLASS}`).length > 0) return;
 
-    const formatButton = $(
-      `<button type="button" class="${BUTTON_CLASS}">
-        <i class="${BUTTON_ICON_FORMAT}"></i>
-        <span>${BUTTON_TEXT_FORMAT}</span>
-      </button>`,
+    const button = $(
+      `<a class="${BUTTON_CLASS}" title="${BUTTON_TITLE}" role="button" aria-disabled="false">
+        <i class="${BUTTON_ICON}"></i>
+        <span>${BUTTON_TEXT}</span>
+      </a>`,
     );
 
-    const remixButton = $(
-      `<button type="button" class="${REMIX_BUTTON_CLASS}">
-        <i class="${BUTTON_ICON_REMIX}"></i>
-        <span>${BUTTON_TEXT_REMIX}</span>
-      </button>`,
-    );
-
-    formatButton.on("click", (event) => {
+    button.on("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
 
-      const currentDescription = resolveItemDescriptionValue(item);
-      if (!currentDescription || !currentDescription.trim()) {
-        ui.notifications?.warn(`${CONSTANTS.MODULE_NAME} | This item has no description text to reformat.`);
-        return;
-      }
-
       void (async () => {
-        setBusy(formatButton, true, BUTTON_ICON_FORMAT);
-        try {
-          const repaired = repairPf2eInlineMacros(currentDescription);
-          if (repaired === currentDescription) {
-            ui.notifications?.info(`${CONSTANTS.MODULE_NAME} | No formatting fixes were detected.`);
-            return;
-          }
-
-          const updateData: Record<string, unknown> = {
-            "system.description.value": repaired,
-          };
-          await item.update(updateData);
-          ui.notifications?.info(`${CONSTANTS.MODULE_NAME} | Updated description formatting for ${item.name}.`);
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          ui.notifications?.error(`${CONSTANTS.MODULE_NAME} | Description format fix failed: ${message}`);
-          console.error(`${CONSTANTS.MODULE_NAME} | Description format fix failed`, error);
-        } finally {
-          setBusy(formatButton, false, BUTTON_ICON_FORMAT);
-        }
-      })();
-    });
-
-    remixButton.on("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-
-      const currentDescription = resolveItemDescriptionValue(item);
-      if (!currentDescription || !currentDescription.trim()) {
-        ui.notifications?.warn(`${CONSTANTS.MODULE_NAME} | This item has no description text to remix.`);
-        return;
-      }
-
-      const openRouterClient = game.handyDandy?.openRouterClient;
-      if (!openRouterClient || typeof openRouterClient.generateWithSchema !== "function") {
-        ui.notifications?.error(`${CONSTANTS.MODULE_NAME} | OpenRouter text generation is unavailable.`);
-        return;
-      }
-
-      void (async () => {
-        const instructions = await promptDescriptionRemixInstructions(item);
-        if (instructions === null) {
+        const request = await promptItemToolChoice(item);
+        if (!request) {
           return;
         }
 
-        setBusy(remixButton, true, BUTTON_ICON_REMIX);
+        setBusy(button, true, BUTTON_ICON);
         try {
-          const prompt = buildDescriptionRemixPrompt(item, currentDescription, instructions);
+          if (request.action === "repair-links") {
+            const currentDescription = resolveItemDescriptionValue(item);
+            if (!currentDescription || !currentDescription.trim()) {
+              ui.notifications?.warn(`${CONSTANTS.MODULE_NAME} | This item has no description text to reformat.`);
+              return;
+            }
+
+            const repaired = repairPf2eInlineMacros(currentDescription);
+            if (repaired === currentDescription) {
+              ui.notifications?.info(`${CONSTANTS.MODULE_NAME} | No formatting fixes were detected.`);
+              return;
+            }
+
+            const updateData: Record<string, unknown> = {
+              "system.description.value": repaired,
+            };
+            await item.update(updateData);
+            ui.notifications?.info(`${CONSTANTS.MODULE_NAME} | Updated description formatting for ${item.name}.`);
+            return;
+          }
+
+          if (!hasAnyRemixSections(request)) {
+            ui.notifications?.warn(`${CONSTANTS.MODULE_NAME} | Select at least one item section to remix.`);
+            return;
+          }
+
+          const descriptionOnly = request.remixDescription &&
+            !request.remixMechanics &&
+            !request.remixTraits &&
+            !request.remixIdentity &&
+            !request.remixEconomy &&
+            !request.generateItemImage;
+
+          if (!descriptionOnly) {
+            const scopedInstructions = buildScopedRemixInstructions(request);
+            await runItemRemixWithRequest(item, {
+              instructions: scopedInstructions,
+              generateItemImage: request.generateItemImage || undefined,
+              itemImagePrompt: request.itemImagePrompt,
+            });
+            return;
+          }
+
+          const currentDescription = resolveItemDescriptionValue(item);
+          if (!currentDescription || !currentDescription.trim()) {
+            ui.notifications?.warn(`${CONSTANTS.MODULE_NAME} | This item has no description text to remix.`);
+            return;
+          }
+
+          const openRouterClient = game.handyDandy?.openRouterClient;
+          if (!openRouterClient || typeof openRouterClient.generateWithSchema !== "function") {
+            ui.notifications?.error(`${CONSTANTS.MODULE_NAME} | OpenRouter text generation is unavailable.`);
+            return;
+          }
+
+          const remixDirection = request.descriptionMode === "preserve"
+            ? "Keep the same context/theme as the original item and improve quality/clarity."
+            : "You may retheme context/tone, but mechanics must stay coherent and PF2E-valid.";
+          const mergedInstructions = [remixDirection, request.instructions].filter((entry) => entry.trim().length > 0).join("\n");
+          const prompt = buildDescriptionRemixPrompt(item, currentDescription, mergedInstructions);
           const response = await openRouterClient.generateWithSchema<{ description: string }>(
             prompt,
             DESCRIPTION_REWRITE_SCHEMA,
@@ -467,31 +527,20 @@ export function registerItemDescriptionFormatFixButton(): void {
           ui.notifications?.info(`${CONSTANTS.MODULE_NAME} | Remixed description for ${item.name}.`);
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
-          ui.notifications?.error(`${CONSTANTS.MODULE_NAME} | Description remix failed: ${message}`);
-          console.error(`${CONSTANTS.MODULE_NAME} | Description remix failed`, error);
+          const prefix = request.action === "repair-links" ? "Description format fix failed" : "Description remix failed";
+          ui.notifications?.error(`${CONSTANTS.MODULE_NAME} | ${prefix}: ${message}`);
+          console.error(`${CONSTANTS.MODULE_NAME} | ${prefix}`, error);
         } finally {
-          setBusy(remixButton, false, BUTTON_ICON_REMIX);
+          setBusy(button, false, BUTTON_ICON);
         }
       })();
     });
 
-    const actionRow = $(`<div class="${ACTION_ROW_CLASS}"></div>`);
-    actionRow.append(formatButton);
-    actionRow.append(remixButton);
-
-    const mountPoint = resolveActionRowMountPoint(html);
-    if (!mountPoint) return;
-
-    if (mountPoint.placement === "after") {
-      mountPoint.target.after(actionRow);
-      return;
+    const closeButton = windowHeader.find(".close").first();
+    if (closeButton.length > 0) {
+      closeButton.before(button);
+    } else {
+      windowHeader.append(button);
     }
-
-    if (mountPoint.placement === "before") {
-      mountPoint.target.before(actionRow);
-      return;
-    }
-
-    mountPoint.target.prepend(actionRow);
   });
 }

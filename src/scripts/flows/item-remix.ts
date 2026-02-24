@@ -2,7 +2,7 @@ import { CONSTANTS } from "../constants";
 import { fromFoundryItem } from "../mappers/export";
 import { importItem } from "../mappers/import";
 
-interface ItemRemixRequest {
+export interface ItemRemixRequest {
   instructions: string;
   generateItemImage?: boolean;
   itemImagePrompt?: string;
@@ -162,12 +162,7 @@ function showWorkingDialog(itemName: string): Dialog {
   return dialog;
 }
 
-export async function runItemRemixFlow(item: Item): Promise<void> {
-  const request = await promptItemRemixRequest(item);
-  if (!request) {
-    return;
-  }
-
+export async function runItemRemixWithRequest(item: Item, request: ItemRemixRequest): Promise<void> {
   const generation = game.handyDandy?.generation?.generateItem;
   if (!generation) {
     ui.notifications?.error(`${CONSTANTS.MODULE_NAME} | Item generation is unavailable.`);
@@ -195,7 +190,8 @@ export async function runItemRemixFlow(item: Item): Promise<void> {
 
     const imported = await importItem(generated, {
       itemId: item.id ?? undefined,
-      folderId: item.folder?.id ?? undefined,
+      actorId: item.actor?.id ?? undefined,
+      folderId: item.actor ? undefined : item.folder?.id ?? undefined,
     });
 
     workingDialog.close({ force: true });
@@ -210,4 +206,13 @@ export async function runItemRemixFlow(item: Item): Promise<void> {
   } finally {
     workingDialog?.close({ force: true });
   }
+}
+
+export async function runItemRemixFlow(item: Item): Promise<void> {
+  const request = await promptItemRemixRequest(item);
+  if (!request) {
+    return;
+  }
+
+  await runItemRemixWithRequest(item, request);
 }
