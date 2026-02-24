@@ -104,6 +104,58 @@ const CONDITION_UUID_PATTERN =
 const CONDITION_COMPENDIUM_PATTERN =
   /@Compendium\[pf2e\.(?:conditionitems|conditions)\.([^\]\}]+)\](?:\{([^}]*)\})?/gi;
 const CONDITION_ID_PATTERN = /^[A-Za-z0-9]{16}$/;
+const ACTION_UUID_PATTERN =
+  /@UUID\[Compendium\.pf2e\.(?:actionspf2e|actions)(?:\.Item)?\.([^\]\}]+)\](?:\{([^}]*)\})?/gi;
+const ACTION_COMPENDIUM_PATTERN =
+  /@Compendium\[pf2e\.(?:actionspf2e|actions)\.([^\]\}]+)\](?:\{([^}]*)\})?/gi;
+const ACTION_ID_PATTERN = /^[A-Za-z0-9]{16}$/;
+
+const ACTION_NAME_ALIASES: Record<string, string> = {
+  "aid": "Aid",
+  "administer-first-aid": "Administer First Aid",
+  "create-a-diversion": "Create a Diversion",
+  "delay": "Delay",
+  "demoralize": "Demoralize",
+  "escape": "Escape",
+  "force-open": "Force Open",
+  "hide": "Hide",
+  "seek": "Seek",
+  "sense-direction": "Sense Direction",
+  "sense-motive": "Sense Motive",
+  "sneak": "Sneak",
+  "stand": "Stand",
+  "step": "Step",
+  "steps": "Step",
+  "stride": "Stride",
+  "strides": "Stride",
+  "strike": "Strike",
+  "strikes": "Strike",
+  "reactive-strike": "Reactive Strike",
+  "recall-knowledge": "Recall Knowledge",
+  "tumble-through": "Tumble Through",
+};
+
+const ACTION_ID_BY_NAME: Record<string, string> = {
+  aid: "HCl3pzVefiv9ZKQW",
+  "administer-first-aid": "MHLuKy4nQO2Z4Am1",
+  "create-a-diversion": "GkmbTGfg8KcgynOA",
+  delay: "A72nHGUtNXgY5Ey9",
+  demoralize: "2u915NdUyQan6uKF",
+  escape: "SkZAQRkLLkmBQNB9",
+  "force-open": "SjmKHgI7a5Z9JzBx",
+  hide: "XMcnh4cSI32tljXa",
+  seek: "BlAOM2X92SI6HMtJ",
+  "sense-direction": "fJImDBQfqfjKJOhk",
+  "sense-motive": "1xRFPTFtWtGJ9ELw",
+  sneak: "VMozDqMMuK5kpoX4",
+  stand: "OdIUybJ3ddfL7wzj",
+  step: "UHpkTuCtyaPqiCAB",
+  stride: "Bcxarzksqt9ezrs6",
+  strike: "VjxZFuUXrCU94MWR",
+  "reactive-strike": "KAVf7AmRnbCAHrkT",
+  "recall-knowledge": "1OagaWtBpVXExToo",
+  "tumble-through": "21WIfSu7Xd7uKqV8",
+};
 
 const DETAIL_HEADERS = [
   "Activate",
@@ -288,6 +340,61 @@ function buildConditionUuidMacro(slug: ConditionSlug, label: string): string {
   return `@UUID[Compendium.pf2e.conditionitems.Item.${conditionId}]{${label}}`;
 }
 
+function toActionTitle(value: string): string {
+  return value
+    .split("-")
+    .filter((part) => part.length > 0)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function resolveActionName(value: string | null | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+
+  const normalized = normalizeLookupKey(value);
+  if (!normalized) {
+    return null;
+  }
+
+  const direct = ACTION_NAME_ALIASES[normalized];
+  if (direct) {
+    return direct;
+  }
+
+  if (normalized.endsWith("s")) {
+    const singular = ACTION_NAME_ALIASES[normalized.slice(0, -1)];
+    if (singular) {
+      return singular;
+    }
+  }
+
+  return toActionTitle(normalized);
+}
+
+function resolveActionId(value: string | null | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+
+  const normalized = normalizeLookupKey(value);
+  if (!normalized) {
+    return null;
+  }
+
+  return ACTION_ID_BY_NAME[normalized] ?? null;
+}
+
+function buildActionUuidMacro(target: string, label?: string | null): string {
+  const trimmedLabel = label?.trim();
+  if (trimmedLabel) {
+    return `@UUID[Compendium.pf2e.actionspf2e.Item.${target}]{${trimmedLabel}}`;
+  }
+
+  return `@UUID[Compendium.pf2e.actionspf2e.Item.${target}]`;
+}
+
 function normalizeConditionMacros(value: string): string {
   let next = value.replace(CONDITION_UUID_PATTERN, (macro, rawTarget: string, rawLabel: string | undefined) => {
     const target = rawTarget.trim();
@@ -323,6 +430,44 @@ function normalizeConditionMacros(value: string): string {
   return next;
 }
 
+function normalizeActionMacros(value: string): string {
+  let next = value.replace(ACTION_UUID_PATTERN, (macro, rawTarget: string, rawLabel: string | undefined) => {
+    const target = rawTarget.trim();
+    const label = rawLabel?.trim() || null;
+
+    if (ACTION_ID_PATTERN.test(target)) {
+      return buildActionUuidMacro(target, label);
+    }
+
+    const actionName = resolveActionName(target) ?? resolveActionName(label);
+    if (!actionName) {
+      return macro;
+    }
+
+    const actionId = resolveActionId(actionName);
+    return buildActionUuidMacro(actionId ?? actionName, label ?? actionName);
+  });
+
+  next = next.replace(ACTION_COMPENDIUM_PATTERN, (macro, rawTarget: string, rawLabel: string | undefined) => {
+    const target = rawTarget.trim();
+    const label = rawLabel?.trim() || null;
+
+    if (ACTION_ID_PATTERN.test(target)) {
+      return buildActionUuidMacro(target, label);
+    }
+
+    const actionName = resolveActionName(target) ?? resolveActionName(label);
+    if (!actionName) {
+      return macro;
+    }
+
+    const actionId = resolveActionId(actionName);
+    return buildActionUuidMacro(actionId ?? actionName, label ?? actionName);
+  });
+
+  return next;
+}
+
 function applyConditionLinks(value: string): string {
   const canonicalMacros = normalizeConditionMacros(value);
   const macros: string[] = [];
@@ -349,6 +494,10 @@ function applyConditionLinks(value: string): string {
     const macro = macros[Number(index)];
     return typeof macro === "string" ? macro : "";
   });
+}
+
+function applyActionLinks(value: string): string {
+  return normalizeActionMacros(value);
 }
 
 function formatDetailHeaderLine(value: string): string {
@@ -394,13 +543,15 @@ function formatInline(value: string): string {
   const withDamage = applyInlineDamage(withChecks);
   const withTemplates = applyInlineTemplates(withDamage);
   const withConditions = applyConditionLinks(withTemplates);
-  return formatDetailHeaderLine(withConditions);
+  const withActions = applyActionLinks(withConditions);
+  return formatDetailHeaderLine(withActions);
 }
 
 function normalizeExistingHtmlRichText(value: string): string {
   const withMacros = normalizeInlineMacroCasing(value);
   const withMarkdown = applyInlineMarkdown(withMacros);
-  return applyConditionLinks(withMarkdown);
+  const withConditions = applyConditionLinks(withMarkdown);
+  return applyActionLinks(withConditions);
 }
 
 function repairInlineMacrosInPlainText(value: string): string {
@@ -408,7 +559,8 @@ function repairInlineMacrosInPlainText(value: string): string {
   const withChecks = applyInlineChecks(withMacroCase);
   const withDamage = applyInlineDamage(withChecks);
   const withTemplates = applyInlineTemplates(withDamage);
-  return applyConditionLinks(withTemplates);
+  const withConditions = applyConditionLinks(withTemplates);
+  return applyActionLinks(withConditions);
 }
 
 function repairInlineMacrosInHtml(value: string): string {
