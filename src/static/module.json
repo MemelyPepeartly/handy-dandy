@@ -21,7 +21,8 @@
   "esmodules": ["handy-dandy.js"],
   "styles": [
     "styles/base.css",
-    "styles/prompt-workbench.css"
+    "styles/prompt-workbench.css",
+    "styles/rule-element-generator.css"
   ],
   "languages": [],
   "packs": [],

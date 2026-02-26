@@ -1,0 +1,80 @@
+.handy-dandy-rulegen-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.handy-dandy-rulegen-setup {
+  border: 1px solid var(--color-border-light-primary);
+  border-radius: 6px;
+  padding: 0.6rem 0.75rem;
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.handy-dandy-rulegen-setup h3 {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+}
+
+.handy-dandy-rulegen-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.handy-dandy-rulegen-supported-keys summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.handy-dandy-rulegen-key-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+}
+
+.handy-dandy-rulegen-key-list code {
+  border: 1px solid var(--color-border-light-primary);
+  border-radius: 4px;
+  padding: 0.15rem 0.35rem;
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.handy-dandy-rulegen-loading {
+  min-width: 440px;
+  padding: 0.2rem 0;
+}
+
+.handy-dandy-rulegen-result {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.handy-dandy-rulegen-summary {
+  margin: 0;
+}
+
+.handy-dandy-rulegen-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.handy-dandy-rulegen-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.handy-dandy-rulegen-list {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+@media (max-width: 880px) {
+  .handy-dandy-rulegen-grid {
+    grid-template-columns: 1fr;
+  }
+}

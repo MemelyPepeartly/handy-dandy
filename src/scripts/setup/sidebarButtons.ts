@@ -1,4 +1,5 @@
 import { runPromptWorkbenchFlow } from "../flows/prompt-workbench-ui";
+import { runRuleElementGeneratorFlow } from "../flows/rule-element-generator-ui";
 import {
   MAP_MARKER_CONTROL_NAME,
   MAP_MARKER_PLACEMENT_TOOL_NAME,
@@ -231,6 +232,16 @@ export function insertSidebarButtons(controls: ControlCollection): void {
     button: true,
     onChange: () => {
       void runPromptWorkbenchFlow();
+    },
+  });
+
+  compatibilityAddTool(handyGroup.tools, {
+    name: "rule-element-generator",
+    title: "Rule Element Generator",
+    icon: "fa-solid fa-gears",
+    button: true,
+    onChange: () => {
+      void runRuleElementGeneratorFlow();
     },
   });
 

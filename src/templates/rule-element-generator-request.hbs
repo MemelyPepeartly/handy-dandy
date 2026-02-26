@@ -1,0 +1,101 @@
+<form class="handy-dandy-rulegen-form">
+  <section class="handy-dandy-rulegen-setup">
+    <h3><i class="fas fa-plug"></i> OpenRouter Setup</h3>
+    <p class="notes">
+      {{#if connected}}
+        Connected. Using <strong>{{textModel}}</strong> (temperature {{temperature}}, top-p {{topP}}).
+      {{else}}
+        Not connected. Configure OpenRouter in module settings before generating.
+      {{/if}}
+    </p>
+  </section>
+
+  <div class="form-group">
+    <label for="handy-dandy-rulegen-objective">Rule Behavior Request</label>
+    <textarea
+      id="handy-dandy-rulegen-objective"
+      name="objective"
+      rows="7"
+      placeholder="Describe the mechanic to implement, including triggers, selectors, bonus types, and conditions."
+      required
+    ></textarea>
+    <p class="notes">Be specific about selectors (like <code>ac</code>, <code>attack-roll</code>) and bonus types.</p>
+  </div>
+
+  <div class="handy-dandy-rulegen-grid">
+    <div class="form-group">
+      <label for="handy-dandy-rulegen-target-item-type">Target Item/Effect Type (optional)</label>
+      <input
+        id="handy-dandy-rulegen-target-item-type"
+        type="text"
+        name="targetItemType"
+        placeholder="effect, feat, action, weapon, armor..."
+      />
+    </div>
+
+    <div class="form-group">
+      <label for="handy-dandy-rulegen-desired-count">Desired Rule Count (optional)</label>
+      <input
+        id="handy-dandy-rulegen-desired-count"
+        type="number"
+        name="desiredRuleCount"
+        min="1"
+        max="20"
+        step="1"
+        placeholder="1"
+      />
+    </div>
+
+    <div class="form-group">
+      <label for="handy-dandy-rulegen-seed">Seed (optional)</label>
+      <input
+        id="handy-dandy-rulegen-seed"
+        type="number"
+        name="seed"
+        step="1"
+        value="{{defaultSeed}}"
+      />
+    </div>
+  </div>
+
+  <div class="form-group">
+    <label for="handy-dandy-rulegen-preferred-keys">Preferred Rule Element Keys (optional)</label>
+    <input
+      id="handy-dandy-rulegen-preferred-keys"
+      type="text"
+      name="preferredRuleKeys"
+      placeholder="FlatModifier, AdjustModifier, RollOption"
+    />
+    <p class="notes">Comma-separated. Leave blank to allow any valid PF2E key.</p>
+  </div>
+
+  <div class="form-group">
+    <label for="handy-dandy-rulegen-context-json">Existing system.rules JSON (optional)</label>
+    <textarea
+      id="handy-dandy-rulegen-context-json"
+      name="contextJson"
+      rows="8"
+      placeholder='[{"key":"FlatModifier","selector":"ac","type":"status","value":1}]'
+    ></textarea>
+    <p class="notes">If provided, it must be valid JSON and will be used as context.</p>
+  </div>
+
+  <div class="form-group">
+    <label for="handy-dandy-rulegen-constraints">Extra Constraints (optional)</label>
+    <textarea
+      id="handy-dandy-rulegen-constraints"
+      name="constraints"
+      rows="4"
+      placeholder="Any extra constraints such as no temporary effects, reusable slug naming, specific predicates, etc."
+    ></textarea>
+  </div>
+
+  <details class="handy-dandy-rulegen-supported-keys">
+    <summary>Supported PF2E Rule Element Keys ({{supportedRuleKeys.length}})</summary>
+    <div class="handy-dandy-rulegen-key-list">
+      {{#each supportedRuleKeys}}
+        <code>{{this}}</code>
+      {{/each}}
+    </div>
+  </details>
+</form>

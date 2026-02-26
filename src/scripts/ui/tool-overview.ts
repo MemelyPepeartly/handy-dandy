@@ -1,5 +1,6 @@
 import { CONSTANTS } from "../constants";
 import { runPromptWorkbenchFlow } from "../flows/prompt-workbench-ui";
+import { runRuleElementGeneratorFlow } from "../flows/rule-element-generator-ui";
 
 interface ToolCardData {
   id: string;
@@ -56,6 +57,17 @@ export class ToolOverview extends FormApplication {
           buttonLabel: "Open Prompt Workbench",
           buttonIcon: "fas fa-hat-wizard",
         },
+        {
+          id: "rule-element-generator",
+          title: "Rule Element Generator",
+          icon: "fas fa-gears",
+          description:
+            "Generate PF2E-ready rule elements for system.rules with schema-validated JSON output and copy/download actions.",
+          location: "Scene Controls -> Handy Dandy Tools -> Rule Element Generator",
+          buttonAction: "rule-element-generator",
+          buttonLabel: "Open Rule Element Generator",
+          buttonIcon: "fas fa-gears",
+        },
       ],
     } satisfies ToolOverviewData;
   }
@@ -69,6 +81,9 @@ export class ToolOverview extends FormApplication {
       switch (action) {
         case "prompt-workbench":
           this.#runPromptWorkbench();
+          break;
+        case "rule-element-generator":
+          this.#runRuleElementGenerator();
           break;
         default:
           console.warn(`${CONSTANTS.MODULE_NAME} | Unknown tool overview action: ${action}`);
@@ -85,5 +100,9 @@ export class ToolOverview extends FormApplication {
 
   #runPromptWorkbench(): void {
     void runPromptWorkbenchFlow();
+  }
+
+  #runRuleElementGenerator(): void {
+    void runRuleElementGeneratorFlow();
   }
 }

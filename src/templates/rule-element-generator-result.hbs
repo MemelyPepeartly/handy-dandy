@@ -1,0 +1,42 @@
+<section class="handy-dandy-rulegen-result">
+  <p class="notes">Generated <strong>{{rulesCount}}</strong> PF2E rule elements.</p>
+
+  {{#if summary}}
+    <p class="handy-dandy-rulegen-summary">{{summary}}</p>
+  {{/if}}
+
+  <div class="handy-dandy-rulegen-actions">
+    <button type="button" data-action="copy-rules">
+      <i class="fas fa-copy" aria-hidden="true"></i> Copy Rules Array
+    </button>
+    <button type="button" data-action="copy-full">
+      <i class="fas fa-file-code" aria-hidden="true"></i> Copy Full Output
+    </button>
+    <button type="button" data-action="download">
+      <i class="fas fa-download" aria-hidden="true"></i> Download
+    </button>
+  </div>
+
+  {{#if assumptions.length}}
+    <h4>Assumptions</h4>
+    <ul class="handy-dandy-rulegen-list">
+      {{#each assumptions}}
+        <li>{{this}}</li>
+      {{/each}}
+    </ul>
+  {{/if}}
+
+  {{#if validationChecks.length}}
+    <h4>Validation Checks</h4>
+    <ul class="handy-dandy-rulegen-list">
+      {{#each validationChecks}}
+        <li>{{this}}</li>
+      {{/each}}
+    </ul>
+  {{/if}}
+
+  <div class="form-group">
+    <label for="handy-dandy-rulegen-rules-json">Generated <code>system.rules</code> JSON</label>
+    <textarea id="handy-dandy-rulegen-rules-json" rows="16" readonly>{{rulesJson}}</textarea>
+  </div>
+</section>

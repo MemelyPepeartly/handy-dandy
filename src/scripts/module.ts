@@ -27,6 +27,7 @@ import type {
   ItemSchemaData,
 } from "./schemas";
 import { generateWorkbenchEntry } from "./flows/prompt-workbench";
+import { runRuleElementGeneratorFlow } from "./flows/rule-element-generator-ui";
 import { ensureValid } from "./validation/ensure-valid";
 import { importAction } from "./mappers/import";
 import { initialiseMapMarkers } from "./map-markers/controller";
@@ -102,6 +103,7 @@ declare global {
       dev: DevNamespace,
       flows: {
         promptWorkbench: typeof generateWorkbenchEntry;
+        ruleElementGenerator: typeof runRuleElementGeneratorFlow;
       };
     };
   }
@@ -124,6 +126,9 @@ Hooks.once("init", async () => {
     "prompt-workbench-entry-detail": `${CONSTANTS.TEMPLATE_PATH}/prompt-workbench-entry-detail.hbs`,
     "prompt-workbench-request": `${CONSTANTS.TEMPLATE_PATH}/prompt-workbench-request.hbs`,
     "prompt-workbench-result": `${CONSTANTS.TEMPLATE_PATH}/prompt-workbench-result.hbs`,
+    "rule-element-generator-request": `${CONSTANTS.TEMPLATE_PATH}/rule-element-generator-request.hbs`,
+    "rule-element-generator-loading": `${CONSTANTS.TEMPLATE_PATH}/rule-element-generator-loading.hbs`,
+    "rule-element-generator-result": `${CONSTANTS.TEMPLATE_PATH}/rule-element-generator-result.hbs`,
   });
 });
 
@@ -157,6 +162,7 @@ Hooks.once("setup", () => {
     dev: devNamespace,
     flows: {
       promptWorkbench: generateWorkbenchEntry,
+      ruleElementGenerator: runRuleElementGeneratorFlow,
     },
   };
 
