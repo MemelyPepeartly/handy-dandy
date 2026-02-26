@@ -7,6 +7,7 @@ import { OpenRouterClient } from "./openrouter/client";
 import { createDevNamespace, canUseDeveloperTools, type DevNamespace } from "./dev/tools";
 import { ToolOverview } from "./ui/tool-overview";
 import { registerNpcRemixButton } from "./ui/npc-remix-button";
+import { registerNpcRuleElementsButton } from "./ui/npc-rule-elements-button";
 import { registerNpcPortraitRegenerateButton } from "./ui/npc-portrait-regenerate-button";
 import { registerNpcRemixSectionButtons } from "./ui/npc-remix-section-buttons";
 import { registerItemImageGenerateButton } from "./ui/item-image-generate-button";
@@ -60,6 +61,7 @@ type BoundGenerateActor = (
 ) => Promise<ActorGenerationResult>;
 
 registerNpcRemixButton();
+registerNpcRuleElementsButton();
 registerNpcPortraitRegenerateButton();
 registerNpcRemixSectionButtons();
 registerItemImageGenerateButton();
@@ -119,6 +121,7 @@ Hooks.once("init", async () => {
   await loadTemplates({
     "tool-overview": `${CONSTANTS.TEMPLATE_PATH}/tool-overview.hbs`,
     "openrouter-account": `${CONSTANTS.TEMPLATE_PATH}/openrouter-account.hbs`,
+    "npc-rule-elements-editor": `${CONSTANTS.TEMPLATE_PATH}/npc-rule-elements-editor.hbs`,
     "prompt-workbench-loading": `${CONSTANTS.TEMPLATE_PATH}/prompt-workbench-loading.hbs`,
     "prompt-workbench-generation-setup": `${CONSTANTS.TEMPLATE_PATH}/prompt-workbench-generation-setup.hbs`,
     "prompt-workbench-history-list": `${CONSTANTS.TEMPLATE_PATH}/prompt-workbench-history-list.hbs`,

@@ -4,6 +4,12 @@
   gap: 4px;
 }
 
+.window-header .handy-dandy-npc-rule-elements-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .window-header .handy-dandy-item-remix-button.disabled {
   pointer-events: none;
   opacity: 0.6;
@@ -34,4 +40,26 @@
   font-size: 12px;
   line-height: 1.1;
   cursor: pointer;
+}
+
+.handy-dandy-npc-rule-elements-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.handy-dandy-npc-rule-elements-form .notes {
+  margin: 0;
+}
+
+.handy-dandy-npc-rule-elements-form textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 260px;
+  font-family: var(--font-monospace, monospace);
+  font-size: 12px;
+}
+
+.handy-dandy-npc-rule-elements-form select {
+  width: 100%;
 }

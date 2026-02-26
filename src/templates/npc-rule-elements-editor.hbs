@@ -1,0 +1,26 @@
+<form class="handy-dandy-npc-rule-elements-form">
+  <p class="notes">
+    Edit PF2E rule elements for <strong>{{actorName}}</strong>. Pick a target first: use
+    NPC-wide for actor-level effects/toggles, or target a specific item/action when rules need item context.
+  </p>
+
+  <label for="handy-dandy-npc-rule-target">Rule Target</label>
+  <select id="handy-dandy-npc-rule-target" name="targetKey">
+    {{#each targetOptions}}
+      <option value="{{this.key}}" {{#if this.selected}}selected{{/if}}>{{this.label}}</option>
+    {{/each}}
+  </select>
+
+  <p class="notes">
+    Accepted JSON: single rule element object, rules array, <code>{ "rules": [...] }</code>,
+    or <code>{ "system": { "rules": [...] } }</code>.
+  </p>
+
+  <label for="handy-dandy-npc-rule-elements-json">Rule Elements JSON</label>
+  <textarea
+    id="handy-dandy-npc-rule-elements-json"
+    name="rulesJson"
+    rows="16"
+    spellcheck="false"
+  >{{rulesJson}}</textarea>
+</form>
