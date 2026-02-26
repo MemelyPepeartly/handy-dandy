@@ -3402,8 +3402,9 @@ export async function importItem(
     const targetedActor = findActorById(actorId);
     const embedded = targetedActor ? findEmbeddedItemOnActor(targetedActor, itemId) : undefined;
     if (embedded) {
-      const updateData = { ...source } as Record<string, unknown>;
-      delete updateData.folder;
+      const updateData = buildExistingItemUpdateData(embedded, source, {
+        isEmbedded: true,
+      });
       await embedded.update(updateData as any);
       return embedded;
     }
@@ -3412,19 +3413,18 @@ export async function importItem(
   if (itemId) {
     const targeted = (game.items as Collection<Item> | undefined)?.get(itemId);
     if (targeted) {
-      const updateData = { ...source } as Record<string, unknown>;
-      if (folderId) {
-        updateData.folder = folderId;
-      }
-
+      const updateData = buildExistingItemUpdateData(targeted, source, {
+        folderId,
+      });
       await targeted.update(updateData as any);
       return targeted;
     }
 
     const embedded = findEmbeddedItemById(itemId);
     if (embedded) {
-      const updateData = { ...source } as Record<string, unknown>;
-      delete updateData.folder;
+      const updateData = buildExistingItemUpdateData(embedded, source, {
+        isEmbedded: true,
+      });
       await embedded.update(updateData as any);
       return embedded;
     }
@@ -3438,11 +3438,9 @@ export async function importItem(
 
     const existing = await findPackDocument(pack, json.slug);
     if (existing) {
-      const updateData = { ...source } as Record<string, unknown>;
-      if (folderId) {
-        updateData.folder = folderId;
-      }
-
+      const updateData = buildExistingItemUpdateData(existing, source, {
+        folderId,
+      });
       await existing.update(updateData as any);
       return existing;
     }
@@ -3457,11 +3455,9 @@ export async function importItem(
 
   const existing = findWorldItem(json.slug);
   if (existing) {
-    const updateData = { ...source } as Record<string, unknown>;
-    if (folderId) {
-      updateData.folder = folderId;
-    }
-
+    const updateData = buildExistingItemUpdateData(existing, source, {
+      folderId,
+    });
     await existing.update(updateData as any);
     return existing;
   }
@@ -3472,6 +3468,33 @@ export async function importItem(
   }
 
   return created;
+}
+
+function buildExistingItemUpdateData(
+  existing: Item,
+  source: FoundryItemSource,
+  options: { folderId?: string; isEmbedded?: boolean } = {},
+): Record<string, unknown> {
+  const updateData = clone(source) as Record<string, unknown>;
+
+  if (options.isEmbedded) {
+    delete updateData.folder;
+  } else if (options.folderId) {
+    updateData.folder = options.folderId;
+  }
+
+  const existingType = String(existing.type ?? "");
+  const incomingType = typeof updateData.type === "string" ? updateData.type : existingType;
+  if (existingType && incomingType && incomingType !== existingType) {
+    console.warn(
+      `Handy Dandy | Prevented item type mutation during update (${existing.name}: ${existingType} -> ${incomingType}).`,
+    );
+  }
+
+  // Foundry does not allow normal updates to mutate Document.type.
+  delete updateData.type;
+
+  return updateData;
 }
 
 async function updateActorDocument(

@@ -162,6 +162,30 @@ function showWorkingDialog(itemName: string): Dialog {
   return dialog;
 }
 
+function coerceRemixItemTypeToExisting(
+  generated: Parameters<typeof importItem>[0],
+  existingItemType: string,
+): Parameters<typeof importItem>[0] {
+  if (generated.itemType === existingItemType) {
+    return generated;
+  }
+
+  ui.notifications?.warn(
+    `${CONSTANTS.MODULE_NAME} | Remix attempted to change item type from "${existingItemType}" to ` +
+      `"${generated.itemType}". Keeping original type for in-place update.`,
+  );
+
+  console.warn(
+    `${CONSTANTS.MODULE_NAME} | Remix changed itemType from "${existingItemType}" to "${generated.itemType}". ` +
+      `Keeping existing item type for in-place update.`,
+  );
+
+  return {
+    ...generated,
+    itemType: existingItemType as Parameters<typeof importItem>[0]["itemType"],
+  };
+}
+
 export async function runItemRemixWithRequest(item: Item, request: ItemRemixRequest): Promise<void> {
   const generation = game.handyDandy?.generation?.generateItem;
   if (!generation) {
@@ -188,7 +212,8 @@ export async function runItemRemixWithRequest(item: Item, request: ItemRemixRequ
       itemImagePrompt: request.itemImagePrompt,
     });
 
-    const imported = await importItem(generated, {
+    const generatedForUpdate = coerceRemixItemTypeToExisting(generated, canonical.itemType);
+    const imported = await importItem(generatedForUpdate, {
       itemId: item.id ?? undefined,
       actorId: item.actor?.id ?? undefined,
       folderId: item.actor ? undefined : item.folder?.id ?? undefined,
