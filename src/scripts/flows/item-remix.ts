@@ -31,11 +31,13 @@ function escapeHtml(value: string): string {
 function buildRemixReferenceText(
   itemName: string,
   canonical: ReturnType<typeof fromFoundryItem>,
+  sourceFoundryType: string,
   request: ItemRemixRequest,
 ): string {
   const parts = [
     `Remix the existing PF2E item "${itemName}".`,
     "Preserve system compatibility and item structure while applying the requested changes.",
+    `The source Foundry document type is "${sourceFoundryType}". Keep this same document type and structure compatibility.`,
     "Apply this remix specification:",
     request.instructions,
     "Current canonical item data (JSON):",
@@ -195,11 +197,12 @@ export async function runItemRemixWithRequest(item: Item, request: ItemRemixRequ
 
   const canonical = fromFoundryItem(item.toObject() as any);
   const itemName = item.name ?? canonical.name;
+  const sourceFoundryType = String(item.type ?? "item");
 
   let workingDialog: Dialog | null = null;
   try {
     workingDialog = showWorkingDialog(itemName);
-    const referenceText = buildRemixReferenceText(itemName, canonical, request);
+    const referenceText = buildRemixReferenceText(itemName, canonical, sourceFoundryType, request);
     const generated = await generation({
       systemId: canonical.systemId,
       name: itemName,
@@ -217,6 +220,7 @@ export async function runItemRemixWithRequest(item: Item, request: ItemRemixRequ
       itemId: item.id ?? undefined,
       actorId: item.actor?.id ?? undefined,
       folderId: item.actor ? undefined : item.folder?.id ?? undefined,
+      strictTarget: true,
     });
 
     workingDialog.close({ force: true });

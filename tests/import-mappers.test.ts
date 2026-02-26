@@ -331,6 +331,23 @@ test("importItem updates an embedded actor item when actorId and itemId are prov
   assert.equal(embedded.folder, null);
 });
 
+test("importItem strictTarget blocks fallback creation when target item is missing", async () => {
+  const payload = {
+    ...createItem(),
+    slug: "should-not-create",
+    name: "Should Not Create",
+  } satisfies ItemSchemaData;
+
+  await assert.rejects(
+    () =>
+      importItem(payload, {
+        itemId: "Missing.Item",
+        strictTarget: true,
+      }),
+    /target item .* was not found .* aborting/i,
+  );
+});
+
 test("toFoundryActorData filters action traits and normalizes frequency", () => {
   const actor = createActor();
   actor.actions = [

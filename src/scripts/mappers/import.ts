@@ -138,6 +138,7 @@ export type ImportOptions = {
   folderId?: string;
   actorId?: string;
   itemId?: string;
+  strictTarget?: boolean;
 };
 
 type ItemCompendium = CompendiumCollection<CompendiumCollection.Metadata & { type: "Item" }>;
@@ -3392,7 +3393,7 @@ export async function importItem(
   assertSystemCompatibility(json.systemId);
   ensureValidItem(json);
   const source = prepareItemSource(json);
-  const { packId, folderId, itemId, actorId } = options;
+  const { packId, folderId, itemId, actorId, strictTarget } = options;
 
   if (folderId) {
     source.folder = folderId;
@@ -3428,6 +3429,12 @@ export async function importItem(
       await embedded.update(updateData as any);
       return embedded;
     }
+  }
+
+  if (strictTarget && itemId) {
+    throw new Error(
+      `Target item ${itemId} was not found for in-place remix; aborting instead of creating a new item.`,
+    );
   }
 
   if (packId) {
