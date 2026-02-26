@@ -173,7 +173,22 @@ const DETAIL_HEADERS = [
 
 const HTML_TAG_PATTERN =
   /<\/?(?:p|ul|ol|li|hr|strong|em|span|br|code|blockquote|h[1-6]|table|thead|tbody|tr|td|th)\b/i;
-const INLINE_MACRO_PATTERN = /@(?:UUID|Compendium|Check|Damage|Template)\[[^\]]+\](?:\{[^}]*\})?/gi;
+const INLINE_MACRO_PATTERN =
+  /@(?:UUID|Compendium|Check|Damage|Template)\[(?:[^\[\]]|\[[^\[\]]*])+\](?:\{[^}]*\})?/gi;
+
+function withInlineMacroMask(value: string, transform: (masked: string) => string): string {
+  const macros: string[] = [];
+  const masked = value.replace(INLINE_MACRO_PATTERN, (macro) => {
+    const id = macros.push(macro) - 1;
+    return `@@HD_MACRO_${id}@@`;
+  });
+
+  const transformed = transform(masked);
+  return transformed.replace(/@@HD_MACRO_(\d+)@@/g, (_placeholder, index: string) => {
+    const macro = macros[Number(index)];
+    return typeof macro === "string" ? macro : "";
+  });
+}
 
 function escapeHtml(value: string): string {
   const utils = (globalThis as { foundry?: { utils?: { escapeHTML?: (input: string) => string } } }).foundry?.utils;
@@ -226,19 +241,65 @@ function applyInlineMarkdown(value: string): string {
 }
 
 function applyInlineChecks(value: string): string {
-  let next = value;
   const statPattern = Object.keys(CHECK_STAT_MAP)
     .sort((left, right) => right.length - left.length)
     .join("|");
 
+  return withInlineMacroMask(value, (masked) => {
+    let next = masked;
+
+    next = next.replace(
+      new RegExp(`\\bDC\\s*(\\d+)\\s*(${statPattern})\\b`, "gi"),
+      (_match, dc: string, stat: string) => `@Check[${CHECK_STAT_MAP[stat.toLowerCase()] ?? stat.toLowerCase()}|dc:${dc}]`,
+    );
+
+    next = next.replace(
+      new RegExp(`\\b(${statPattern})\\s*DC\\s*(\\d+)\\b`, "gi"),
+      (_match, stat: string, dc: string) => `@Check[${CHECK_STAT_MAP[stat.toLowerCase()] ?? stat.toLowerCase()}|dc:${dc}]`,
+    );
+
+    return next;
+  });
+}
+
+function normalizeDamageFormula(value: string): string {
+  const compact = value.replace(/\s+/g, "");
+  const inner = compact.replace(/^\((.*)\)$/, "$1");
+  return /[+-]/.test(inner) ? `(${inner})` : inner;
+}
+
+function normalizeMalformedDamageMacros(value: string): string {
+  const damageTypeGroup = DAMAGE_TYPES.join("|");
+  const formulaGroup = "((?:\\(\\s*)?(?:\\d+d\\d+(?:\\s*[+-]\\s*\\d+)?|\\d+)(?:\\s*\\))?)";
+
+  let next = value;
+
   next = next.replace(
-    new RegExp(`\\bDC\\s*(\\d+)\\s*(${statPattern})\\b`, "gi"),
-    (_match, dc: string, stat: string) => `@Check[${CHECK_STAT_MAP[stat.toLowerCase()] ?? stat.toLowerCase()}|dc:${dc}]`,
+    new RegExp(`@Damage\\[\\s*${formulaGroup}\\s+persistent\\s+(${damageTypeGroup})(?:\\s+damage)?\\s*\\]`, "gi"),
+    (_match, formula: string, damageType: string) => {
+      return `@Damage[${normalizeDamageFormula(formula)}[persistent,${damageType.toLowerCase()}]]`;
+    },
   );
 
   next = next.replace(
-    new RegExp(`\\b(${statPattern})\\s*DC\\s*(\\d+)\\b`, "gi"),
-    (_match, stat: string, dc: string) => `@Check[${CHECK_STAT_MAP[stat.toLowerCase()] ?? stat.toLowerCase()}|dc:${dc}]`,
+    new RegExp(`@Damage\\[\\s*${formulaGroup}\\s+(${damageTypeGroup})(?:\\s+damage)?\\s*\\]`, "gi"),
+    (_match, formula: string, damageType: string) => {
+      return `@Damage[${normalizeDamageFormula(formula)}[${damageType.toLowerCase()}]]`;
+    },
+  );
+
+  next = next.replace(
+    new RegExp(`@Damage\\[\\s*${formulaGroup}\\s*\\[\\s*persistent\\s*,\\s*(${damageTypeGroup})(?:\\s+damage)?\\s*\\]\\s*\\]`, "gi"),
+    (_match, formula: string, damageType: string) => {
+      return `@Damage[${normalizeDamageFormula(formula)}[persistent,${damageType.toLowerCase()}]]`;
+    },
+  );
+
+  next = next.replace(
+    new RegExp(`@Damage\\[\\s*${formulaGroup}\\s*\\[\\s*(${damageTypeGroup})(?:\\s+damage)?\\s*\\]\\s*\\]`, "gi"),
+    (_match, formula: string, damageType: string) => {
+      return `@Damage[${normalizeDamageFormula(formula)}[${damageType.toLowerCase()}]]`;
+    },
   );
 
   return next;
@@ -246,41 +307,47 @@ function applyInlineChecks(value: string): string {
 
 function applyInlineDamage(value: string): string {
   const damageTypeGroup = DAMAGE_TYPES.join("|");
-  let next = value;
 
-  next = next.replace(
-    new RegExp(`\\b(\\d+)d(\\d+)\\s+persistent\\s+(${damageTypeGroup})\\s+damage\\b`, "gi"),
-    (_match, count: string, faces: string, damageType: string) => {
-      return `@Damage[${count}d${faces}[persistent,${damageType.toLowerCase()}]] damage`;
-    },
-  );
+  const withNaturalLanguageDamage = withInlineMacroMask(value, (masked) => {
+    let next = masked;
 
-  next = next.replace(
-    new RegExp(`\\b((?:\\d+d\\d+(?:\\s*[+-]\\s*\\d+)?))\\s+(${damageTypeGroup})\\s+damage\\b`, "gi"),
-    (_match, formula: string, damageType: string) => {
-      const compact = formula.replace(/\s+/g, "");
-      const wrapped = /[+-]/.test(compact) ? `(${compact})` : compact;
-      return `@Damage[${wrapped}[${damageType.toLowerCase()}]] damage`;
-    },
-  );
+    next = next.replace(
+      new RegExp(`\\b(\\d+)d(\\d+)\\s+persistent\\s+(${damageTypeGroup})\\s+damage\\b`, "gi"),
+      (_match, count: string, faces: string, damageType: string) => {
+        return `@Damage[${count}d${faces}[persistent,${damageType.toLowerCase()}]] damage`;
+      },
+    );
 
-  next = next.replace(
-    new RegExp(`\\b(\\d+)\\s+(${damageTypeGroup})\\s+damage\\b`, "gi"),
-    (_match, valueText: string, damageType: string) => {
-      return `@Damage[${valueText}[${damageType.toLowerCase()}]] damage`;
-    },
-  );
+    next = next.replace(
+      new RegExp(`\\b((?:\\d+d\\d+(?:\\s*[+-]\\s*\\d+)?))\\s+(${damageTypeGroup})\\s+damage\\b`, "gi"),
+      (_match, formula: string, damageType: string) => {
+        const wrapped = normalizeDamageFormula(formula);
+        return `@Damage[${wrapped}[${damageType.toLowerCase()}]] damage`;
+      },
+    );
 
-  return next;
+    next = next.replace(
+      new RegExp(`\\b(\\d+)\\s+(${damageTypeGroup})\\s+damage\\b`, "gi"),
+      (_match, valueText: string, damageType: string) => {
+        return `@Damage[${valueText}[${damageType.toLowerCase()}]] damage`;
+      },
+    );
+
+    return next;
+  });
+
+  return normalizeMalformedDamageMacros(withNaturalLanguageDamage);
 }
 
 function applyInlineTemplates(value: string): string {
-  return value.replace(
-    /\b(\d+)\s*(?:-|\s)?\s*foot\s+(emanation|burst|cone|line)\b/gi,
-    (_match, distance: string, shape: string) => {
-      return `@Template[type:${shape.toLowerCase()}|distance:${distance}]`;
-    },
-  );
+  return withInlineMacroMask(value, (masked) => {
+    return masked.replace(
+      /\b(\d+)\s*(?:-|\s)?\s*foot\s+(emanation|burst|cone|line)\b/gi,
+      (_match, distance: string, shape: string) => {
+        return `@Template[type:${shape.toLowerCase()}|distance:${distance}]`;
+      },
+    );
+  });
 }
 
 function normalizeLookupKey(value: string): string {

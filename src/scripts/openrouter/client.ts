@@ -47,6 +47,28 @@ const isRecord = (value: unknown): value is Record<string, unknown> => {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 };
 
+function hasLooseAdditionalProperties(node: unknown): boolean {
+  if (Array.isArray(node)) {
+    return node.some((entry) => hasLooseAdditionalProperties(entry));
+  }
+
+  if (!isRecord(node)) {
+    return false;
+  }
+
+  if (node.type === "object" && node.additionalProperties === true) {
+    return true;
+  }
+
+  for (const value of Object.values(node)) {
+    if (hasLooseAdditionalProperties(value)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 function normalizeRequiredProperties(node: unknown): JsonValue {
   if (Array.isArray(node)) {
     return node.map((entry) => normalizeRequiredProperties(entry)) as JsonValue;
@@ -467,6 +489,17 @@ export class OpenRouterClient {
     options?: GenerateWithSchemaOptions,
   ): Promise<T> {
     const promptHash = await hashPrompt(prompt);
+    const supportsStructured = this.#supportsStructuredSchema(schema);
+
+    if (!supportsStructured) {
+      return await this.#runWithLogging<T>(
+        "tool",
+        promptHash,
+        schema,
+        async () => this.#generateWithTool<T>(prompt, schema, options),
+      );
+    }
+
     try {
       return await this.#runWithLogging<T>(
         "structured",
@@ -650,6 +683,10 @@ export class OpenRouterClient {
     } satisfies JsonSchemaDefinition;
   }
 
+  #supportsStructuredSchema(schema: JsonSchemaDefinition): boolean {
+    return !hasLooseAdditionalProperties(schema.schema);
+  }
+
   #shouldFallback(error: unknown): boolean {
     if (!(error instanceof Error)) return false;
     const candidate = error as Error & { status?: number; code?: string };
@@ -802,6 +839,20 @@ export class OpenRouterClient {
 
     for (const block of output) {
       if (!block || typeof block !== "object") continue;
+      const blockType = (block as { type?: unknown }).type;
+      if (blockType === "function_call" || blockType === "tool_call") {
+        const directArgs = (block as { arguments?: unknown }).arguments;
+        const parsedDirect = this.#tryParseText<T>(directArgs);
+        if (parsedDirect !== undefined) return parsedDirect;
+
+        const nestedToolCall = (block as { tool_call?: unknown }).tool_call;
+        if (nestedToolCall && typeof nestedToolCall === "object") {
+          const nestedArgs = (nestedToolCall as { arguments?: unknown }).arguments;
+          const parsedNested = this.#tryParseText<T>(nestedArgs);
+          if (parsedNested !== undefined) return parsedNested;
+        }
+      }
+
       const content = (block as { content?: unknown }).content;
       if (!Array.isArray(content)) continue;
       for (const item of content) {

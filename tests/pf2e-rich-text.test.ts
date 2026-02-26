@@ -54,3 +54,17 @@ If Dr. Stone is currently within smoke or behind cover, he can Step into that sm
   assert.match(repaired, /@UUID\[Compendium\.pf2e\.actionspf2e\.Item\.VjxZFuUXrCU94MWR\]\{Strike\}/);
   assert.match(repaired, /@UUID\[Compendium\.pf2e\.actionspf2e\.Item\.UHpkTuCtyaPqiCAB\]\{Steps\}/);
 });
+
+test("repairPf2eInlineMacros normalizes malformed inline @Damage formulas without nesting macros", () => {
+  const source = "Deal @Damage[6d10+20 force damage], then deal 2d6 fire damage.";
+  const repaired = repairPf2eInlineMacros(source);
+
+  assert.equal(repaired, "Deal @Damage[(6d10+20)[force]], then deal @Damage[2d6[fire]] damage.");
+});
+
+test("repairPf2eInlineMacros normalizes malformed persistent @Damage formulas", () => {
+  const source = "On a critical hit, apply @Damage[2d6 persistent fire damage].";
+  const repaired = repairPf2eInlineMacros(source);
+
+  assert.equal(repaired, "On a critical hit, apply @Damage[2d6[persistent,fire]].");
+});

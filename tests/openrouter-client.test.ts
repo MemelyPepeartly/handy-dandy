@@ -235,6 +235,73 @@ test("generateWithSchema falls back to tool calls when response_format unsupport
   assert.equal(fallbackCall.tool_choice?.name, schema.name);
 });
 
+test("generateWithSchema parses tool output from response function_call blocks", async () => {
+  const stub = new StubOpenAI();
+  const error = new Error("This model does not support response_format");
+  (error as Error & { status?: number }).status = 400;
+  stub.responses.enqueue(error);
+  stub.responses.enqueue({
+    output: [
+      {
+        type: "function_call",
+        name: schema.name,
+        arguments: JSON.stringify({ value: 11 }),
+      },
+    ],
+  });
+
+  const client = OpenRouterClient.fromSettings(stub as unknown as OpenAI);
+  const result = await client.generateWithSchema<{ value: number }>("Say hello", schema);
+
+  assert.deepEqual(result, { value: 11 });
+});
+
+test("generateWithSchema uses tool mode directly when schema has additionalProperties true", async () => {
+  const stub = new StubOpenAI();
+  const looseSchema = {
+    name: "LooseObject",
+    schema: {
+      type: "object",
+      required: ["rules"],
+      properties: {
+        rules: {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: true,
+            required: ["key"],
+            properties: {
+              key: { type: "string" },
+            },
+          },
+        },
+      },
+      additionalProperties: false,
+    },
+  } as const satisfies JsonSchemaDefinition;
+
+  stub.responses.enqueue({
+    output: [
+      {
+        type: "function_call",
+        name: looseSchema.name,
+        arguments: JSON.stringify({ rules: [{ key: "FlatModifier", value: 6 }] }),
+      },
+    ],
+  });
+
+  const client = OpenRouterClient.fromSettings(stub as unknown as OpenAI);
+  const result = await client.generateWithSchema<{ rules: Array<{ key: string; value: number }> }>(
+    "Generate rules",
+    looseSchema,
+  );
+
+  assert.deepEqual(result, { rules: [{ key: "FlatModifier", value: 6 }] });
+  assert.equal(stub.responses.calls.length, 1);
+  assert.equal(stub.responses.calls[0]?.text, undefined);
+  assert.equal(Array.isArray(stub.responses.calls[0]?.tools), true);
+});
+
 test("generateImage uses chat completions image modalities and parses data URLs", async () => {
   const stub = new StubOpenAI();
   stub.chat.completions.enqueue({

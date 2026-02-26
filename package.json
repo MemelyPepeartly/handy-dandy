@@ -1,6 +1,6 @@
 {
   "name": "handy-dandy",
-  "version": "1.14.6",
+  "version": "1.14.7",
   "type": "module",
   "scripts": {
     "build": "webpack --mode production",
