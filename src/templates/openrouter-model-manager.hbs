@@ -1,0 +1,57 @@
+<form class="openrouter-model-manager-form">
+  <p class="notes">
+    Catalog source: <strong>{{source}}</strong><br />
+    Last loaded: <strong>{{loadedAt}}</strong>
+  </p>
+
+  <div class="form-group">
+    <label for="handy-dandy-text-model">OpenRouter Text Model</label>
+    <select id="handy-dandy-text-model" name="textModel">
+      {{#each textOptions}}
+        <option value="{{value}}"{{#if selected}} selected{{/if}}>{{label}}</option>
+      {{/each}}
+    </select>
+  </div>
+
+  {{#if selectedTextModel}}
+    <div class="notes">
+      <strong>Selected text model details</strong><br />
+      ID: <code>{{selectedTextModel.id}}</code><br />
+      Context length: {{selectedTextModel.contextLength}}<br />
+      Inputs: {{selectedTextModel.inputModalities}}<br />
+      Outputs: {{selectedTextModel.outputModalities}}<br />
+      Supported parameters: {{selectedTextModel.supportedParameters}}
+    </div>
+  {{/if}}
+
+  <div class="form-group">
+    <label for="handy-dandy-image-model">OpenRouter Image Model</label>
+    <select id="handy-dandy-image-model" name="imageModel">
+      {{#each imageOptions}}
+        <option value="{{value}}"{{#if selected}} selected{{/if}}>{{label}}</option>
+      {{/each}}
+    </select>
+  </div>
+
+  {{#if selectedImageModel}}
+    <div class="notes">
+      <strong>Selected image model details</strong><br />
+      ID: <code>{{selectedImageModel.id}}</code><br />
+      Context length: {{selectedImageModel.contextLength}}<br />
+      Inputs: {{selectedImageModel.inputModalities}}<br />
+      Outputs: {{selectedImageModel.outputModalities}}<br />
+      Supported parameters: {{selectedImageModel.supportedParameters}}
+    </div>
+  {{/if}}
+
+  <footer class="sheet-footer flexrow">
+    <button type="button" data-action="refresh-models">
+      <i class="fas fa-rotate"></i>
+      Refresh Catalog
+    </button>
+    <button type="submit">
+      <i class="fas fa-save"></i>
+      Save Models
+    </button>
+  </footer>
+</form>
