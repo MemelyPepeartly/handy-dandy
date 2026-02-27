@@ -1,6 +1,7 @@
 import { CONSTANTS } from "../constants";
 import { fromFoundryItem } from "../mappers/export";
 import { importItem } from "../mappers/import";
+import { showGeneratedOutputRecoveryDialog } from "../ui/generated-output-recovery";
 
 export interface ItemRemixRequest {
   instructions: string;
@@ -200,6 +201,7 @@ export async function runItemRemixWithRequest(item: Item, request: ItemRemixRequ
   const sourceFoundryType = String(item.type ?? "item");
 
   let workingDialog: Dialog | null = null;
+  let generatedForUpdate: Parameters<typeof importItem>[0] | null = null;
   try {
     workingDialog = showWorkingDialog(itemName);
     const referenceText = buildRemixReferenceText(itemName, canonical, sourceFoundryType, request);
@@ -215,7 +217,7 @@ export async function runItemRemixWithRequest(item: Item, request: ItemRemixRequ
       itemImagePrompt: request.itemImagePrompt,
     });
 
-    const generatedForUpdate = coerceRemixItemTypeToExisting(generated, canonical.itemType);
+    generatedForUpdate = coerceRemixItemTypeToExisting(generated, canonical.itemType);
     const imported = await importItem(generatedForUpdate, {
       itemId: item.id ?? undefined,
       actorId: item.actor?.id ?? undefined,
@@ -231,6 +233,16 @@ export async function runItemRemixWithRequest(item: Item, request: ItemRemixRequ
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     ui.notifications?.error(`${CONSTANTS.MODULE_NAME} | Item remix failed: ${message}`);
+
+    if (generatedForUpdate) {
+      await showGeneratedOutputRecoveryDialog({
+        title: `${CONSTANTS.MODULE_NAME} | Item Remix Output`,
+        summary: `Item remix generated JSON for "${itemName}", but Foundry could not apply it.`,
+        payload: generatedForUpdate,
+        filenameBase: `${itemName}-item-remix`,
+      });
+    }
+
     console.error(`${CONSTANTS.MODULE_NAME} | Item remix failed`, error);
   } finally {
     workingDialog?.close({ force: true });
