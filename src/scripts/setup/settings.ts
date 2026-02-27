@@ -116,6 +116,30 @@ export async function registerSettings(): Promise<void> {
     },
   });
 
+  settings.register(CONSTANTS.MODULE_ID, "OpenRouterEnableWebSearch", {
+    name: "OpenRouter Web Search",
+    hint: "Enable OpenRouter web plugin for generation requests. Recommended for PF2E rulings and current references.",
+    scope: USER_SCOPE,
+    config: true,
+    type: Boolean,
+    default: true,
+    onChange: () => {
+      updateOpenRouterClientFromSettings();
+    },
+  });
+
+  settings.register(CONSTANTS.MODULE_ID, "OpenRouterWebSearchMaxResults", {
+    name: "OpenRouter Web Search Max Results",
+    hint: "Maximum web results used per request when web search is enabled (1-10).",
+    scope: USER_SCOPE,
+    config: true,
+    type: Number,
+    default: 5,
+    onChange: () => {
+      updateOpenRouterClientFromSettings();
+    },
+  });
+
   settings.register(CONSTANTS.MODULE_ID, "GeneratedImageDirectory", {
     name: "Generated Image Directory",
     hint: "Directory under assets used for generated images. Enter asset-relative paths only (no Data/ prefix). Examples: handy-dandy, my-custom-images.",
