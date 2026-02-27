@@ -5,6 +5,7 @@ import { initializeOpenRouterClientFromSettings } from "../openrouter/runtime";
 import { loadOpenRouterModelChoiceCatalog } from "../openrouter/model-catalog";
 import { ToolOverview } from "../ui/tool-overview";
 import { OpenRouterAccountSettings } from "./openrouter-account";
+import { OpenRouterModelManagerSettings } from "./openrouter-model-manager";
 
 // Foundry V13 supports "user" scope. The installed type package still targets
 // V12, so we cast to keep strict TypeScript while using runtime-correct scope.
@@ -44,9 +45,18 @@ export async function registerSettings(): Promise<void> {
     restricted: false,
   });
 
+  settings.registerMenu(CONSTANTS.MODULE_ID, "openRouterModelManager", {
+    name: "OpenRouter Model Manager",
+    label: "Manage OpenRouter Models",
+    hint: "Refresh available OpenRouter models and choose text/image models from a capability-validated catalog.",
+    icon: "fas fa-list-check",
+    type: OpenRouterModelManagerSettings,
+    restricted: false,
+  });
+
   settings.register(CONSTANTS.MODULE_ID, "OpenRouterModel", {
     name: "OpenRouter Text Model",
-    hint: "Model used for structured text generation. List is loaded from OpenRouter model catalog at startup.",
+    hint: "Model used for structured text generation. Use OpenRouter Model Manager to refresh the list.",
     scope: USER_SCOPE,
     config: true,
     type: String,
@@ -59,7 +69,7 @@ export async function registerSettings(): Promise<void> {
 
   settings.register(CONSTANTS.MODULE_ID, "OpenRouterImageModel", {
     name: "OpenRouter Image Model",
-    hint: "Model used for image generation. List is loaded from OpenRouter model catalog at startup.",
+    hint: "Model used for image generation. Use OpenRouter Model Manager to refresh the list.",
     scope: USER_SCOPE,
     config: true,
     type: String,
