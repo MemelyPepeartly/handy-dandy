@@ -5,6 +5,9 @@ import {
   DEFAULT_OPENROUTER_MODEL,
   normalizeModelId,
 } from "./models";
+import {
+  getCachedOpenRouterModelChoiceCatalog,
+} from "./model-catalog";
 
 export interface JsonSchemaDefinition {
   name: string;
@@ -488,15 +491,42 @@ export class OpenRouterClient {
     schema: JsonSchemaDefinition,
     options?: GenerateWithSchemaOptions,
   ): Promise<T> {
-    const promptHash = await hashPrompt(prompt);
-    const supportsStructured = this.#supportsStructuredSchema(schema);
+    this.#assertTextModelSupported();
 
-    if (!supportsStructured) {
+    const promptHash = await hashPrompt(prompt);
+    const schemaSupportsStructured = this.#supportsStructuredSchema(schema);
+    const modelSupportsStructured = this.#modelSupportsStructuredOutputs();
+    const modelSupportsTools = this.#modelSupportsToolCalling();
+
+    if (!schemaSupportsStructured) {
+      if (!modelSupportsTools) {
+        throw new Error(
+          `Configured text model "${this.#config.model}" does not advertise tool-call support, ` +
+            "but this schema requires tool mode (contains additionalProperties:true). " +
+            "Choose a model with tools support in OpenRouter Model Manager.",
+        );
+      }
       return await this.#runWithLogging<T>(
         "tool",
         promptHash,
         schema,
         async () => this.#generateWithTool<T>(prompt, schema, options),
+      );
+    }
+
+    if (!modelSupportsStructured && modelSupportsTools) {
+      return await this.#runWithLogging<T>(
+        "tool",
+        promptHash,
+        schema,
+        async () => this.#generateWithTool<T>(prompt, schema, options),
+      );
+    }
+
+    if (!modelSupportsStructured && !modelSupportsTools) {
+      throw new Error(
+        `Configured text model "${this.#config.model}" does not advertise structured-output or tool-call support. ` +
+          "Choose a compatible text model in OpenRouter Model Manager.",
       );
     }
 
@@ -508,7 +538,7 @@ export class OpenRouterClient {
         async () => this.#generateStructured<T>(prompt, schema, options),
       );
     } catch (error) {
-      if (!this.#shouldFallback(error)) {
+      if (!this.#shouldFallback(error) || !modelSupportsTools) {
         throw error;
       }
 
@@ -525,7 +555,11 @@ export class OpenRouterClient {
     prompt: string,
     options: GenerateImageOptions = {},
   ): Promise<GeneratedImageResult> {
-    const model = options.model ?? this.#config.imageModel;
+    const model = options.model
+      ? normalizeModelId(options.model, this.#config.imageModel)
+      : this.#config.imageModel;
+    this.#assertImageModelSupported(model);
+
     const format = options.format ?? "png";
     const referenceImages = options.referenceImages?.filter((entry): entry is File => entry instanceof File) ?? [];
 
@@ -922,5 +956,67 @@ export class OpenRouterClient {
     } catch {
       return undefined;
     }
+  }
+
+  #assertTextModelSupported(): void {
+    const capabilities = this.#getCurrentModelCapabilities();
+    if (!capabilities) {
+      return;
+    }
+
+    if (!capabilities.supportsTextGeneration) {
+      throw new Error(
+        `Configured text model "${this.#config.model}" does not advertise structured/tool support for JSON generation. ` +
+          `Open OpenRouter Model Manager and choose a compatible text model.`,
+      );
+    }
+  }
+
+  #assertImageModelSupported(model: string): void {
+    const catalog = getCachedOpenRouterModelChoiceCatalog();
+    if (!catalog) {
+      return;
+    }
+
+    const capabilities = catalog.capabilitiesById[model];
+    if (!capabilities) {
+      return;
+    }
+
+    if (!capabilities.supportsImageGeneration) {
+      throw new Error(
+        `Image model "${model}" does not advertise text->image support. ` +
+          `Open OpenRouter Model Manager and choose a compatible image model.`,
+      );
+    }
+  }
+
+  #getCurrentModelCapabilities(): { supportedParameters: string[]; supportsTextGeneration: boolean } | undefined {
+    const catalog = getCachedOpenRouterModelChoiceCatalog();
+    if (!catalog) {
+      return undefined;
+    }
+
+    return catalog.capabilitiesById[this.#config.model];
+  }
+
+  #modelSupportsToolCalling(): boolean {
+    const capabilities = this.#getCurrentModelCapabilities();
+    if (!capabilities) {
+      return true;
+    }
+
+    const parameters = capabilities.supportedParameters;
+    return parameters.includes("tools") || parameters.includes("tool_choice");
+  }
+
+  #modelSupportsStructuredOutputs(): boolean {
+    const capabilities = this.#getCurrentModelCapabilities();
+    if (!capabilities) {
+      return true;
+    }
+
+    const parameters = capabilities.supportedParameters;
+    return parameters.includes("structured_outputs") || parameters.includes("response_format");
   }
 }
