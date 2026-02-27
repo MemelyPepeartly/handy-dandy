@@ -77,6 +77,8 @@ beforeEach(() => {
           OpenRouterTemperature: 0.5,
           OpenRouterTopP: 0.75,
           OpenRouterSeed: 123,
+          OpenRouterEnableWebSearch: true,
+          OpenRouterWebSearchMaxResults: 4,
         };
         return values[key] ?? null;
       }
@@ -91,6 +93,8 @@ test("readOpenRouterSettings pulls module settings with sane defaults", () => {
     imageModel: "openai/gpt-5-image",
     temperature: 0.5,
     top_p: 0.75,
+    enableWebSearch: true,
+    webSearchMaxResults: 4,
     seed: 123,
   });
 });
@@ -106,6 +110,8 @@ test("readOpenRouterSettings falls back to defaults for malformed model ids", ()
           OpenRouterTemperature: 0.25,
           OpenRouterTopP: 0.5,
           OpenRouterSeed: Number.NaN,
+          OpenRouterEnableWebSearch: "yes",
+          OpenRouterWebSearchMaxResults: "abc",
         };
         return values[key] ?? null;
       },
@@ -118,6 +124,8 @@ test("readOpenRouterSettings falls back to defaults for malformed model ids", ()
     imageModel: "openai/gpt-5-image-mini",
     temperature: 0.25,
     top_p: 0.5,
+    enableWebSearch: true,
+    webSearchMaxResults: 5,
   });
 });
 
@@ -145,6 +153,7 @@ test("generateWithSchema returns parsed JSON from structured outputs", async () 
   const [call] = stub.responses.calls;
   assert.equal(call.text?.format?.name, schema.name);
   assert.equal(call.text?.format?.strict, true);
+  assert.deepEqual(call.plugins, [{ id: "web", max_results: 4 }]);
 });
 
 test("generateWithSchema normalizes schema required properties for strict mode", async () => {
@@ -329,6 +338,7 @@ test("generateImage uses chat completions image modalities and parses data URLs"
   assert.equal(result.revisedPrompt, "Updated prompt");
   assert.equal(stub.chat.completions.calls.length, 1);
   assert.deepEqual(stub.chat.completions.calls[0]?.modalities, ["image", "text"]);
+  assert.deepEqual(stub.chat.completions.calls[0]?.plugins, [{ id: "web", max_results: 4 }]);
 });
 
 test("generateImage includes reference images in chat content blocks", async () => {
