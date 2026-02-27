@@ -121,12 +121,28 @@ export interface OpenRouterClientConfig {
   imageModel: string;
   temperature: number;
   top_p: number;
+  enableWebSearch: boolean;
+  webSearchMaxResults: number;
   seed?: number;
+}
+
+interface OpenRouterWebPluginConfig {
+  id: "web";
+  max_results: number;
 }
 
 const sanitizeNumber = (value: unknown): number | undefined => {
   if (typeof value !== "number") return undefined;
   return Number.isFinite(value) ? value : undefined;
+};
+
+const sanitizeWebSearchMaxResults = (value: unknown): number | undefined => {
+  const numeric = sanitizeNumber(value);
+  if (typeof numeric !== "number" || !Number.isInteger(numeric)) {
+    return undefined;
+  }
+
+  return Math.max(1, Math.min(10, numeric));
 };
 
 export const readOpenRouterSettings = (): OpenRouterClientConfig => {
@@ -145,12 +161,16 @@ export const readOpenRouterSettings = (): OpenRouterClientConfig => {
   const temperature = safeGet("OpenRouterTemperature");
   const top_p = safeGet("OpenRouterTopP");
   const seedSetting = safeGet("OpenRouterSeed");
+  const enableWebSearch = safeGet("OpenRouterEnableWebSearch");
+  const webSearchMaxResults = safeGet("OpenRouterWebSearchMaxResults");
 
   const config: OpenRouterClientConfig = {
     model: normalizeModelId(model, DEFAULT_OPENROUTER_MODEL),
     imageModel: normalizeModelId(imageModel, DEFAULT_OPENROUTER_IMAGE_MODEL),
     temperature: sanitizeNumber(temperature) ?? 0,
     top_p: sanitizeNumber(top_p) ?? 1,
+    enableWebSearch: typeof enableWebSearch === "boolean" ? enableWebSearch : true,
+    webSearchMaxResults: sanitizeWebSearchMaxResults(webSearchMaxResults) ?? 5,
   };
 
   const seed = sanitizeNumber(seedSetting);
@@ -590,6 +610,7 @@ export class OpenRouterClient {
         },
       ],
     };
+    this.#applyOpenRouterPlugins(requestBase);
 
     if (aspectRatio) {
       requestBase.image_config = {
@@ -656,6 +677,7 @@ export class OpenRouterClient {
     };
 
     this.#applySamplingParameters(request);
+    this.#applyOpenRouterPlugins(request as unknown as Record<string, unknown>);
 
     const response = await this.#openai.responses.create(request);
 
@@ -691,6 +713,7 @@ export class OpenRouterClient {
     };
 
     this.#applySamplingParameters(request);
+    this.#applyOpenRouterPlugins(request as unknown as Record<string, unknown>);
 
     const response = await this.#openai.responses.create(request);
 
@@ -705,9 +728,20 @@ export class OpenRouterClient {
     systemInstruction: string,
   ): Array<{ role: "system" | "user"; content: string }> {
     return [
-      { role: "system", content: systemInstruction },
+      { role: "system", content: this.#buildSystemInstruction(systemInstruction) },
       { role: "user", content: prompt },
     ];
+  }
+
+  #buildSystemInstruction(baseInstruction: string): string {
+    if (!this.#config.enableWebSearch) {
+      return baseInstruction;
+    }
+
+    return (
+      `${baseInstruction}\n` +
+      "Use OpenRouter web search when helpful to ground PF2E rulings, compendium references, and current public documentation."
+    );
   }
 
   #prepareSchemaDefinition(schema: JsonSchemaDefinition): JsonSchemaDefinition {
@@ -806,6 +840,28 @@ export class OpenRouterClient {
     }
 
     request.top_p = this.#config.top_p;
+  }
+
+  #buildOpenRouterPlugins(): OpenRouterWebPluginConfig[] | undefined {
+    if (!this.#config.enableWebSearch) {
+      return undefined;
+    }
+
+    return [
+      {
+        id: "web",
+        max_results: this.#config.webSearchMaxResults,
+      },
+    ];
+  }
+
+  #applyOpenRouterPlugins(target: Record<string, unknown>): void {
+    const plugins = this.#buildOpenRouterPlugins();
+    if (!plugins || plugins.length === 0) {
+      return;
+    }
+
+    target.plugins = plugins;
   }
 
   #supportsTemperature(): boolean {
