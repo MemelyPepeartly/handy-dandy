@@ -2,6 +2,7 @@ import { CONSTANTS } from "../constants";
 import { fromFoundryActor } from "../mappers/export";
 import { importActor } from "../mappers/import";
 import type { ActorGenerationResult, ActorSchemaData } from "../schemas";
+import { showGeneratedOutputRecoveryDialog } from "../ui/generated-output-recovery";
 
 export type RemixMode = "scale" | "features" | "remake" | "equipment" | "spells";
 
@@ -456,10 +457,10 @@ async function runNpcRemix(actor: Actor, request: NpcRemixRequest): Promise<void
   const normalizedRequest = normalizeRemixRequest(canonical, request);
 
   let workingDialog: Dialog | null = null;
+  let generated: ActorGenerationResult | null = null;
   try {
     workingDialog = showWorkingDialog(actor.name ?? canonical.name);
 
-    let generated: ActorGenerationResult | null = null;
     let referenceText = buildRemixReferenceText(actor.name ?? canonical.name, canonical, normalizedRequest);
 
     for (let attempt = 1; attempt <= REMIX_RETRY_LIMIT; attempt += 1) {
@@ -508,6 +509,16 @@ async function runNpcRemix(actor: Actor, request: NpcRemixRequest): Promise<void
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     ui.notifications?.error(`${CONSTANTS.MODULE_NAME} | NPC remix failed: ${message}`);
+
+    if (generated) {
+      await showGeneratedOutputRecoveryDialog({
+        title: `${CONSTANTS.MODULE_NAME} | NPC Remix Output`,
+        summary: `NPC remix generated JSON for "${actor.name ?? canonical.name}", but Foundry could not apply it.`,
+        payload: generated,
+        filenameBase: `${actor.name ?? canonical.name}-npc-remix`,
+      });
+    }
+
     console.error(`${CONSTANTS.MODULE_NAME} | NPC remix failed`, error);
   } finally {
     workingDialog?.close({ force: true });
