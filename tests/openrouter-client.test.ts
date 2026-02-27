@@ -88,7 +88,7 @@ test("readOpenRouterSettings pulls module settings with sane defaults", () => {
   const config = readOpenRouterSettings();
   assert.deepEqual(config, {
     model: "openai/gpt-5-mini",
-    imageModel: "openai/gpt-image-1",
+    imageModel: "openai/gpt-5-image",
     temperature: 0.5,
     top_p: 0.75,
     seed: 123,
@@ -115,7 +115,7 @@ test("readOpenRouterSettings falls back to defaults for malformed model ids", ()
   const config = readOpenRouterSettings();
   assert.deepEqual(config, {
     model: "openai/gpt-5-mini",
-    imageModel: "openai/gpt-image-1",
+    imageModel: "openai/gpt-5-image-mini",
     temperature: 0.25,
     top_p: 0.5,
   });
