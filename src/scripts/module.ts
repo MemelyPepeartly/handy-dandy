@@ -121,6 +121,7 @@ Hooks.once("init", async () => {
   await loadTemplates({
     "tool-overview": `${CONSTANTS.TEMPLATE_PATH}/tool-overview.hbs`,
     "openrouter-account": `${CONSTANTS.TEMPLATE_PATH}/openrouter-account.hbs`,
+    "openrouter-model-manager": `${CONSTANTS.TEMPLATE_PATH}/openrouter-model-manager.hbs`,
     "npc-rule-elements-editor": `${CONSTANTS.TEMPLATE_PATH}/npc-rule-elements-editor.hbs`,
     "prompt-workbench-loading": `${CONSTANTS.TEMPLATE_PATH}/prompt-workbench-loading.hbs`,
     "prompt-workbench-generation-setup": `${CONSTANTS.TEMPLATE_PATH}/prompt-workbench-generation-setup.hbs`,
@@ -132,6 +133,7 @@ Hooks.once("init", async () => {
     "rule-element-generator-request": `${CONSTANTS.TEMPLATE_PATH}/rule-element-generator-request.hbs`,
     "rule-element-generator-loading": `${CONSTANTS.TEMPLATE_PATH}/rule-element-generator-loading.hbs`,
     "rule-element-generator-result": `${CONSTANTS.TEMPLATE_PATH}/rule-element-generator-result.hbs`,
+    "generation-recovery-dialog": `${CONSTANTS.TEMPLATE_PATH}/generation-recovery-dialog.hbs`,
   });
 });
 
