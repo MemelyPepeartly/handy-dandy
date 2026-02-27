@@ -16,6 +16,8 @@ declare module "fvtt-types/configuration" {
     "handy-dandy.OpenRouterTemperature": number;
     "handy-dandy.OpenRouterTopP": number;
     "handy-dandy.OpenRouterSeed": number;
+    "handy-dandy.OpenRouterEnableWebSearch": boolean;
+    "handy-dandy.OpenRouterWebSearchMaxResults": number;
 
     "handy-dandy.GeneratedImageDirectory": string;
     "handy-dandy.developerDumpInvalidJson": boolean;
