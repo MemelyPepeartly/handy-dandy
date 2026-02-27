@@ -1,5 +1,5 @@
 export const DEFAULT_OPENROUTER_MODEL = "openai/gpt-5-mini";
-export const DEFAULT_OPENROUTER_IMAGE_MODEL = "openai/gpt-image-1";
+export const DEFAULT_OPENROUTER_IMAGE_MODEL = "openai/gpt-5-image-mini";
 
 export type OpenRouterModelId = string;
 export type OpenRouterImageModelId = string;
@@ -13,6 +13,16 @@ export function normalizeModelId(
   }
 
   const trimmed = model.trim();
+  const lowered = trimmed.toLowerCase();
+
+  if (lowered === "openai/gpt-image-1" || lowered === "gpt-image-1") {
+    return "openai/gpt-5-image";
+  }
+
+  if (lowered === "openai/gpt-image" || lowered === "gpt-image") {
+    return "openai/gpt-5-image";
+  }
+
   if (trimmed.includes("/")) {
     return trimmed;
   }
