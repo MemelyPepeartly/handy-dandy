@@ -31,7 +31,15 @@
   margin: 4px 0 0;
 }
 
-.handy-dandy-item-image-generate {
+.handy-dandy-item-image-stack {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.handy-dandy-item-image-generate,
+.handy-dandy-item-image-preview {
   display: inline-flex;
   align-items: center;
   justify-content: center;

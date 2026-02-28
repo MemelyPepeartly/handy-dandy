@@ -3,9 +3,13 @@ import { buildItemImagePrompt, generateItemImage } from "../generation/token-ima
 import { promptImageGenerationRequest } from "./image-generation-dialog";
 
 const BUTTON_CLASS = "handy-dandy-item-image-generate" as const;
+const PREVIEW_BUTTON_CLASS = "handy-dandy-item-image-preview" as const;
 const STACK_CLASS = "handy-dandy-item-image-stack" as const;
 const BUTTON_ICON = "fas fa-palette" as const;
 const BUTTON_TEXT = "Generate Image" as const;
+const PREVIEW_BUTTON_ICON = "fas fa-image" as const;
+const PREVIEW_BUTTON_TEXT = "Preview Image" as const;
+const PREVIEW_BUTTON_TITLE = "Preview current item image" as const;
 
 function toSlug(value: string): string {
   return value
@@ -31,6 +35,56 @@ function setBusy(button: JQuery<HTMLElement>, busy: boolean): void {
   icon.attr("class", busy ? "fas fa-spinner fa-spin" : BUTTON_ICON);
 }
 
+function showItemImagePreview(item: Item): void {
+  const source = typeof item.img === "string" ? item.img.trim() : "";
+  if (!source) {
+    ui.notifications?.warn(`${CONSTANTS.MODULE_NAME} | Item image source is empty.`);
+    return;
+  }
+
+  const title = `${item.name?.trim() || "Item"} | Current Image`;
+  const uuid = item.uuid;
+  const appImagePopout = (globalThis as {
+    foundry?: {
+      applications?: {
+        apps?: {
+          ImagePopout?: new (options: {
+            src: string;
+            window: { title: string };
+            uuid?: string;
+          }) => { render: (options: { force: boolean }) => unknown };
+        };
+      };
+    };
+  }).foundry?.applications?.apps?.ImagePopout;
+
+  if (appImagePopout) {
+    new appImagePopout({
+      src: source,
+      window: { title },
+      uuid,
+    }).render({ force: true });
+    return;
+  }
+
+  new ImagePopout(source, {
+    title,
+    uuid,
+    shareable: true,
+  }).render(true);
+}
+
+function ensureImageButtonStack(imageElement: JQuery<HTMLElement>): JQuery<HTMLElement> {
+  let stack = imageElement.parent(`.${STACK_CLASS}`).first();
+  if (stack.length === 0) {
+    stack = $(`<div class="${STACK_CLASS}"></div>`);
+    imageElement.before(stack);
+    stack.append(imageElement);
+  }
+
+  return stack;
+}
+
 function resolveItemDescription(item: Item): string | null {
   const candidate = (item as Item & { system?: { description?: { value?: unknown } } }).system?.description?.value;
   if (typeof candidate !== "string") {
@@ -47,24 +101,31 @@ export function registerItemImageGenerateButton(): void {
 
     const user = game.user;
     if (!user) return;
-    if (!user.isGM && !item.isOwner) return;
+    const canGenerate = user.isGM || item.isOwner;
 
     const imageElement = html.find(".sheet-header img[data-edit=\"img\"]").first();
     if (imageElement.length === 0) return;
 
-    let stack = imageElement.parent(`.${STACK_CLASS}`).first();
-    if (stack.length === 0) {
-      stack = $(`<div class="${STACK_CLASS}"></div>`);
-      stack.css({
-        display: "inline-flex",
-        "flex-direction": "column",
-        "align-items": "center",
-        gap: "6px",
+    const stack = ensureImageButtonStack(imageElement);
+
+    if (stack.find(`.${PREVIEW_BUTTON_CLASS}`).length === 0) {
+      const previewButton = $(
+        `<button type="button" class="${PREVIEW_BUTTON_CLASS}" title="${PREVIEW_BUTTON_TITLE}" aria-label="${PREVIEW_BUTTON_TITLE}">
+          <i class="${PREVIEW_BUTTON_ICON}"></i>
+          <span>${PREVIEW_BUTTON_TEXT}</span>
+        </button>`,
+      );
+
+      previewButton.on("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        showItemImagePreview(item);
       });
-      imageElement.before(stack);
-      stack.append(imageElement);
+
+      stack.append(previewButton);
     }
 
+    if (!canGenerate) return;
     if (stack.find(`.${BUTTON_CLASS}`).length > 0) return;
 
     const button = $(
@@ -73,15 +134,6 @@ export function registerItemImageGenerateButton(): void {
         <span>${BUTTON_TEXT}</span>
       </button>`,
     );
-    button.css({
-      display: "inline-flex",
-      "align-items": "center",
-      gap: "6px",
-      padding: "4px 8px",
-      "font-size": "12px",
-      "line-height": "1.1",
-      cursor: "pointer",
-    });
 
     button.on("click", (event) => {
       event.preventDefault();
