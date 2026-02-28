@@ -139,6 +139,7 @@ export type ImportOptions = {
   actorId?: string;
   itemId?: string;
   strictTarget?: boolean;
+  createNew?: boolean;
 };
 
 type ItemCompendium = CompendiumCollection<CompendiumCollection.Metadata & { type: "Item" }>;
@@ -3281,7 +3282,7 @@ export async function importActor(
   assertSystemCompatibility(json.systemId);
   const source = prepareGeneratedActorSource(json);
   source.items = await resolveActorItems(source.items);
-  const { packId, folderId, actorId } = options;
+  const { packId, folderId, actorId, createNew } = options;
 
   if (folderId) {
     source.folder = folderId;
@@ -3301,10 +3302,12 @@ export async function importActor(
       throw new Error(`Pack with id "${packId}" was not found.`);
     }
 
-    const existing = await findActorPackDocument(pack, json.slug);
-    if (existing) {
-      await updateActorDocument(existing, source, folderId);
-      return existing;
+    if (!createNew) {
+      const existing = await findActorPackDocument(pack, json.slug);
+      if (existing) {
+        await updateActorDocument(existing, source, folderId);
+        return existing;
+      }
     }
 
     const imported = (await pack.importDocument(clone(source) as any, { keepId: true } as any)) as Actor | null | undefined;
@@ -3315,10 +3318,12 @@ export async function importActor(
     return imported;
   }
 
-  const existing = findWorldActor(json.slug);
-  if (existing) {
-    await updateActorDocument(existing, source, folderId);
-    return existing;
+  if (!createNew) {
+    const existing = findWorldActor(json.slug);
+    if (existing) {
+      await updateActorDocument(existing, source, folderId);
+      return existing;
+    }
   }
 
   const created = (await Actor.create(clone(source) as any, { keepId: true } as any)) as Actor | null | undefined;

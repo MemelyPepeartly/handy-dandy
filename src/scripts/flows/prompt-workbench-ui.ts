@@ -870,7 +870,7 @@ function createHistoryImporter(
     case "item":
       return () => importItem(data as GeneratedEntityMap["item"]);
     case "actor":
-      return () => importActor(data as GeneratedEntityMap["actor"]);
+      return () => importActor(data as GeneratedEntityMap["actor"], { createNew: true });
     default:
       return undefined;
   }

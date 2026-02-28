@@ -801,6 +801,83 @@ test("toFoundryActorData emits label-safe skill entries for standard and lore-li
   assert.equal(skills["lore-science"].visible, true);
 });
 
+test("importActor updates a matching world actor by slug by default", async () => {
+  const actor = createActor();
+  actor.slug = "world-actor-upsert-test";
+  actor.name = "World Actor Upsert Test";
+  actor.actions = [];
+  actor.strikes = [];
+  actor.spellcasting = null;
+  actor.inventory = null;
+
+  const foundry = toFoundryActorData(actor);
+  const existing = new MockActor({
+    ...foundry,
+    name: "Existing Actor",
+  });
+  (game.actors as MockCollection<MockActor>).set(existing.id, existing);
+
+  const generated: ActorGenerationResult = {
+    schema_version: actor.schema_version,
+    systemId: actor.systemId,
+    slug: actor.slug,
+    name: "Updated Actor Name",
+    type: foundry.type as ActorGenerationResult["type"],
+    img: foundry.img,
+    system: foundry.system as Record<string, unknown>,
+    prototypeToken: foundry.prototypeToken as Record<string, unknown>,
+    items: foundry.items as Record<string, unknown>[],
+    effects: foundry.effects,
+    folder: foundry.folder ?? null,
+    flags: foundry.flags ?? {},
+  };
+
+  const imported = await importActor(generated);
+
+  assert.strictEqual(imported, existing);
+  assert.equal(existing.name, "Updated Actor Name");
+  assert.equal(MockActor.created.length, 1);
+});
+
+test("importActor createNew bypasses world slug matching and creates a new actor", async () => {
+  const actor = createActor();
+  actor.slug = "world-actor-create-new-test";
+  actor.name = "World Actor Create New Test";
+  actor.actions = [];
+  actor.strikes = [];
+  actor.spellcasting = null;
+  actor.inventory = null;
+
+  const foundry = toFoundryActorData(actor);
+  const existing = new MockActor({
+    ...foundry,
+    name: "Existing Actor",
+  });
+  (game.actors as MockCollection<MockActor>).set(existing.id, existing);
+
+  const generated: ActorGenerationResult = {
+    schema_version: actor.schema_version,
+    systemId: actor.systemId,
+    slug: actor.slug,
+    name: "Created Actor",
+    type: foundry.type as ActorGenerationResult["type"],
+    img: foundry.img,
+    system: foundry.system as Record<string, unknown>,
+    prototypeToken: foundry.prototypeToken as Record<string, unknown>,
+    items: foundry.items as Record<string, unknown>[],
+    effects: foundry.effects,
+    folder: foundry.folder ?? null,
+    flags: foundry.flags ?? {},
+  };
+
+  const imported = await importActor(generated, { createNew: true });
+
+  assert.notStrictEqual(imported, existing);
+  assert.equal((imported as unknown as MockActor).name, "Created Actor");
+  assert.equal(existing.name, "Existing Actor");
+  assert.equal(MockActor.created.length, 2);
+});
+
 test("importActor sanitizes malformed melee attack effects in generated actor payloads", async () => {
   const actor = createActor();
   actor.slug = "malformed-effects-test";

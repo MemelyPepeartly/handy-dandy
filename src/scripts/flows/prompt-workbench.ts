@@ -83,7 +83,7 @@ const GENERATION_METHOD_MAP: Record<EntityType, keyof NonNullable<Game["handyDan
 const DEFAULT_IMPORTERS: Partial<ImporterMap> = {
   action: async (json, options) => importAction(json, options),
   item: async (json, options) => importItem(json, options),
-  actor: async (json, options) => importActor(json, options),
+  actor: async (json, options) => importActor(json, { ...options, createNew: true }),
 };
 
 interface BoundGenerationOptions {
