@@ -6,7 +6,6 @@ import { insertSidebarButtons, type ControlCollection } from "./setup/sidebarBut
 import { OpenRouterClient } from "./openrouter/client";
 import { createDevNamespace, canUseDeveloperTools, type DevNamespace } from "./dev/tools";
 import { ToolOverview } from "./ui/tool-overview";
-import { registerNpcRemixButton } from "./ui/npc-remix-button";
 import { registerNpcRuleElementsButton } from "./ui/npc-rule-elements-button";
 import { registerNpcPortraitRegenerateButton } from "./ui/npc-portrait-regenerate-button";
 import { registerNpcRemixSectionButtons } from "./ui/npc-remix-section-buttons";
@@ -60,7 +59,6 @@ type BoundGenerateActor = (
   options?: BoundGenerationOptions,
 ) => Promise<ActorGenerationResult>;
 
-registerNpcRemixButton();
 registerNpcRuleElementsButton();
 registerNpcPortraitRegenerateButton();
 registerNpcRemixSectionButtons();

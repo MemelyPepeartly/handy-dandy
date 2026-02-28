@@ -28,42 +28,7 @@ interface NormalizedNpcRemixRequest extends NpcRemixRequest {
   preserveExistingSpellcasting: boolean;
 }
 
-export interface NpcRemixPreset {
-  mode?: RemixMode;
-  instructions?: string;
-  targetLevel?: number;
-  generateTokenImage?: boolean;
-  tokenPrompt?: string;
-  title?: string;
-  minimumInventoryItems?: number;
-  minimumSpellEntries?: number;
-  minimumSpells?: number;
-  preserveExistingInventory?: boolean;
-  preserveExistingSpellcasting?: boolean;
-}
-
-type RemixFormResponse = {
-  instructions: string;
-  mode: string;
-  targetLevel: string;
-  generateTokenImage: string | null;
-  tokenPrompt: string;
-};
-
 const REMIX_RETRY_LIMIT = 2;
-
-const QUICK_MODE_DEFAULTS: Record<Extract<RemixMode, "equipment" | "spells">, string> = {
-  equipment: [
-    "Refresh this NPC's inventory with level-appropriate official PF2E equipment.",
-    "Keep the creature's core identity while improving tactical gear variety.",
-    "Prefer official weapons, armor, consumables, and utility items already present in PF2E content.",
-  ].join(" "),
-  spells: [
-    "Refresh this NPC's spellcasting with official PF2E spells appropriate to role and level.",
-    "Ensure there is at least one spellcasting entry and a useful spread of combat and utility spells.",
-    "Prefer official spells from Foundry compendia instead of inventing replacements.",
-  ].join(" "),
-};
 
 function escapeHtml(value: string): string {
   const utils = foundry.utils as { escapeHTML?: (input: string) => string };
@@ -77,26 +42,6 @@ function escapeHtml(value: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
-}
-
-function parseOptionalNumber(value: string): number | undefined {
-  const trimmed = value.trim();
-  if (!trimmed) return undefined;
-  const parsed = Number(trimmed);
-  return Number.isFinite(parsed) ? parsed : undefined;
-}
-
-function parseRemixMode(raw: string, fallback: RemixMode): RemixMode {
-  switch (raw) {
-    case "scale":
-    case "features":
-    case "remake":
-    case "equipment":
-    case "spells":
-      return raw;
-    default:
-      return fallback;
-  }
 }
 
 function buildModeInstruction(mode: RemixMode): string {
@@ -308,120 +253,6 @@ function getCoverageGap(
   return null;
 }
 
-async function promptRemixRequest(actor: Actor, preset: NpcRemixPreset): Promise<NpcRemixRequest | null> {
-  const defaultMode = preset.mode ?? "remake";
-  const defaultTargetLevel = typeof preset.targetLevel === "number" ? String(Math.max(0, Math.trunc(preset.targetLevel))) : "";
-  const defaultInstructions = preset.instructions?.trim() ?? "";
-  const defaultTokenPrompt = preset.tokenPrompt?.trim() ?? "";
-  const title = preset.title?.trim() || `Remix ${actor.name ?? "NPC"}`;
-
-  const content = `
-    <form class="handy-dandy-remix-form" style="display:flex;flex-direction:column;gap:0.75rem;min-width:560px;">
-      <div class="form-group">
-        <label for="handy-dandy-remix-mode">Remix Mode</label>
-        <select id="handy-dandy-remix-mode" name="mode">
-          <option value="scale"${defaultMode === "scale" ? " selected" : ""}>Scale Up/Down</option>
-          <option value="features"${defaultMode === "features" ? " selected" : ""}>Add Features</option>
-          <option value="remake"${defaultMode === "remake" ? " selected" : ""}>Complete Remake</option>
-          <option value="equipment"${defaultMode === "equipment" ? " selected" : ""}>Equipment Refresh</option>
-          <option value="spells"${defaultMode === "spells" ? " selected" : ""}>Spellcasting Refresh</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label for="handy-dandy-remix-target-level">Target Level (optional)</label>
-        <input id="handy-dandy-remix-target-level" type="number" name="targetLevel" min="0" value="${escapeHtml(defaultTargetLevel)}" />
-      </div>
-      <div class="form-group">
-        <label for="handy-dandy-remix-instructions">Remix Instructions</label>
-        <textarea id="handy-dandy-remix-instructions" name="instructions" rows="10" placeholder="Examples: make this creature level 11 elite controller, swap weapons to polearms, add occult spells, keep defensive profile but increase battlefield mobility.">${escapeHtml(defaultInstructions)}</textarea>
-      </div>
-      <div class="form-group">
-        <label><input type="checkbox" name="generateTokenImage"${preset.generateTokenImage ? " checked" : ""} /> Generate transparent token image</label>
-      </div>
-      <div class="form-group">
-        <label for="handy-dandy-remix-token-prompt">Token Prompt Override (optional)</label>
-        <input id="handy-dandy-remix-token-prompt" type="text" name="tokenPrompt" placeholder="Optional art direction for token generation" value="${escapeHtml(defaultTokenPrompt)}" />
-      </div>
-      <p class="notes">Current actor: <strong>${escapeHtml(actor.name ?? "Unnamed NPC")}</strong></p>
-      <p class="notes">Tip: leave instructions blank to use mode defaults.</p>
-    </form>
-  `;
-
-  const response = await new Promise<RemixFormResponse | null>((resolve) => {
-    let settled = false;
-    const finish = (value: RemixFormResponse | null): void => {
-      if (!settled) {
-        settled = true;
-        resolve(value);
-      }
-    };
-
-    const dialog = new Dialog(
-      {
-        title: `${CONSTANTS.MODULE_NAME} | ${title}`,
-        content,
-        buttons: {
-          remix: {
-            icon: '<i class="fas fa-random"></i>',
-            label: "Remix",
-            callback: (html) => {
-              const form = html[0]?.querySelector("form");
-              if (!(form instanceof HTMLFormElement)) {
-                finish(null);
-                return;
-              }
-              const formData = new FormData(form);
-              finish({
-                instructions: String(formData.get("instructions") ?? ""),
-                mode: String(formData.get("mode") ?? ""),
-                targetLevel: String(formData.get("targetLevel") ?? ""),
-                generateTokenImage: formData.get("generateTokenImage") as string | null,
-                tokenPrompt: String(formData.get("tokenPrompt") ?? ""),
-              });
-            },
-          },
-          cancel: {
-            icon: '<i class="fas fa-times"></i>',
-            label: "Cancel",
-            callback: () => finish(null),
-          },
-        },
-        default: "remix",
-        close: () => finish(null),
-      },
-      { jQuery: true, width: 700 },
-    );
-
-    dialog.render(true);
-  });
-
-  if (!response) {
-    return null;
-  }
-
-  const mode = parseRemixMode(response.mode, defaultMode);
-  const modeDefaultInstruction = (mode === "equipment" || mode === "spells") ? QUICK_MODE_DEFAULTS[mode] : "";
-  const fallbackInstruction = preset.instructions?.trim() || modeDefaultInstruction;
-  const instructions = response.instructions.trim() || fallbackInstruction;
-  if (!instructions) {
-    ui.notifications?.warn(`${CONSTANTS.MODULE_NAME} | Remix instructions are required.`);
-    return null;
-  }
-
-  return {
-    instructions,
-    mode,
-    targetLevel: parseOptionalNumber(response.targetLevel),
-    generateTokenImage: response.generateTokenImage ? true : undefined,
-    tokenPrompt: response.tokenPrompt.trim() || undefined,
-    minimumInventoryItems: preset.minimumInventoryItems,
-    minimumSpellEntries: preset.minimumSpellEntries,
-    minimumSpells: preset.minimumSpells,
-    preserveExistingInventory: preset.preserveExistingInventory,
-    preserveExistingSpellcasting: preset.preserveExistingSpellcasting,
-  };
-}
-
 function showWorkingDialog(actorName: string): Dialog {
   const safeName = escapeHtml(actorName);
   const dialog = new Dialog(
@@ -523,15 +354,6 @@ async function runNpcRemix(actor: Actor, request: NpcRemixRequest): Promise<void
   } finally {
     workingDialog?.close({ force: true });
   }
-}
-
-export async function runNpcRemixFlow(actor: Actor, preset: NpcRemixPreset = {}): Promise<void> {
-  const request = await promptRemixRequest(actor, preset);
-  if (!request) {
-    return;
-  }
-
-  await runNpcRemix(actor, request);
 }
 
 export async function runNpcRemixWithRequest(actor: Actor, request: NpcRemixRequest): Promise<void> {

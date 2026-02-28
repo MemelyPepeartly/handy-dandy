@@ -4,6 +4,12 @@
   gap: 4px;
 }
 
+.window-header .handy-dandy-npc-remix-sections-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .window-header .handy-dandy-npc-rule-elements-button {
   display: inline-flex;
   align-items: center;

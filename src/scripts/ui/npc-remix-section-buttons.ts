@@ -1,73 +1,9 @@
-import {
-  runNpcInventoryRemixFlow,
-  runNpcMainSheetRemixFlow,
-  runNpcSpellRemixFlow,
-} from "../flows/npc-section-remix";
+import { runNpcMainSheetRemixFlow } from "../flows/npc-section-remix";
 
-const BUTTON_BASE_CLASS = "handy-dandy-npc-remix-section-button" as const;
-const BUTTON_ROW_CLASS = "handy-dandy-npc-remix-section-controls" as const;
-const INVENTORY_BUTTON_CLASS = "handy-dandy-npc-remix-inventory-button" as const;
-const SPELLS_BUTTON_CLASS = "handy-dandy-npc-remix-spells-button" as const;
-const MAIN_SHEET_BUTTON_CLASS = "handy-dandy-npc-remix-main-sheet-button" as const;
-
-function appendSectionButton(
-  html: JQuery<HTMLElement>,
-  selector: string,
-  className: string,
-  label: string,
-  title: string,
-  iconClass: string,
-  onClick: () => void,
-): void {
-  const container = html.find(selector).first();
-  if (container.length === 0) return;
-  if (container.find(`.${className}`).length > 0) return;
-
-  const controlsRow = (() => {
-    const existing = container.children(`.${BUTTON_ROW_CLASS}`).first();
-    if (existing.length > 0) {
-      return existing;
-    }
-
-    const row = $(`<div class="${BUTTON_ROW_CLASS}"></div>`);
-    row.css({
-      display: "flex",
-      "justify-content": "flex-end",
-      "margin-bottom": "8px",
-    });
-    container.prepend(row);
-    return row;
-  })();
-
-  const button = $(
-    `<a class="${BUTTON_BASE_CLASS} ${className}" role="button" title="${title}" aria-label="${title}">
-      <i class="${iconClass}"></i>
-      <span>${label}</span>
-    </a>`,
-  );
-
-  button.css({
-    display: "inline-flex",
-    "align-items": "center",
-    gap: "6px",
-    padding: "4px 8px",
-    "border-radius": "999px",
-    border: "1px solid rgba(0, 0, 0, 0.35)",
-    background: "rgba(0, 0, 0, 0.55)",
-    color: "#ffffff",
-    "font-size": "12px",
-    "line-height": "1",
-    "z-index": "4",
-  });
-
-  button.on("click", (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    onClick();
-  });
-
-  controlsRow.append(button);
-}
+const BUTTON_CLASS = "handy-dandy-npc-remix-sections-button" as const;
+const BUTTON_ICON_CLASS = "fas fa-sliders-h" as const;
+const BUTTON_LABEL = "Remix Sections" as const;
+const BUTTON_TITLE = "Open section remix planner for this NPC" as const;
 
 export function registerNpcRemixSectionButtons(): void {
   Hooks.on("renderActorSheetPF2e", (app: ActorSheet, html: JQuery<HTMLElement>) => {
@@ -79,40 +15,27 @@ export function registerNpcRemixSectionButtons(): void {
     if (!user) return;
     if (!user.isGM && !app.document?.isOwner) return;
 
-    appendSectionButton(
-      html,
-      ".tab.main",
-      MAIN_SHEET_BUTTON_CLASS,
-      "Remix Sections",
-      "Open section remix planner for this NPC",
-      "fas fa-sliders-h",
-      () => {
-        void runNpcMainSheetRemixFlow(actor);
-      },
+    const windowHeader = html.find(".window-header");
+    if (windowHeader.length === 0) return;
+    if (windowHeader.find(`.${BUTTON_CLASS}`).length > 0) return;
+
+    const closeButton = windowHeader.find(".close");
+    const button = $(
+      `<a class="${BUTTON_CLASS}" title="${BUTTON_TITLE}" aria-label="${BUTTON_TITLE}">
+        <i class="${BUTTON_ICON_CLASS}"></i>
+        <span>${BUTTON_LABEL}</span>
+      </a>`,
     );
 
-    appendSectionButton(
-      html,
-      ".tab.inventory",
-      INVENTORY_BUTTON_CLASS,
-      "Remix Gear",
-      "Remix NPC inventory and equipment",
-      "fas fa-toolbox",
-      () => {
-        void runNpcInventoryRemixFlow(actor);
-      },
-    );
+    if (closeButton.length > 0) {
+      closeButton.before(button);
+    } else {
+      windowHeader.append(button);
+    }
 
-    appendSectionButton(
-      html,
-      ".tab.spells",
-      SPELLS_BUTTON_CLASS,
-      "Remix Spells",
-      "Remix NPC spellcasting entries and spells",
-      "fas fa-book-sparkles",
-      () => {
-        void runNpcSpellRemixFlow(actor);
-      },
-    );
+    button.on("click", (event) => {
+      event.preventDefault();
+      void runNpcMainSheetRemixFlow(actor);
+    });
   });
 }
