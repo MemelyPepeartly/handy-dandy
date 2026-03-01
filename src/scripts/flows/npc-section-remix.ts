@@ -5,6 +5,7 @@ import { toFoundryActorDataWithCompendium } from "../mappers/import";
 import type { JsonSchemaDefinition, OpenRouterClient } from "../openrouter/client";
 import { actorSchema, type ActorSchemaData } from "../schemas";
 import { showGeneratedOutputRecoveryDialog } from "../ui/generated-output-recovery";
+import { showRemixSummaryDialog, type RemixSummaryRow } from "../ui/remix-summary";
 import { ensureValid } from "../validation/ensure-valid";
 
 type MainSheetRemixFormResponse = {
@@ -230,6 +231,145 @@ function countSpells(canonical: ActorSchemaData): number {
     total += entry.spells.length;
   }
   return total;
+}
+
+function formatSigned(value: number): string {
+  return value >= 0 ? `+${value}` : String(value);
+}
+
+function describeTextLength(value: string | null | undefined): string {
+  const length = typeof value === "string" ? value.trim().length : 0;
+  return length > 0 ? `${length} chars` : "Empty";
+}
+
+function buildSectionRemixSummaryRows(
+  beforeState: ActorSchemaData,
+  afterState: ActorSchemaData,
+  request: MainSheetRemixRequest,
+): RemixSummaryRow[] {
+  const rows: RemixSummaryRow[] = [];
+
+  if (request.sections.core) {
+    rows.push(
+      {
+        label: "Level",
+        before: String(beforeState.level),
+        after: String(afterState.level),
+      },
+      {
+        label: "Size",
+        before: beforeState.size,
+        after: afterState.size,
+      },
+      {
+        label: "Speed",
+        before: `${beforeState.attributes.speed.value} ft`,
+        after: `${afterState.attributes.speed.value} ft`,
+      },
+    );
+  }
+
+  if (request.sections.defenses) {
+    rows.push(
+      {
+        label: "HP (max)",
+        before: String(beforeState.attributes.hp.max),
+        after: String(afterState.attributes.hp.max),
+      },
+      {
+        label: "AC",
+        before: String(beforeState.attributes.ac.value),
+        after: String(afterState.attributes.ac.value),
+      },
+      {
+        label: "Saves",
+        before: `F${formatSigned(beforeState.attributes.saves.fortitude.value)} / R${formatSigned(beforeState.attributes.saves.reflex.value)} / W${formatSigned(beforeState.attributes.saves.will.value)}`,
+        after: `F${formatSigned(afterState.attributes.saves.fortitude.value)} / R${formatSigned(afterState.attributes.saves.reflex.value)} / W${formatSigned(afterState.attributes.saves.will.value)}`,
+      },
+    );
+  }
+
+  if (request.sections.skills) {
+    rows.push(
+      {
+        label: "Perception",
+        before: formatSigned(beforeState.attributes.perception.value),
+        after: formatSigned(afterState.attributes.perception.value),
+      },
+      {
+        label: "Skills",
+        before: String(beforeState.skills?.length ?? 0),
+        after: String(afterState.skills?.length ?? 0),
+      },
+    );
+  }
+
+  if (request.sections.strikes) {
+    rows.push({
+      label: "Strikes",
+      before: String(beforeState.strikes?.length ?? 0),
+      after: String(afterState.strikes?.length ?? 0),
+    });
+  }
+
+  if (request.sections.actions) {
+    rows.push({
+      label: "Action Abilities",
+      before: String(beforeState.actions?.length ?? 0),
+      after: String(afterState.actions?.length ?? 0),
+    });
+  }
+
+  if (request.sections.inventory) {
+    rows.push({
+      label: "Inventory Entries",
+      before: String(beforeState.inventory?.length ?? 0),
+      after: String(afterState.inventory?.length ?? 0),
+      note: `${request.inventory.operation.toUpperCase()} operation`,
+    });
+  }
+
+  if (request.sections.spells) {
+    rows.push(
+      {
+        label: "Spellcasting Entries",
+        before: String(beforeState.spellcasting?.length ?? 0),
+        after: String(afterState.spellcasting?.length ?? 0),
+        note: `${request.spells.operation.toUpperCase()} operation`,
+      },
+      {
+        label: "Total Spells",
+        before: String(countSpells(beforeState)),
+        after: String(countSpells(afterState)),
+      },
+    );
+  }
+
+  if (request.sections.narrative) {
+    rows.push(
+      {
+        label: "Public Description",
+        before: describeTextLength(beforeState.description),
+        after: describeTextLength(afterState.description),
+      },
+      {
+        label: "Recall Knowledge",
+        before: describeTextLength(beforeState.recallKnowledge),
+        after: describeTextLength(afterState.recallKnowledge),
+      },
+    );
+  }
+
+  if (request.generateTokenImage) {
+    rows.push({
+      label: "Token Image",
+      before: beforeState.img ?? "None",
+      after: afterState.img ?? "None",
+      note: "Generated image requested",
+    });
+  }
+
+  return rows;
 }
 
 function summarizeMainSheetProfile(canonical: ActorSchemaData): string {
@@ -1684,11 +1824,20 @@ export async function runNpcMainSheetRemixFlow(actor: Actor): Promise<void> {
       request,
       openRouterClient as SectionRemixClient,
     );
+    const updatedCanonical = fromFoundryActor(actor.toObject() as any);
+    const summaryRows = buildSectionRemixSummaryRows(canonical, updatedCanonical, request);
+    const selectedSections = getSelectedSections(request.sections).map((entry) => sectionLabel(entry));
 
     workingDialog.close({ force: true });
     workingDialog = null;
 
     ui.notifications?.info(`${CONSTANTS.MODULE_NAME} | Remixed selected sections for ${actor.name}.`);
+    await showRemixSummaryDialog({
+      title: `${CONSTANTS.MODULE_NAME} | NPC Remix Summary`,
+      subtitle: actor.name ?? canonical.name,
+      rows: summaryRows,
+      notes: [`Sections remixed: ${selectedSections.join(", ")}`],
+    });
     actor.sheet?.render(true);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

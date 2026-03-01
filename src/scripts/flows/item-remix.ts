@@ -2,6 +2,7 @@ import { CONSTANTS } from "../constants";
 import { fromFoundryItem } from "../mappers/export";
 import { importItem } from "../mappers/import";
 import { showGeneratedOutputRecoveryDialog } from "../ui/generated-output-recovery";
+import { showRemixSummaryDialog, type RemixSummaryRow } from "../ui/remix-summary";
 
 export interface ItemRemixRequest {
   instructions: string;
@@ -189,6 +190,46 @@ function coerceRemixItemTypeToExisting(
   };
 }
 
+function normalizeText(value: string | null | undefined): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function describeTextLength(value: string | null | undefined): string {
+  const length = normalizeText(value).length;
+  if (length === 0) {
+    return "Empty";
+  }
+  return `${length} chars`;
+}
+
+function normalizeTraits(value: string[] | null | undefined): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .filter((entry): entry is string => typeof entry === "string")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+}
+
+function buildTraitDelta(before: string[], after: string[]): string {
+  const beforeSet = new Set(before.map((entry) => entry.toLowerCase()));
+  const afterSet = new Set(after.map((entry) => entry.toLowerCase()));
+
+  const added = after.filter((entry) => !beforeSet.has(entry.toLowerCase()));
+  const removed = before.filter((entry) => !afterSet.has(entry.toLowerCase()));
+  const parts: string[] = [];
+
+  if (added.length > 0) {
+    parts.push(`+ ${added.slice(0, 5).join(", ")}`);
+  }
+  if (removed.length > 0) {
+    parts.push(`- ${removed.slice(0, 5).join(", ")}`);
+  }
+
+  return parts.length > 0 ? parts.join(" | ") : "No trait changes";
+}
+
 export async function runItemRemixWithRequest(item: Item, request: ItemRemixRequest): Promise<void> {
   const generation = game.handyDandy?.generation?.generateItem;
   if (!generation) {
@@ -224,11 +265,67 @@ export async function runItemRemixWithRequest(item: Item, request: ItemRemixRequ
       folderId: item.actor ? undefined : item.folder?.id ?? undefined,
       strictTarget: true,
     });
+    const updatedCanonical = fromFoundryItem(imported.toObject() as any);
+
+    const beforeTraits = normalizeTraits(canonical.traits);
+    const afterTraits = normalizeTraits(updatedCanonical.traits);
+    const summaryRows: RemixSummaryRow[] = [
+      {
+        label: "Name",
+        before: canonical.name,
+        after: updatedCanonical.name,
+      },
+      {
+        label: "Item Type",
+        before: canonical.itemType,
+        after: updatedCanonical.itemType,
+      },
+      {
+        label: "Level",
+        before: String(canonical.level),
+        after: String(updatedCanonical.level),
+      },
+      {
+        label: "Rarity",
+        before: canonical.rarity,
+        after: updatedCanonical.rarity,
+      },
+      {
+        label: "Traits",
+        before: `${beforeTraits.length}`,
+        after: `${afterTraits.length}`,
+        note: buildTraitDelta(beforeTraits, afterTraits),
+      },
+      {
+        label: "Description",
+        before: describeTextLength(canonical.description),
+        after: describeTextLength(updatedCanonical.description),
+      },
+      {
+        label: "Image",
+        before: normalizeText(canonical.img) || "None",
+        after: normalizeText(updatedCanonical.img) || "None",
+        note: request.generateItemImage ? "Requested new generated image" : undefined,
+      },
+    ];
+    const highlights: string[] = [];
+    if (normalizeText(canonical.description) !== normalizeText(updatedCanonical.description)) {
+      highlights.push("Description text changed.");
+    }
+    if ((normalizeText(canonical.img) || "None") !== (normalizeText(updatedCanonical.img) || "None")) {
+      highlights.push("Image path changed.");
+    }
 
     workingDialog.close({ force: true });
     workingDialog = null;
 
     ui.notifications?.info(`${CONSTANTS.MODULE_NAME} | Remixed ${imported.name}.`);
+    await showRemixSummaryDialog({
+      title: `${CONSTANTS.MODULE_NAME} | Item Remix Summary`,
+      subtitle: imported.name ?? itemName,
+      rows: summaryRows,
+      notes: highlights,
+    });
     imported.sheet?.render(true);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

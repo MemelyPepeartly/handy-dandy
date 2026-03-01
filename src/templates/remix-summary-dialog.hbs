@@ -1,0 +1,36 @@
+<section class="handy-dandy-remix-summary">
+  {{#if subtitle}}
+    <p><strong>{{subtitle}}</strong></p>
+  {{/if}}
+
+  <table class="handy-dandy-remix-summary-table">
+    <thead>
+      <tr>
+        <th scope="col">Field</th>
+        <th scope="col">Before</th>
+        <th scope="col">After</th>
+        <th scope="col">Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{#each rows}}
+        <tr>
+          <th scope="row">{{label}}</th>
+          <td>{{before}}</td>
+          <td>{{after}}</td>
+          <td>{{note}}</td>
+        </tr>
+      {{/each}}
+    </tbody>
+  </table>
+
+  {{#if notes}}
+    <p class="notes"><strong>Highlights</strong></p>
+    <ul>
+      {{#each notes}}
+        <li>{{this}}</li>
+      {{/each}}
+    </ul>
+  {{/if}}
+</section>
+

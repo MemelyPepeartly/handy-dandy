@@ -3,6 +3,7 @@ import { fromFoundryActor } from "../mappers/export";
 import { importActor } from "../mappers/import";
 import type { ActorGenerationResult, ActorSchemaData } from "../schemas";
 import { showGeneratedOutputRecoveryDialog } from "../ui/generated-output-recovery";
+import { showRemixSummaryDialog, type RemixSummaryRow } from "../ui/remix-summary";
 
 export type RemixMode = "scale" | "features" | "remake" | "equipment" | "spells";
 
@@ -101,6 +102,63 @@ function countCanonicalSpells(canonical: ActorSchemaData): number {
     total += entry.spells.length;
   }
   return total;
+}
+
+function formatSigned(value: number): string {
+  return value >= 0 ? `+${value}` : String(value);
+}
+
+function buildNpcRemixSummaryRows(
+  beforeState: ActorSchemaData,
+  afterState: ActorSchemaData,
+): RemixSummaryRow[] {
+  return [
+    {
+      label: "Level",
+      before: String(beforeState.level),
+      after: String(afterState.level),
+    },
+    {
+      label: "HP (max)",
+      before: String(beforeState.attributes.hp.max),
+      after: String(afterState.attributes.hp.max),
+    },
+    {
+      label: "AC",
+      before: String(beforeState.attributes.ac.value),
+      after: String(afterState.attributes.ac.value),
+    },
+    {
+      label: "Perception",
+      before: formatSigned(beforeState.attributes.perception.value),
+      after: formatSigned(afterState.attributes.perception.value),
+    },
+    {
+      label: "Strikes",
+      before: String(beforeState.strikes.length),
+      after: String(afterState.strikes.length),
+    },
+    {
+      label: "Action Abilities",
+      before: String(beforeState.actions.length),
+      after: String(afterState.actions.length),
+    },
+    {
+      label: "Inventory Entries",
+      before: String(beforeState.inventory?.length ?? 0),
+      after: String(afterState.inventory?.length ?? 0),
+    },
+    {
+      label: "Spellcasting Entries",
+      before: String(beforeState.spellcasting?.length ?? 0),
+      after: String(afterState.spellcasting?.length ?? 0),
+    },
+    {
+      label: "Total Spells",
+      before: String(countCanonicalSpells(beforeState)),
+      after: String(countCanonicalSpells(afterState)),
+    },
+  ];
 }
 
 function resolveMinimum(value: number | undefined, fallback: number): number {
@@ -331,11 +389,29 @@ async function runNpcRemix(actor: Actor, request: NpcRemixRequest): Promise<void
       actorId: actor.id ?? undefined,
       folderId: actor.folder?.id ?? undefined,
     });
+    const updatedCanonical = fromFoundryActor(imported.toObject() as any);
+    const summaryRows = buildNpcRemixSummaryRows(canonical, updatedCanonical);
+    const highlights: string[] = [];
+    if ((canonical.img ?? "") !== (updatedCanonical.img ?? "")) {
+      highlights.push("Token/portrait image changed.");
+    }
+    if (request.mode === "equipment") {
+      highlights.push("Equipment-focused remix mode was used.");
+    }
+    if (request.mode === "spells") {
+      highlights.push("Spellcasting-focused remix mode was used.");
+    }
 
     workingDialog.close({ force: true });
     workingDialog = null;
 
     ui.notifications?.info(`${CONSTANTS.MODULE_NAME} | Remixed ${imported.name}.`);
+    await showRemixSummaryDialog({
+      title: `${CONSTANTS.MODULE_NAME} | NPC Remix Summary`,
+      subtitle: imported.name ?? (actor.name ?? canonical.name),
+      rows: summaryRows,
+      notes: highlights,
+    });
     imported.sheet?.render(true);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

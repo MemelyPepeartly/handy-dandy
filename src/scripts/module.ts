@@ -127,6 +127,7 @@ Hooks.once("init", async () => {
     "prompt-workbench-history-list": `${CONSTANTS.TEMPLATE_PATH}/prompt-workbench-history-list.hbs`,
     "prompt-workbench-history-placeholder": `${CONSTANTS.TEMPLATE_PATH}/prompt-workbench-history-placeholder.hbs`,
     "prompt-workbench-entry-detail": `${CONSTANTS.TEMPLATE_PATH}/prompt-workbench-entry-detail.hbs`,
+    "remix-summary-dialog": `${CONSTANTS.TEMPLATE_PATH}/remix-summary-dialog.hbs`,
     "prompt-workbench-request": `${CONSTANTS.TEMPLATE_PATH}/prompt-workbench-request.hbs`,
     "prompt-workbench-result": `${CONSTANTS.TEMPLATE_PATH}/prompt-workbench-result.hbs`,
     "rule-element-generator-request": `${CONSTANTS.TEMPLATE_PATH}/rule-element-generator-request.hbs`,
