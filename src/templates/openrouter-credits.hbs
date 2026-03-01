@@ -1,0 +1,47 @@
+<section class="handy-dandy-openrouter-credits">
+  <p class="notes">
+    OpenRouter credit snapshot for the current user account.
+    Last fetched: <strong>{{fetchedAt}}</strong>
+  </p>
+
+  <fieldset>
+    <legend>Account Credits</legend>
+    <div class="form-group">
+      <label>Available</label>
+      <div><strong>{{availableCredits}}</strong></div>
+    </div>
+    <div class="form-group">
+      <label>Total Credits</label>
+      <div>{{totalCredits}}</div>
+    </div>
+    <div class="form-group">
+      <label>Total Usage</label>
+      <div>{{totalUsage}}</div>
+    </div>
+    <div class="form-group">
+      <label>Usage Percent</label>
+      <div>{{usagePercent}}</div>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Current API Key Limits</legend>
+    <div class="form-group">
+      <label>Limit Remaining</label>
+      <div>{{keyLimitRemaining}}</div>
+    </div>
+    <div class="form-group">
+      <label>Limit</label>
+      <div>{{keyLimit}}</div>
+    </div>
+    <div class="form-group">
+      <label>Usage</label>
+      <div>{{keyUsage}}</div>
+    </div>
+  </fieldset>
+
+  <p class="notes">
+    If values show as <em>Unavailable</em>, the selected endpoint did not return that field for your account/key.
+  </p>
+</section>
+

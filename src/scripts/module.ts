@@ -119,6 +119,7 @@ Hooks.once("init", async () => {
   await loadTemplates({
     "tool-overview": `${CONSTANTS.TEMPLATE_PATH}/tool-overview.hbs`,
     "openrouter-account": `${CONSTANTS.TEMPLATE_PATH}/openrouter-account.hbs`,
+    "openrouter-credits": `${CONSTANTS.TEMPLATE_PATH}/openrouter-credits.hbs`,
     "openrouter-model-manager": `${CONSTANTS.TEMPLATE_PATH}/openrouter-model-manager.hbs`,
     "npc-rule-elements-editor": `${CONSTANTS.TEMPLATE_PATH}/npc-rule-elements-editor.hbs`,
     "prompt-workbench-loading": `${CONSTANTS.TEMPLATE_PATH}/prompt-workbench-loading.hbs`,

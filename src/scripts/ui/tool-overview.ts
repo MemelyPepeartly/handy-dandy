@@ -1,6 +1,7 @@
 import { CONSTANTS } from "../constants";
 import { runPromptWorkbenchFlow } from "../flows/prompt-workbench-ui";
 import { runRuleElementGeneratorFlow } from "../flows/rule-element-generator-ui";
+import { runOpenRouterCreditsFlow } from "../flows/openrouter-credits-ui";
 
 interface ToolCardData {
   id: string;
@@ -68,6 +69,17 @@ export class ToolOverview extends FormApplication {
           buttonLabel: "Open Rule Element Generator",
           buttonIcon: "fas fa-gears",
         },
+        {
+          id: "openrouter-credits",
+          title: "OpenRouter Credits",
+          icon: "fas fa-wallet",
+          description:
+            "View current OpenRouter account credits and API-key limit usage for your connected user.",
+          location: "Scene Controls -> Handy Dandy Tools -> OpenRouter Credits",
+          buttonAction: "openrouter-credits",
+          buttonLabel: "Open Credits Snapshot",
+          buttonIcon: "fas fa-wallet",
+        },
       ],
     } satisfies ToolOverviewData;
   }
@@ -84,6 +96,9 @@ export class ToolOverview extends FormApplication {
           break;
         case "rule-element-generator":
           this.#runRuleElementGenerator();
+          break;
+        case "openrouter-credits":
+          this.#runOpenRouterCredits();
           break;
         default:
           console.warn(`${CONSTANTS.MODULE_NAME} | Unknown tool overview action: ${action}`);
@@ -104,5 +119,9 @@ export class ToolOverview extends FormApplication {
 
   #runRuleElementGenerator(): void {
     void runRuleElementGeneratorFlow();
+  }
+
+  #runOpenRouterCredits(): void {
+    void runOpenRouterCreditsFlow();
   }
 }

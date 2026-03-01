@@ -260,29 +260,37 @@ function summarizeMainSheetProfile(canonical: ActorSchemaData): string {
 
 function buildInventoryGoalDirective(goal: string): string {
   switch (goal) {
+    case "add":
     case "expand":
-      return "Expand the current inventory with more tactical and utility coverage.";
-    case "retheme":
-      return "Retheme the inventory while keeping role-appropriate effectiveness.";
+      return "Add new inventory entries while keeping existing items.";
+    case "enhance":
+      return "Enhance existing inventory quality and usefulness while preserving current identity.";
+    case "replace":
     case "rebuild":
-      return "Rebuild the inventory from scratch while maintaining PF2E correctness.";
+      return "Replace inventory entries with a fresh loadout while maintaining PF2E correctness.";
+    case "retheme":
+      return "Retheme inventory while keeping role-appropriate effectiveness.";
     case "upgrade":
     default:
-      return "Upgrade the current inventory with level-appropriate improvements.";
+      return "Enhance existing inventory quality and usefulness while preserving current identity.";
   }
 }
 
 function buildSpellGoalDirective(goal: string): string {
   switch (goal) {
+    case "add":
+    case "expand":
+      return "Add spells without removing the existing spell package.";
+    case "enhance":
+    case "boss":
+      return "Enhance spell effectiveness and coverage while preserving the current package.";
+    case "replace":
+    case "rebuild":
+      return "Replace spellcasting with a fresh PF2E-valid package.";
     case "retheme":
       return "Retheme spellcasting around a new magical concept while keeping robust coverage.";
-    case "rebuild":
-      return "Rebuild spellcasting from scratch while preserving PF2E validity and breadth.";
-    case "boss":
-      return "Upgrade spellcasting for a high-impact encounter profile.";
-    case "expand":
     default:
-      return "Expand and improve the existing spell package rather than shrinking it.";
+      return "Enhance spell effectiveness and coverage while preserving the current package.";
   }
 }
 
@@ -297,6 +305,7 @@ function buildFocusList(response: Pick<MainSheetRemixFormResponse, "focusOffense
 
 function resolveInventoryOperation(goal: string): SectionOperation {
   switch (goal) {
+    case "replace":
     case "rebuild":
     case "retheme":
       return "replace";
@@ -307,8 +316,48 @@ function resolveInventoryOperation(goal: string): SectionOperation {
 
 function resolveSpellOperation(goal: string): SectionOperation {
   switch (goal) {
+    case "replace":
     case "rebuild":
     case "retheme":
+      return "replace";
+    default:
+      return "add";
+  }
+}
+
+function normalizeInventoryGoal(value: string): string {
+  const normalized = value.trim().toLowerCase();
+  switch (normalized) {
+    case "add":
+    case "enhance":
+    case "replace":
+    case "retheme":
+      return normalized;
+    case "expand":
+      return "add";
+    case "upgrade":
+      return "enhance";
+    case "rebuild":
+      return "replace";
+    default:
+      return "enhance";
+  }
+}
+
+function normalizeSpellGoal(value: string): string {
+  const normalized = value.trim().toLowerCase();
+  switch (normalized) {
+    case "add":
+    case "enhance":
+    case "replace":
+    case "retheme":
+      return normalized;
+    case "expand":
+      return "add";
+    case "upgrade":
+    case "boss":
+      return "enhance";
+    case "rebuild":
       return "replace";
     default:
       return "add";
@@ -397,12 +446,12 @@ async function promptMainSheetRemixRequest(
         <legend style="padding:0 0.2rem;">Inventory Options (used when Gear and inventory is selected)</legend>
         <div class="notes">Current items (${inventoryCount}): ${escapeHtml(summarizeInventory(canonical))}</div>
         <div class="form-group">
-          <label for="handy-dandy-remix-main-inventory-goal">Inventory Goal</label>
+          <label for="handy-dandy-remix-main-inventory-goal">Inventory Action</label>
           <select id="handy-dandy-remix-main-inventory-goal" name="inventoryGoal">
-            <option value="upgrade">Upgrade Existing Loadout</option>
-            <option value="expand">Expand Tactical Coverage</option>
-            <option value="retheme">Retheme Gear Package</option>
-            <option value="rebuild">Full Gear Rebuild</option>
+            <option value="enhance">Enhance</option>
+            <option value="add">Add</option>
+            <option value="replace">Replace</option>
+            <option value="retheme">Retheme</option>
           </select>
         </div>
         <div class="form-group">
@@ -433,12 +482,12 @@ async function promptMainSheetRemixRequest(
         <div class="notes">Entries: ${spellEntryCount}; Spells: ${spellCount}</div>
         <div class="notes">${escapeHtml(summarizeSpells(canonical))}</div>
         <div class="form-group">
-          <label for="handy-dandy-remix-main-spell-goal">Spellcasting Goal</label>
+          <label for="handy-dandy-remix-main-spell-goal">Spell Action</label>
           <select id="handy-dandy-remix-main-spell-goal" name="spellGoal">
-            <option value="expand">Expand Existing Spell Arsenal</option>
-            <option value="boss">Boss Encounter Upgrade</option>
-            <option value="retheme">Retheme Spell Package</option>
-            <option value="rebuild">Full Spellcasting Rebuild</option>
+            <option value="add">Add</option>
+            <option value="enhance">Enhance</option>
+            <option value="replace">Replace</option>
+            <option value="retheme">Retheme</option>
           </select>
         </div>
         <div class="form-group">
@@ -572,8 +621,8 @@ async function promptMainSheetRemixRequest(
     return null;
   }
 
-  const inventoryGoal = response.inventoryGoal.trim() || "upgrade";
-  const spellGoal = response.spellGoal.trim() || "expand";
+  const inventoryGoal = normalizeInventoryGoal(response.inventoryGoal);
+  const spellGoal = normalizeSpellGoal(response.spellGoal);
   const inventoryMustInclude = splitCsvList(response.inventoryMustInclude);
   const inventoryAvoid = splitCsvList(response.inventoryAvoid);
   const spellMustInclude = splitCsvList(response.spellMustInclude);

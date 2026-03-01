@@ -1,5 +1,6 @@
 import { runPromptWorkbenchFlow } from "../flows/prompt-workbench-ui";
 import { runRuleElementGeneratorFlow } from "../flows/rule-element-generator-ui";
+import { runOpenRouterCreditsFlow } from "../flows/openrouter-credits-ui";
 import {
   MAP_MARKER_CONTROL_NAME,
   MAP_MARKER_PLACEMENT_TOOL_NAME,
@@ -242,6 +243,16 @@ export function insertSidebarButtons(controls: ControlCollection): void {
     button: true,
     onChange: () => {
       void runRuleElementGeneratorFlow();
+    },
+  });
+
+  compatibilityAddTool(handyGroup.tools, {
+    name: "openrouter-credits",
+    title: "OpenRouter Credits",
+    icon: "fa-solid fa-wallet",
+    button: true,
+    onChange: () => {
+      void runOpenRouterCreditsFlow();
     },
   });
 
