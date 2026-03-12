@@ -19,6 +19,8 @@ interface CapabilitySummaryViewData {
   inputModalities: string;
   outputModalities: string;
   supportedParameters: string;
+  supportsStructuredOutputs: string;
+  supportsToolCalling: string;
 }
 
 interface OpenRouterModelManagerViewData {
@@ -26,6 +28,7 @@ interface OpenRouterModelManagerViewData {
   loadedAt: string;
   textOptions: ModelOptionViewData[];
   imageOptions: ModelOptionViewData[];
+  textSelectionNote?: string;
   selectedTextModel?: CapabilitySummaryViewData;
   selectedImageModel?: CapabilitySummaryViewData;
 }
@@ -82,6 +85,8 @@ function toCapabilityViewData(capabilities: OpenRouterModelCapabilities | undefi
     inputModalities: capabilities.inputModalities.join(", ") || "Unknown",
     outputModalities: capabilities.outputModalities.join(", ") || "Unknown",
     supportedParameters: capabilities.supportedParameters.join(", ") || "Unknown",
+    supportsStructuredOutputs: capabilities.supportsStructuredOutputs ? "Yes" : "No",
+    supportsToolCalling: capabilities.supportsToolCalling ? "Yes" : "No",
   };
 }
 
@@ -123,6 +128,8 @@ export class OpenRouterModelManagerSettings extends FormApplication {
       loadedAt: formatLoadedAt(catalog.loadedAt),
       textOptions: mapOptionsToView(catalog.textChoices, currentTextModel),
       imageOptions: mapOptionsToView(catalog.imageChoices, currentImageModel),
+      textSelectionNote:
+        "Text models are limited to entries advertising structured outputs (structured_outputs/response_format).",
       selectedTextModel: toCapabilityViewData(catalog.capabilitiesById[currentTextModel]),
       selectedImageModel: toCapabilityViewData(catalog.capabilitiesById[currentImageModel]),
     };
@@ -147,6 +154,14 @@ export class OpenRouterModelManagerSettings extends FormApplication {
     const imageModel = typeof formData.imageModel === "string" ? formData.imageModel.trim() : "";
     if (!textModel || !imageModel) {
       throw new Error("Text and image model selections are required.");
+    }
+
+    const catalog = getCachedOpenRouterModelChoiceCatalog() ?? await loadOpenRouterModelChoiceCatalog();
+    if (!Object.hasOwn(catalog.textChoices, textModel)) {
+      throw new Error("Choose a text model that advertises structured outputs.");
+    }
+    if (!Object.hasOwn(catalog.imageChoices, imageModel)) {
+      throw new Error("Choose an image model that advertises text-to-image support.");
     }
 
     await settings.set(CONSTANTS.MODULE_ID, "OpenRouterModel", textModel);
