@@ -1,4 +1,5 @@
 import { CONSTANTS } from "../constants";
+import { generateStructuredOutput } from "../generation/pipeline";
 import type { JsonSchemaDefinition } from "../openrouter/client";
 import type { MapMarkerData } from "./types";
 
@@ -123,7 +124,8 @@ export async function generateMapMarkerBoxText(
     throw new Error(`${CONSTANTS.MODULE_NAME} | AI client has not been initialised`);
   }
 
-  const response = await openRouterClient.generateWithSchema<BoxTextGenerationResult>(
+  const response = await generateStructuredOutput<BoxTextGenerationResult>(
+    openRouterClient,
     buildMapMarkerBoxTextPrompt(marker),
     BOXTEXT_GENERATION_SCHEMA,
   );
