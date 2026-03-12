@@ -13,6 +13,10 @@
     </select>
   </div>
 
+  {{#if textSelectionNote}}
+    <p class="notes">{{textSelectionNote}}</p>
+  {{/if}}
+
   {{#if selectedTextModel}}
     <div class="notes">
       <strong>Selected text model details</strong><br />
@@ -20,6 +24,8 @@
       Context length: {{selectedTextModel.contextLength}}<br />
       Inputs: {{selectedTextModel.inputModalities}}<br />
       Outputs: {{selectedTextModel.outputModalities}}<br />
+      Structured outputs: {{selectedTextModel.supportsStructuredOutputs}}<br />
+      Tool calling: {{selectedTextModel.supportsToolCalling}}<br />
       Supported parameters: {{selectedTextModel.supportedParameters}}
     </div>
   {{/if}}
@@ -40,6 +46,8 @@
       Context length: {{selectedImageModel.contextLength}}<br />
       Inputs: {{selectedImageModel.inputModalities}}<br />
       Outputs: {{selectedImageModel.outputModalities}}<br />
+      Structured outputs: {{selectedImageModel.supportsStructuredOutputs}}<br />
+      Tool calling: {{selectedImageModel.supportsToolCalling}}<br />
       Supported parameters: {{selectedImageModel.supportedParameters}}
     </div>
   {{/if}}
