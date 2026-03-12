@@ -2,11 +2,15 @@ import { CONSTANTS } from "../constants";
 import { DEFAULT_OPENROUTER_IMAGE_MODEL, DEFAULT_OPENROUTER_MODEL } from "./models";
 
 const OPENROUTER_MODELS_ENDPOINT = "https://openrouter.ai/api/v1/models";
+const OPENROUTER_USER_MODELS_ENDPOINT = "https://openrouter.ai/api/v1/models/user";
 const OPENROUTER_MODELS_TIMEOUT_MS = 7000;
 
-const OPENROUTER_TEXT_SUPPORT_PARAMETERS = [
+const OPENROUTER_STRUCTURED_OUTPUT_PARAMETERS = [
   "structured_outputs",
   "response_format",
+ ] as const;
+
+const OPENROUTER_TOOL_SUPPORT_PARAMETERS = [
   "tools",
   "tool_choice",
 ] as const;
@@ -40,6 +44,8 @@ export interface OpenRouterModelCapabilities {
   outputModalities: string[];
   supportedParameters: string[];
   contextLength?: number;
+  supportsStructuredOutputs: boolean;
+  supportsToolCalling: boolean;
   supportsTextGeneration: boolean;
   supportsImageGeneration: boolean;
 }
@@ -134,8 +140,9 @@ function toCapabilities(record: OpenRouterModelRecord): OpenRouterModelCapabilit
 
   const supportsTextOutput = outputModalities.includes("text");
   const supportsImageOutput = outputModalities.includes("image");
-  const supportsTextGeneration = supportsTextOutput &&
-    hasAnyParameter(supportedParameters, OPENROUTER_TEXT_SUPPORT_PARAMETERS);
+  const supportsStructuredOutputs = hasAnyParameter(supportedParameters, OPENROUTER_STRUCTURED_OUTPUT_PARAMETERS);
+  const supportsToolCalling = hasAnyParameter(supportedParameters, OPENROUTER_TOOL_SUPPORT_PARAMETERS);
+  const supportsTextGeneration = supportsTextOutput && supportsStructuredOutputs;
   const supportsImageGeneration = supportsImageOutput && inputModalities.includes("text");
 
   const contextLength = typeof record.context_length === "number" && Number.isFinite(record.context_length)
@@ -149,6 +156,8 @@ function toCapabilities(record: OpenRouterModelRecord): OpenRouterModelCapabilit
     outputModalities,
     supportedParameters,
     contextLength,
+    supportsStructuredOutputs,
+    supportsToolCalling,
     supportsTextGeneration,
     supportsImageGeneration,
   };
@@ -203,6 +212,8 @@ function fallbackCatalog(): OpenRouterModelChoiceCatalog {
       inputModalities: ["text"],
       outputModalities: ["text"],
       supportedParameters: ["structured_outputs", "tools", "tool_choice", "response_format"],
+      supportsStructuredOutputs: true,
+      supportsToolCalling: true,
       supportsTextGeneration: true,
       supportsImageGeneration: false,
     },
@@ -212,6 +223,8 @@ function fallbackCatalog(): OpenRouterModelChoiceCatalog {
       inputModalities: ["text"],
       outputModalities: ["text"],
       supportedParameters: ["structured_outputs", "tools", "tool_choice", "response_format"],
+      supportsStructuredOutputs: true,
+      supportsToolCalling: true,
       supportsTextGeneration: true,
       supportsImageGeneration: false,
     },
@@ -221,6 +234,8 @@ function fallbackCatalog(): OpenRouterModelChoiceCatalog {
       inputModalities: ["text", "image"],
       outputModalities: ["text", "image"],
       supportedParameters: ["response_format", "structured_outputs"],
+      supportsStructuredOutputs: true,
+      supportsToolCalling: false,
       supportsTextGeneration: true,
       supportsImageGeneration: true,
     },
@@ -230,6 +245,8 @@ function fallbackCatalog(): OpenRouterModelChoiceCatalog {
       inputModalities: ["text", "image"],
       outputModalities: ["text", "image"],
       supportedParameters: ["response_format", "structured_outputs"],
+      supportsStructuredOutputs: true,
+      supportsToolCalling: false,
       supportsTextGeneration: true,
       supportsImageGeneration: true,
     },
@@ -264,20 +281,33 @@ async function fetchOpenRouterModels(): Promise<OpenRouterModelRecord[]> {
       headers.Authorization = `Bearer ${apiKey}`;
     }
 
-    const response = await fetch(OPENROUTER_MODELS_ENDPOINT, {
-      method: "GET",
-      headers,
-      signal: controller?.signal,
-    });
+    const endpoints = apiKey
+      ? [OPENROUTER_USER_MODELS_ENDPOINT, OPENROUTER_MODELS_ENDPOINT]
+      : [OPENROUTER_MODELS_ENDPOINT];
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status} ${response.statusText}`);
+    let lastError: Error | null = null;
+    for (const endpoint of endpoints) {
+      try {
+        const response = await fetch(endpoint, {
+          method: "GET",
+          headers,
+          signal: controller?.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status} ${response.statusText}`);
+        }
+
+        const payload = await response.json() as OpenRouterModelsResponse;
+        return Array.isArray(payload.data)
+          ? (payload.data as OpenRouterModelRecord[])
+          : [];
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+      }
     }
 
-    const payload = await response.json() as OpenRouterModelsResponse;
-    return Array.isArray(payload.data)
-      ? (payload.data as OpenRouterModelRecord[])
-      : [];
+    throw lastError ?? new Error("Unable to load OpenRouter model catalog.");
   } finally {
     if (timeoutId !== null) {
       globalThis.clearTimeout(timeoutId);

@@ -677,6 +677,7 @@ export class OpenRouterClient {
     };
 
     this.#applySamplingParameters(request);
+    this.#applySchemaProviderPreferences(request as unknown as Record<string, unknown>);
     this.#applyOpenRouterPlugins(request as unknown as Record<string, unknown>);
 
     const response = await this.#openai.responses.create(request);
@@ -713,6 +714,7 @@ export class OpenRouterClient {
     };
 
     this.#applySamplingParameters(request);
+    this.#applySchemaProviderPreferences(request as unknown as Record<string, unknown>);
     this.#applyOpenRouterPlugins(request as unknown as Record<string, unknown>);
 
     const response = await this.#openai.responses.create(request);
@@ -758,16 +760,25 @@ export class OpenRouterClient {
   #shouldFallback(error: unknown): boolean {
     if (!(error instanceof Error)) return false;
     const candidate = error as Error & { status?: number; code?: string };
-    if (typeof candidate.code === "string" && candidate.code.toLowerCase().includes("response_format")) {
-      return true;
+    const parts = [
+      typeof candidate.code === "string" ? candidate.code : "",
+      typeof candidate.message === "string" ? candidate.message : "",
+    ];
+    const combined = parts.join(" ").toLowerCase();
+
+    if (combined.includes("unable to parse json response")) {
+      return false;
     }
-    if (typeof candidate.status === "number" && candidate.status >= 400 && candidate.status < 500) {
-      return true;
-    }
-    if (typeof candidate.message === "string" && candidate.message.toLowerCase().includes("response_format")) {
-      return true;
-    }
-    return false;
+
+    return (
+      combined.includes("response_format") ||
+      combined.includes("structured output") ||
+      combined.includes("structured-output") ||
+      combined.includes("structured outputs") ||
+      combined.includes("json_schema") ||
+      combined.includes("text.format") ||
+      combined.includes("unsupported parameter")
+    );
   }
 
   async #runWithLogging<T>(
@@ -840,6 +851,12 @@ export class OpenRouterClient {
     }
 
     request.top_p = this.#config.top_p;
+  }
+
+  #applySchemaProviderPreferences(target: Record<string, unknown>): void {
+    const provider = isRecord(target.provider) ? { ...target.provider } : {};
+    provider.require_parameters = true;
+    target.provider = provider;
   }
 
   #buildOpenRouterPlugins(): OpenRouterWebPluginConfig[] | undefined {
