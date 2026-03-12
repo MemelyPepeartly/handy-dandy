@@ -41,7 +41,6 @@ type GeneratorFunction<TInput, TResult> = (
 
 interface BoundGenerationOptions {
   seed?: number;
-  maxAttempts?: number;
   openRouterClient?: Pick<OpenRouterClient, "generateWithSchema">;
   onProgress?: (update: GenerationProgressUpdate) => void;
 }
@@ -70,7 +69,7 @@ function bindGenerator<TInput, TResult>(
   fn: GeneratorFunction<TInput, TResult>,
 ): (input: TInput, options?: BoundGenerationOptions) => Promise<TResult> {
   return async (input: TInput, options: BoundGenerationOptions = {}) => {
-    const { openRouterClient: explicitClient, seed, maxAttempts, onProgress } = options;
+    const { openRouterClient: explicitClient, seed, onProgress } = options;
     const openRouterClient = explicitClient ?? game.handyDandy?.openRouterClient;
     if (!openRouterClient) {
       throw new Error(`${CONSTANTS.MODULE_NAME} | AI client has not been initialised`);
@@ -79,7 +78,6 @@ function bindGenerator<TInput, TResult>(
     return fn(input, {
       openRouterClient,
       seed: seed ?? DEFAULT_GENERATION_SEED,
-      maxAttempts,
       onProgress,
     });
   };
@@ -149,7 +147,6 @@ Hooks.once("setup", () => {
 
   const devNamespace = createDevNamespace({
     canAccess: canUseDeveloperTools,
-    getOpenRouterClient: () => game.handyDandy?.openRouterClient ?? null,
     generateAction: generation.generateAction,
     ensureValid,
     importAction,

@@ -20,7 +20,6 @@ import {
   type ValidatorKey,
 } from "../schemas";
 import { formatError } from "../helpers/validation";
-import type { JsonSchemaDefinition, OpenRouterClient } from "../openrouter/client";
 import { getTraitSlugSet } from "../data/trait-dictionaries";
 
 export type { SchemaDataFor, ValidatorKey } from "../schemas";
@@ -32,31 +31,13 @@ export interface EnsureValidDiagnostics<K extends ValidatorKey> {
   normalized: unknown;
 }
 
-export interface EnsureValidPromptContext<K extends ValidatorKey> {
-  type: K;
-  attempt: number;
-  maxAttempts: number;
-  errors: ErrorObject[];
-  payload: unknown;
-  normalized: unknown;
-  diagnostics: EnsureValidDiagnostics<K>[];
-}
-
 export interface EnsureValidOptions<K extends ValidatorKey> {
   type: K;
   payload: unknown;
-  maxAttempts?: number;
-  openRouterClient?: Pick<OpenRouterClient, "generateWithSchema">;
-  promptBuilder?: (context: EnsureValidPromptContext<K>) => string;
-  schema?: JsonSchemaDefinition;
 }
 
 export interface EnsureValidRepairOptions<K extends ValidatorKey> {
   payload?: unknown;
-  maxAttempts?: number;
-  openRouterClient?: Pick<OpenRouterClient, "generateWithSchema">;
-  promptBuilder?: (context: EnsureValidPromptContext<K>) => string;
-  schema?: JsonSchemaDefinition;
 }
 
 type ActorSpellcastingEntry = NonNullable<ActorSchemaData["spellcasting"]>[number];
@@ -90,8 +71,6 @@ export class EnsureValidError<K extends ValidatorKey> extends Error {
   }
 }
 
-const DEFAULT_MAX_ATTEMPTS = 3;
-
 const ACTION_TYPE_LOOKUP = createEnumLookup(ACTION_EXECUTIONS, {
   one: "one-action",
   "1": "one-action",
@@ -114,59 +93,23 @@ const ENTITY_TYPE_LOOKUP = createEnumLookup(ENTITY_TYPES);
 export async function ensureValid<K extends ValidatorKey>(
   options: EnsureValidOptions<K>,
 ): Promise<SchemaDataFor<K>> {
-  const { type, payload, openRouterClient, promptBuilder } = options;
-  const maxAttempts = Math.max(1, options.maxAttempts ?? DEFAULT_MAX_ATTEMPTS);
+  const { type, payload } = options;
   const validator = validators[type];
-  const schemaDefinition =
-    options.schema ?? createSchemaDefinition(type, schemas[type]);
-  const diagnostics: EnsureValidDiagnostics<K>[] = [];
-
-  let attemptPayload = clone(payload);
   const originalPayload = clone(payload);
-  let lastNormalized: unknown = attemptPayload;
+  const normalized = normalizePayload(type, payload);
+  const candidate = clone(normalized);
 
-  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    const normalized = normalizePayload(type, attemptPayload);
-    const candidate = clone(normalized);
-    const valid = validator(candidate);
-
-    if (valid) {
-      return candidate as SchemaDataFor<K>;
-    }
-
-    const errors = cloneErrors(validator.errors ?? []);
-    diagnostics.push({
-      attempt,
-      errors,
-      payload: clone(attemptPayload),
-      normalized: clone(candidate),
-    });
-
-    lastNormalized = clone(candidate);
-
-    if (!openRouterClient || attempt === maxAttempts) {
-      break;
-    }
-
-    const context: EnsureValidPromptContext<K> = {
-      type,
-      attempt,
-      maxAttempts,
-      errors,
-      payload: clone(attemptPayload),
-      normalized: clone(candidate),
-      diagnostics: diagnostics.slice(),
-    };
-
-    const prompt = promptBuilder
-      ? promptBuilder(context)
-      : buildDefaultPrompt(context);
-
-    attemptPayload = await openRouterClient.generateWithSchema<Record<string, unknown>>(
-      prompt,
-      schemaDefinition,
-    );
+  if (validator(candidate)) {
+    return candidate as SchemaDataFor<K>;
   }
+
+  const diagnostics: EnsureValidDiagnostics<K>[] = [{
+    attempt: 1,
+    errors: cloneErrors(validator.errors ?? []),
+    payload: clone(originalPayload),
+    normalized: clone(candidate),
+  }];
+  const lastNormalized = clone(candidate);
 
   const dumpInvalidJson = readBooleanSetting("developerDumpInvalidJson");
   const dumpAjvErrors = readBooleanSetting("developerDumpAjvErrors");
@@ -194,7 +137,7 @@ export async function ensureValid<K extends ValidatorKey>(
   }
 
   throw new EnsureValidError(
-    `Failed to validate ${type} payload after ${maxAttempts} attempts`,
+    `Failed to validate normalized ${type} payload`,
     diagnostics,
     originalPayload,
     lastNormalized,
@@ -210,10 +153,6 @@ export async function ensureValid<K extends ValidatorKey>(
         return ensureValid({
           type,
           payload: retryPayload,
-          maxAttempts: overrides.maxAttempts ?? maxAttempts,
-          openRouterClient: overrides.openRouterClient ?? openRouterClient,
-          promptBuilder: overrides.promptBuilder ?? promptBuilder,
-          schema: overrides.schema ?? schemaDefinition,
         });
       },
     },
@@ -239,43 +178,6 @@ function readBooleanSetting(settingKey: "developerDumpInvalidJson" | "developerD
   } catch (_error) {
     return false;
   }
-}
-
-function buildDefaultPrompt<K extends ValidatorKey>(
-  context: EnsureValidPromptContext<K>,
-): string {
-  const header = `Repair the following ${context.type} JSON so that it matches the Handy Dandy schema.`;
-  const formattedErrors = context.errors
-    .map((error) => `- ${formatError(error)}`)
-    .join("\n");
-
-  const diagnostics = formattedErrors
-    ? `Validation errors:\n${formattedErrors}`
-    : "Validation failed without detailed errors.";
-
-  const json = JSON.stringify(context.normalized, null, 2);
-
-  return [
-    header,
-    diagnostics,
-    "Current JSON:",
-    json,
-  ].join("\n\n");
-}
-
-function createSchemaDefinition<K extends ValidatorKey>(
-  type: K,
-  schema: SchemaMap[K],
-): JsonSchemaDefinition {
-  const name = typeof schema === "object" && schema !== null && "$id" in schema
-    ? String((schema as { $id?: unknown }).$id ?? `${type}-schema`)
-    : `${type}-schema`;
-
-  return {
-    name,
-    schema: schema as unknown as Record<string, unknown>,
-    description: `Schema for ${type} entries`,
-  };
 }
 
 function normalizePayload<K extends ValidatorKey>(
