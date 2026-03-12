@@ -28,7 +28,6 @@ import type {
 export interface GenerateOptions extends GenerateWithSchemaOptions {
   openRouterClient: Pick<OpenRouterClient, "generateWithSchema"> &
     Partial<Pick<OpenRouterClient, "generateImage">>;
-  maxAttempts?: number;
   onProgress?: (update: GenerationProgressUpdate) => void;
 }
 
@@ -91,7 +90,7 @@ export async function generateAction(
   input: ActionPromptInput,
   options: GenerateOptions,
 ): Promise<ActionSchemaData> {
-  const { openRouterClient, maxAttempts, seed = DEFAULT_GENERATION_SEED } = options;
+  const { openRouterClient, seed = DEFAULT_GENERATION_SEED } = options;
   reportProgress(options, {
     step: "prompt",
     message: "Preparing action prompt...",
@@ -111,15 +110,12 @@ export async function generateAction(
 
   reportProgress(options, {
     step: "validation",
-    message: "Validating and repairing action structure...",
+    message: "Normalizing and validating action structure...",
     percent: 75,
   });
   const validated = await ensureValid({
     type: "action",
     payload: draft,
-    openRouterClient,
-    maxAttempts,
-    schema: ACTION_SCHEMA_DEFINITION,
   });
   reportProgress(options, {
     step: "done",
@@ -133,7 +129,7 @@ export async function generateItem(
   input: ItemPromptInput,
   options: GenerateOptions,
 ): Promise<ItemSchemaData> {
-  const { openRouterClient, maxAttempts, seed = DEFAULT_GENERATION_SEED } = options;
+  const { openRouterClient, seed = DEFAULT_GENERATION_SEED } = options;
   reportProgress(options, {
     step: "prompt",
     message: "Preparing item prompt...",
@@ -153,15 +149,12 @@ export async function generateItem(
 
   reportProgress(options, {
     step: "validation",
-    message: "Validating and repairing item structure...",
+    message: "Normalizing and validating item structure...",
     percent: 70,
   });
   const canonical = await ensureValid({
     type: "item",
     payload: draft,
-    openRouterClient,
-    maxAttempts,
-    schema: ITEM_SCHEMA_DEFINITION,
   });
 
   if (input.generateItemImage && canGenerateImages(openRouterClient)) {
@@ -203,7 +196,7 @@ export async function generateActor(
   input: ActorPromptInput,
   options: GenerateOptions,
 ): Promise<ActorGenerationResult> {
-  const { openRouterClient, maxAttempts, seed = DEFAULT_GENERATION_SEED } = options;
+  const { openRouterClient, seed = DEFAULT_GENERATION_SEED } = options;
   reportProgress(options, {
     step: "prompt",
     message: "Preparing actor prompt...",
@@ -223,15 +216,12 @@ export async function generateActor(
 
   reportProgress(options, {
     step: "validation",
-    message: "Validating and repairing actor structure...",
+    message: "Normalizing and validating actor structure...",
     percent: 55,
   });
   const canonical = await ensureValid({
     type: "actor",
     payload: draft,
-    openRouterClient,
-    maxAttempts,
-    schema: ACTOR_SCHEMA_DEFINITION,
   });
 
   if (input.actorType) {
