@@ -6,23 +6,17 @@ import {
   type ActorPromptInput,
   type ItemPromptInput,
 } from "../prompts";
-import { ensureValid } from "../validation/ensure-valid";
-import { toFoundryActorDataWithCompendium } from "../mappers/import";
 import { getDefaultItemImage } from "../data/item-images";
 import { generateItemImage, generateTransparentTokenImage } from "./token-image";
 import {
-  actionSchema,
-  actorSchema,
-  itemSchema,
   type ActionSchemaData,
   type ActorGenerationResult,
-  type ActorSchemaData,
   type ItemSchemaData,
 } from "../schemas";
+import { generateCanonicalEntity, mapCanonicalActor } from "./pipeline";
 import type {
   GenerateWithSchemaOptions,
   OpenRouterClient,
-  JsonSchemaDefinition,
 } from "../openrouter/client";
 
 export interface GenerateOptions extends GenerateWithSchemaOptions {
@@ -68,24 +62,6 @@ function reportProgress(
   }
 }
 
-const ACTION_SCHEMA_DEFINITION: JsonSchemaDefinition = {
-  name: String(actionSchema.$id ?? "Action"),
-  schema: actionSchema as unknown as Record<string, unknown>,
-  description: "Schema for action entries",
-};
-
-const ITEM_SCHEMA_DEFINITION: JsonSchemaDefinition = {
-  name: String(itemSchema.$id ?? "Item"),
-  schema: itemSchema as unknown as Record<string, unknown>,
-  description: "Schema for item entries",
-};
-
-const ACTOR_SCHEMA_DEFINITION: JsonSchemaDefinition = {
-  name: String(actorSchema.$id ?? "Actor"),
-  schema: actorSchema as unknown as Record<string, unknown>,
-  description: "Schema for actor entries",
-};
-
 export async function generateAction(
   input: ActionPromptInput,
   options: GenerateOptions,
@@ -102,21 +78,13 @@ export async function generateAction(
     message: "Generating action JSON with OpenRouter...",
     percent: 35,
   });
-  const draft = await openRouterClient.generateWithSchema<ActionSchemaData>(
-    prompt,
-    ACTION_SCHEMA_DEFINITION,
-    { seed },
-  );
 
   reportProgress(options, {
     step: "validation",
     message: "Normalizing and validating action structure...",
     percent: 75,
   });
-  const validated = await ensureValid({
-    type: "action",
-    payload: draft,
-  });
+  const validated = await generateCanonicalEntity(openRouterClient, "action", prompt, { seed });
   reportProgress(options, {
     step: "done",
     message: "Action generation complete.",
@@ -141,21 +109,13 @@ export async function generateItem(
     message: "Generating item JSON with OpenRouter...",
     percent: 35,
   });
-  const draft = await openRouterClient.generateWithSchema<ItemSchemaData>(
-    prompt,
-    ITEM_SCHEMA_DEFINITION,
-    { seed },
-  );
 
   reportProgress(options, {
     step: "validation",
     message: "Normalizing and validating item structure...",
     percent: 70,
   });
-  const canonical = await ensureValid({
-    type: "item",
-    payload: draft,
-  });
+  const canonical = await generateCanonicalEntity(openRouterClient, "item", prompt, { seed });
 
   if (input.generateItemImage && canGenerateImages(openRouterClient)) {
     reportProgress(options, {
@@ -208,21 +168,13 @@ export async function generateActor(
     message: "Generating actor JSON with OpenRouter...",
     percent: 25,
   });
-  const draft = await openRouterClient.generateWithSchema<ActorSchemaData>(
-    prompt,
-    ACTOR_SCHEMA_DEFINITION,
-    { seed },
-  );
 
   reportProgress(options, {
     step: "validation",
     message: "Normalizing and validating actor structure...",
     percent: 55,
   });
-  const canonical = await ensureValid({
-    type: "actor",
-    payload: draft,
-  });
+  const canonical = await generateCanonicalEntity(openRouterClient, "actor", prompt, { seed });
 
   if (input.actorType) {
     canonical.actorType = input.actorType;
@@ -255,7 +207,7 @@ export async function generateActor(
       : "Resolving compendium links and finalizing actor data...",
     percent: 90,
   });
-  const foundry = await toFoundryActorDataWithCompendium(canonical, {
+  const foundry = await mapCanonicalActor(canonical, {
     resolveOfficialContent: input.includeOfficialContent !== false,
   });
 
