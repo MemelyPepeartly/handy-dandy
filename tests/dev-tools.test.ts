@@ -13,7 +13,6 @@ import type {
   ValidatorKey,
 } from "../src/scripts/validation/ensure-valid";
 import type { ImportOptions } from "../src/scripts/mappers/import";
-import type { OpenRouterClient } from "../src/scripts/openrouter/client";
 
 const noopGenerateAction = async (): Promise<ActionSchemaData> =>
   ({ name: "noop", systemId: "pf2e" } as ActionSchemaData);
@@ -73,7 +72,6 @@ test("dev.generateAction delegates to the provided generator and logs output", a
 
   const namespace = createDevNamespace({
     canAccess: () => true,
-    getOpenRouterClient: () => null,
     generateAction: async (input, opts) => {
       assert.equal(input, prompt);
       capturedOptions = opts;
@@ -98,7 +96,6 @@ test("developer helpers enforce access restrictions", async () => {
   const consoleRecorder = createConsoleStub();
   const namespace = createDevNamespace({
     canAccess: () => false,
-    getOpenRouterClient: () => null,
     generateAction: noopGenerateAction,
     ensureValid: noopEnsureValid,
     importAction: noopImportAction,
@@ -117,18 +114,12 @@ test("developer helpers enforce access restrictions", async () => {
   assert.equal(consoleRecorder.warns.length, 1);
 });
 
-test("dev.validate injects the active OpenRouter client by default", async () => {
+test("dev.validate delegates payload and type to ensureValid", async () => {
   const consoleRecorder = createConsoleStub();
-  const openRouterClient = { generateWithSchema: async () => ({}) } as unknown as Pick<
-    OpenRouterClient,
-    "generateWithSchema"
-  >;
-
   let capturedOptions: EnsureValidOptions<"action"> | undefined;
 
   const namespace = createDevNamespace({
     canAccess: () => true,
-    getOpenRouterClient: () => openRouterClient,
     generateAction: noopGenerateAction,
     ensureValid: async (options) => {
       capturedOptions = options as EnsureValidOptions<"action">;
@@ -142,21 +133,16 @@ test("dev.validate injects the active OpenRouter client by default", async () =>
   await namespace.validate("action", payload);
 
   assert.ok(capturedOptions);
-  assert.equal(capturedOptions?.openRouterClient, openRouterClient);
+  assert.equal(capturedOptions?.type, "action");
+  assert.equal(capturedOptions?.payload, payload);
 });
 
-test("dev.validate respects the useOpenRouter override", async () => {
+test("dev.validate logs payload without mutating validation input", async () => {
   const consoleRecorder = createConsoleStub();
-  const openRouterClient = { generateWithSchema: async () => ({}) } as unknown as Pick<
-    OpenRouterClient,
-    "generateWithSchema"
-  >;
-
   let capturedOptions: EnsureValidOptions<"action"> | undefined;
 
   const namespace = createDevNamespace({
     canAccess: () => true,
-    getOpenRouterClient: () => openRouterClient,
     generateAction: noopGenerateAction,
     ensureValid: async (options) => {
       capturedOptions = options as EnsureValidOptions<"action">;
@@ -167,10 +153,14 @@ test("dev.validate respects the useOpenRouter override", async () => {
   });
 
   const payload = { name: "Manual" };
-  await namespace.validate("action", payload, { useOpenRouter: false });
+  await namespace.validate("action", payload);
 
   assert.ok(capturedOptions);
-  assert.equal(capturedOptions?.openRouterClient, undefined);
+  assert.deepEqual(capturedOptions, {
+    type: "action",
+    payload,
+  });
+  assert.ok(consoleRecorder.infos.some((entry) => entry[0] === "payload:"));
 });
 
 test("canUseDeveloperTools returns true for GM users", () => {

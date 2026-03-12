@@ -153,6 +153,7 @@ test("generateWithSchema returns parsed JSON from structured outputs", async () 
   const [call] = stub.responses.calls;
   assert.equal(call.text?.format?.name, schema.name);
   assert.equal(call.text?.format?.strict, true);
+  assert.equal(call.provider?.require_parameters, true);
   assert.deepEqual(call.plugins, [{ id: "web", max_results: 4 }]);
 });
 
@@ -242,6 +243,7 @@ test("generateWithSchema falls back to tool calls when response_format unsupport
   const [, fallbackCall] = stub.responses.calls;
   assert.equal(Array.isArray(fallbackCall.tools), true);
   assert.equal(fallbackCall.tool_choice?.name, schema.name);
+  assert.equal(fallbackCall.provider?.require_parameters, true);
 });
 
 test("generateWithSchema parses tool output from response function_call blocks", async () => {
@@ -263,6 +265,22 @@ test("generateWithSchema parses tool output from response function_call blocks",
   const result = await client.generateWithSchema<{ value: number }>("Say hello", schema);
 
   assert.deepEqual(result, { value: 11 });
+});
+
+test("generateWithSchema does not fall back on unrelated client errors", async () => {
+  const stub = new StubOpenAI();
+  const error = new Error("Invalid prompt: user content is empty");
+  (error as Error & { status?: number }).status = 400;
+  stub.responses.enqueue(error);
+
+  const client = OpenRouterClient.fromSettings(stub as unknown as OpenAI);
+
+  await assert.rejects(
+    client.generateWithSchema<{ value: number }>("Say hello", schema),
+    /Invalid prompt: user content is empty/,
+  );
+
+  assert.equal(stub.responses.calls.length, 1);
 });
 
 test("generateWithSchema uses tool mode directly when schema has additionalProperties true", async () => {

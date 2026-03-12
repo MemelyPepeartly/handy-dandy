@@ -6,7 +6,6 @@ import {
   EnsureValidError,
   type EnsureValidDiagnostics,
 } from "../src/scripts/validation/ensure-valid";
-import type { JsonSchemaDefinition, OpenRouterClient } from "../src/scripts/openrouter/client";
 
 (globalThis as { CONFIG?: unknown }).CONFIG = {
   PF2E: {
@@ -33,31 +32,6 @@ import type { JsonSchemaDefinition, OpenRouterClient } from "../src/scripts/open
     traitDescriptions: {},
   },
 };
-
-class StubOpenRouterClient {
-  public calls: Array<{ prompt: string; schema: JsonSchemaDefinition }> = [];
-  private readonly responses: Array<unknown> = [];
-
-  enqueue(response: unknown): void {
-    this.responses.push(response);
-  }
-
-  async generateWithSchema<T>(
-    prompt: string,
-    schema: JsonSchemaDefinition,
-    _options?: { seed?: number },
-  ): Promise<T> {
-    this.calls.push({ prompt, schema });
-    const response = this.responses.shift();
-    if (response instanceof Error) {
-      throw response;
-    }
-    if (response === undefined) {
-      throw new Error("No stubbed response available");
-    }
-    return response as T;
-  }
-}
 
 test("ensureValid normalises PF2e payloads before validation", async () => {
   const payload = {
@@ -226,62 +200,7 @@ test("ensureValid normalizes loot and hazard actor-type settings", async () => {
   assert.equal(hazardResult.loot, null);
 });
 
-test("ensureValid uses OpenRouter repair when Ajv validation fails", async () => {
-  const stub = new StubOpenRouterClient();
-  stub.enqueue({
-    schema_version: 3,
-    systemId: "pf2e",
-    type: "item",
-    slug: "test-item",
-    name: "Test Item",
-    itemType: "wand",
-    rarity: "common",
-    level: 3,
-    price: 15,
-    traits: ["magical"],
-    description: "A repaired wand.",
-    source: "",
-  });
-
-  const payload = {
-    schema_version: 3,
-    systemId: "pf2e",
-    type: "item",
-    slug: "test-item",
-    name: "Test Item",
-    itemType: "wand",
-    rarity: "legendary",
-    level: "3",
-    extra: true,
-  };
-
-  const result = await ensureValid({
-    type: "item",
-    payload,
-    openRouterClient: stub as unknown as OpenRouterClient,
-  });
-
-  assert.equal(stub.calls.length, 1);
-  assert.equal(result.rarity, "common");
-  assert.equal(result.price, 15);
-  assert.deepEqual(result.traits, ["magical"]);
-  assert.equal(Object.hasOwn(result as Record<string, unknown>, "extra"), false);
-});
-
-test("ensureValid throws typed error with diagnostics after exhausting retries", async () => {
-  const stub = new StubOpenRouterClient();
-  stub.enqueue({
-    schema_version: 3,
-    systemId: "pf2e",
-    type: "item",
-    slug: "broken-item",
-    name: "Broken Item",
-    itemType: "wand",
-    rarity: "legendary",
-    level: 1,
-    source: "",
-  });
-
+test("ensureValid throws typed error when deterministic normalization still fails schema validation", async () => {
   const payload = {
     schema_version: 3,
     systemId: "pf2e",
@@ -297,14 +216,12 @@ test("ensureValid throws typed error with diagnostics after exhausting retries",
     await ensureValid({
       type: "item",
       payload,
-      openRouterClient: stub as unknown as OpenRouterClient,
-      maxAttempts: 2,
     });
     assert.fail("Expected ensureValid to throw");
   } catch (error) {
     assert.ok(error instanceof EnsureValidError);
     const ensureError = error as EnsureValidError<"item">;
-    assert.equal(ensureError.diagnostics.length, 2);
+    assert.equal(ensureError.diagnostics.length, 1);
     assert.equal(ensureError.originalPayload?.slug, "broken-item");
     assert.equal((ensureError.lastPayload as { rarity?: string }).rarity, "legendary");
 
@@ -314,20 +231,7 @@ test("ensureValid throws typed error with diagnostics after exhausting retries",
   }
 });
 
-test("EnsureValidError exposes a repair helper that retries OpenRouter fixes", async () => {
-  const stub = new StubOpenRouterClient();
-  stub.enqueue({
-    schema_version: 3,
-    systemId: "pf2e",
-    type: "item",
-    slug: "retry-item",
-    name: "Retry Item",
-    itemType: "wand",
-    rarity: "legendary",
-    level: 1,
-    source: "",
-  });
-
+test("EnsureValidError exposes a repair helper that retries deterministic normalization", async () => {
   const payload = {
     schema_version: 3,
     systemId: "pf2e",
@@ -343,32 +247,28 @@ test("EnsureValidError exposes a repair helper that retries OpenRouter fixes", a
     await ensureValid({
       type: "item",
       payload,
-      openRouterClient: stub as unknown as OpenRouterClient,
-      maxAttempts: 2,
     });
     assert.fail("Expected ensureValid to throw");
   } catch (error) {
     assert.ok(error instanceof EnsureValidError);
     const ensureError = error as EnsureValidError<"item">;
-    assert.equal(stub.calls.length, 1);
 
-    stub.enqueue({
-      schema_version: 3,
-      systemId: "pf2e",
-      type: "item",
-      slug: "retry-item",
-      name: "Retry Item",
-      itemType: "wand",
-      rarity: "common",
-      level: 1,
-      price: 50,
-      traits: ["magical"],
-      description: "A repaired wand.",
-      source: "",
+    const repaired = await ensureError.repair({
+      payload: {
+        schema_version: 3,
+        systemId: "pf2e",
+        type: "item",
+        slug: "retry-item",
+        name: "Retry Item",
+        itemType: "wand",
+        rarity: "common",
+        level: 1,
+        price: 50,
+        traits: ["magical"],
+        description: "A repaired wand.",
+        source: "",
+      },
     });
-
-    const repaired = await ensureError.repair();
-    assert.equal(stub.calls.length, 2);
     assert.equal(repaired.rarity, "common");
     assert.equal(repaired.price, 50);
   }
