@@ -3,10 +3,7 @@ import type { ActionPromptInput } from "../prompts";
 import type { ActionSchemaData, SchemaDataFor, ValidatorKey } from "../schemas";
 import type { ImportOptions } from "../mappers/import";
 import type { OpenRouterClient } from "../openrouter/client";
-import type {
-  EnsureValidOptions,
-  EnsureValidPromptContext,
-} from "../validation/ensure-valid";
+import type { EnsureValidOptions } from "../validation/ensure-valid";
 
 type GenerateActionFn = (
   input: ActionPromptInput,
@@ -26,16 +23,7 @@ type DevConsole = Pick<Console, "groupCollapsed" | "groupEnd" | "info" | "warn" 
 
 export interface DevGenerateActionOptions {
   seed?: number;
-  maxAttempts?: number;
   openRouterClient?: Pick<OpenRouterClient, "generateWithSchema">;
-}
-
-export interface DevValidateOptions<K extends ValidatorKey> {
-  maxAttempts?: number;
-  useOpenRouter?: boolean;
-  openRouterClient?: Pick<OpenRouterClient, "generateWithSchema">;
-  promptBuilder?: (context: EnsureValidPromptContext<K>) => string;
-  schema?: EnsureValidOptions<K>["schema"];
 }
 
 export interface DevNamespace {
@@ -43,11 +31,7 @@ export interface DevNamespace {
     input: ActionPromptInput,
     options?: DevGenerateActionOptions,
   ) => Promise<ActionSchemaData>;
-  validate: <K extends ValidatorKey>(
-    type: K,
-    payload: unknown,
-    options?: DevValidateOptions<K>,
-  ) => Promise<SchemaDataFor<K>>;
+  validate: <K extends ValidatorKey>(type: K, payload: unknown) => Promise<SchemaDataFor<K>>;
   importAction: (
     json: ActionSchemaData,
     options?: ImportOptions,
@@ -56,7 +40,6 @@ export interface DevNamespace {
 
 interface DevNamespaceDependencies {
   canAccess: () => boolean;
-  getOpenRouterClient: () => Pick<OpenRouterClient, "generateWithSchema"> | null;
   generateAction: GenerateActionFn;
   ensureValid: EnsureValidFn;
   importAction: ImportActionFn;
@@ -178,31 +161,6 @@ const assertDeveloperAccess = (deps: DevNamespaceDependencies, operation: string
   throw new Error(message);
 };
 
-const summarizeValidateOptions = <K extends ValidatorKey>(
-  options: DevValidateOptions<K> | undefined,
-) => {
-  if (!options) return undefined;
-
-  const summary: Record<string, unknown> = {};
-  if (typeof options.maxAttempts === "number") {
-    summary.maxAttempts = options.maxAttempts;
-  }
-  if (typeof options.useOpenRouter === "boolean") {
-    summary.useOpenRouter = options.useOpenRouter;
-  }
-  if (options.promptBuilder) {
-    summary.promptBuilder = "[function]";
-  }
-  if (options.schema) {
-    summary.schema = "[custom schema]";
-  }
-  if (options.openRouterClient) {
-    summary.openRouterClient = "[custom client]";
-  }
-
-  return summary;
-};
-
 export function canUseDeveloperTools(): boolean {
   const gameInstance = (globalThis as { game?: Game }).game;
   if (!gameInstance) {
@@ -247,33 +205,19 @@ export function createDevNamespace(deps: DevNamespaceDependencies): DevNamespace
       );
     },
 
-    validate: async (type, payload, options) => {
+    validate: async (type, payload) => {
       assertDeveloperAccess(deps, "validate");
-      const {
-        maxAttempts,
-        useOpenRouter = true,
-        openRouterClient: explicitClient,
-        promptBuilder,
-        schema,
-      } = options ?? {};
-
-      const openRouterClient = explicitClient ?? (useOpenRouter ? deps.getOpenRouterClient() ?? undefined : undefined);
 
       return logOperation(
         deps.console,
         `dev.validate(${type})`,
         {
           payload,
-          options: summarizeValidateOptions(options),
         },
         () =>
           deps.ensureValid({
             type,
             payload,
-            maxAttempts,
-            openRouterClient,
-            promptBuilder,
-            schema,
           }),
       );
     },
