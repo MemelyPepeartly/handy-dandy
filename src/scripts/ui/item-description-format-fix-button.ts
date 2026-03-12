@@ -1,5 +1,6 @@
 import { CONSTANTS } from "../constants";
 import { fromFoundryItem, type FoundryItem } from "../mappers/export";
+import { generateStructuredOutput } from "../generation/pipeline";
 import type { JsonSchemaDefinition } from "../openrouter/client";
 import { repairPf2eInlineMacros, toPf2eRichText } from "../text/pf2e-rich-text";
 import { runItemRemixWithRequest } from "../flows/item-remix";
@@ -498,7 +499,8 @@ export function registerItemDescriptionFormatFixButton(): void {
             : "You may retheme context/tone, but mechanics must stay coherent and PF2E-valid.";
           const mergedInstructions = [remixDirection, request.instructions].filter((entry) => entry.trim().length > 0).join("\n");
           const prompt = buildDescriptionRemixPrompt(item, currentDescription, mergedInstructions);
-          const response = await openRouterClient.generateWithSchema<{ description: string }>(
+          const response = await generateStructuredOutput<{ description: string }>(
+            openRouterClient,
             prompt,
             DESCRIPTION_REWRITE_SCHEMA,
           );
