@@ -153,6 +153,29 @@ beforeEach(() => {
       actionTraits: {
         fire: "Fire",
         magical: "Magical",
+        manipulate: "Manipulate",
+      },
+      npcAttackTraits: {
+        agile: "Agile",
+        magical: "Magical",
+      },
+      damageTypes: {
+        acid: "Acid",
+        bleed: "Bleed",
+        bludgeoning: "Bludgeoning",
+        cold: "Cold",
+        electricity: "Electricity",
+        fire: "Fire",
+        force: "Force",
+        mental: "Mental",
+        piercing: "Piercing",
+        poison: "Poison",
+        slashing: "Slashing",
+        sonic: "Sonic",
+        spirit: "Spirit",
+        untyped: "Untyped",
+        vitality: "Vitality",
+        void: "Void",
       },
       immunityTypes: {
         fire: "Fire",
@@ -450,6 +473,34 @@ test("toFoundryActorData canonicalizes condition UUIDs that use condition names 
     true,
   );
   assert.equal(strike!.system.description.value.includes(".Item.Frightened]"), false);
+});
+
+test("toFoundryActorData normalizes strike traits and prefixed damage types into PF2E melee fields", () => {
+  const actor = createActor();
+  actor.strikes = [
+    {
+      name: "Crucible Claw",
+      type: "melee",
+      attackBonus: 15,
+      traits: ["magical", "inventor", "unstable"],
+      damage: [{ formula: "2d8+7", damageType: "persistent-fire", notes: null }],
+      effects: [],
+      description: "<p>Molten slag clings to the wound.</p>",
+    },
+  ];
+
+  const result = toFoundryActorData(actor);
+  const strike = result.items.find((item) => item.type === "melee" && item.name === "Crucible Claw");
+
+  assert.ok(strike, "expected generated strike item");
+  assert.deepEqual(strike!.system.traits.value, ["magical"]);
+  assert.deepEqual(strike!.system.traits.otherTags, ["inventor", "unstable"]);
+  const damageRoll = Object.values(strike!.system.damageRolls)[0];
+  assert.deepEqual(damageRoll, {
+    damage: "2d8+7",
+    damageType: "fire",
+    category: "persistent",
+  });
 });
 
 test("toFoundryActorData converts markdown emphasis inside HTML action descriptions", () => {
@@ -932,6 +983,111 @@ test("importActor sanitizes malformed melee attack effects in generated actor pa
   assert.deepEqual(importedStrike.system.attackEffects.value, ["grab"]);
   assert.match(importedStrike.system.description.value, /Frightened 1/);
   assert.match(importedStrike.system.description.value, /homebrew-stagger/);
+});
+
+test("importActor sanitizes generated melee traits and damage categories in repaired actor payloads", async () => {
+  const actor = createActor();
+  actor.slug = "generated-melee-sanitization-test";
+  actor.name = "Generated Melee Sanitization Test";
+  actor.strikes = [
+    {
+      name: "Foundry Crucible",
+      type: "melee",
+      attackBonus: 14,
+      traits: ["magical"],
+      damage: [{ formula: "2d10+6", damageType: "fire", notes: null }],
+      effects: [],
+      description: "<p>Superheated scrap tears into the target.</p>",
+    },
+  ];
+  actor.actions = [];
+  actor.spellcasting = null;
+  actor.inventory = null;
+
+  const foundry = toFoundryActorData(actor);
+  const strike = foundry.items.find((item) => item.type === "melee" && item.name === "Foundry Crucible");
+  assert.ok(strike, "expected generated strike item");
+
+  strike!.system.traits = { value: ["magical", "inventor", "unstable"], otherTags: [] };
+  const damageRollKey = Object.keys(strike!.system.damageRolls)[0];
+  strike!.system.damageRolls[damageRollKey].damageType = "persistent-fire";
+  strike!.system.damageRolls[damageRollKey].category = null;
+
+  const generated: ActorGenerationResult = {
+    schema_version: actor.schema_version,
+    systemId: actor.systemId,
+    slug: actor.slug,
+    name: foundry.name,
+    type: foundry.type as ActorGenerationResult["type"],
+    img: foundry.img,
+    system: foundry.system as Record<string, unknown>,
+    prototypeToken: foundry.prototypeToken as Record<string, unknown>,
+    items: foundry.items as Record<string, unknown>[],
+    effects: foundry.effects,
+    folder: foundry.folder ?? null,
+    flags: foundry.flags ?? {},
+  };
+
+  const imported = await importActor(generated);
+  const importedStrike = (imported as unknown as MockActor).items.find(
+    (item: any) => item.type === "melee" && item.name === "Foundry Crucible",
+  );
+
+  assert.ok(importedStrike, "expected imported strike item");
+  assert.deepEqual(importedStrike.system.traits.value, ["magical"]);
+  assert.deepEqual(importedStrike.system.traits.otherTags, ["inventor", "unstable"]);
+  assert.equal(importedStrike.system.damageRolls[damageRollKey].damageType, "fire");
+  assert.equal(importedStrike.system.damageRolls[damageRollKey].category, "persistent");
+});
+
+test("importActor sanitizes generated action traits in repaired actor payloads", async () => {
+  const actor = createActor();
+  actor.slug = "generated-action-sanitization-test";
+  actor.name = "Generated Action Sanitization Test";
+  actor.actions = [
+    {
+      name: "Overdrive Burst",
+      actionCost: "two-actions",
+      description: "The prototype flares beyond safe tolerances.",
+      traits: ["fire", "manipulate"],
+      requirements: null,
+      trigger: null,
+      frequency: null,
+    },
+  ];
+  actor.strikes = [];
+  actor.spellcasting = null;
+  actor.inventory = null;
+
+  const foundry = toFoundryActorData(actor);
+  const action = foundry.items.find((item) => item.type === "action" && item.name === "Overdrive Burst");
+  assert.ok(action, "expected generated action item");
+
+  action!.system.traits = { value: ["inventor", "unstable", "fire", "manipulate"], otherTags: [] };
+
+  const generated: ActorGenerationResult = {
+    schema_version: actor.schema_version,
+    systemId: actor.systemId,
+    slug: actor.slug,
+    name: foundry.name,
+    type: foundry.type as ActorGenerationResult["type"],
+    img: foundry.img,
+    system: foundry.system as Record<string, unknown>,
+    prototypeToken: foundry.prototypeToken as Record<string, unknown>,
+    items: foundry.items as Record<string, unknown>[],
+    effects: foundry.effects,
+    folder: foundry.folder ?? null,
+    flags: foundry.flags ?? {},
+  };
+
+  const imported = await importActor(generated);
+  const importedAction = (imported as unknown as MockActor).items.find(
+    (item: any) => item.type === "action" && item.name === "Overdrive Burst",
+  );
+
+  assert.ok(importedAction, "expected imported action item");
+  assert.deepEqual(importedAction.system.traits.value, ["fire", "manipulate"]);
+  assert.deepEqual(importedAction.system.traits.otherTags, ["inventor", "unstable"]);
 });
 
 test("importActor normalizes malformed generated skill entries to locale-safe records", async () => {

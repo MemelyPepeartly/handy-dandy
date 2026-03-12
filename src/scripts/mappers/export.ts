@@ -78,6 +78,31 @@ function slugify(value: string): string {
     .replace(/-{2,}/g, "-");
 }
 
+const STRIKE_DAMAGE_CATEGORIES = new Set(["persistent", "precision", "splash"]);
+
+function normalizeStrikeDamageCategory(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const normalized = slugify(value);
+  return STRIKE_DAMAGE_CATEGORIES.has(normalized) ? normalized : null;
+}
+
+function encodeStrikeDamageType(damageType: unknown, category: unknown): string | null {
+  if (typeof damageType !== "string") {
+    return null;
+  }
+
+  const normalizedDamageType = slugify(damageType);
+  if (!normalizedDamageType) {
+    return null;
+  }
+
+  const normalizedCategory = normalizeStrikeDamageCategory(category);
+  return normalizedCategory ? `${normalizedCategory}-${normalizedDamageType}` : normalizedDamageType;
+}
+
 function normalizeSlug(doc: { system?: { slug?: string | null }; slug?: string | null; name: string }): string {
   const candidate = doc.system?.slug ?? doc.slug;
   const base = candidate && candidate.trim() ? candidate.trim() : doc.name ?? "";
@@ -599,7 +624,7 @@ function extractDamageRolls(value: unknown): ActorSchemaData["strikes"][number][
       }
       return {
         formula,
-        damageType: typeof record.damageType === "string" ? record.damageType.trim() : null,
+        damageType: encodeStrikeDamageType(record.damageType, record.category),
         notes: null,
       } satisfies ActorSchemaData["strikes"][number]["damage"][number];
     })

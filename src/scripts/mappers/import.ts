@@ -44,12 +44,18 @@ function normalizeTraitKey(value: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
-function getPf2eActionTraits(): Set<string> {
+const STRIKE_DAMAGE_CATEGORIES = new Set(["persistent", "precision", "splash"]);
+const STRIKE_DAMAGE_TYPE_ALIASES: Readonly<Record<string, string>> = {
+  negative: "void",
+  positive: "vitality",
+};
+
+function getPf2eConfigKeySet(key: "actionTraits" | "damageTypes" | "npcAttackTraits"): Set<string> {
   const config = (globalThis as { CONFIG?: unknown }).CONFIG;
   const pf2eConfig = (config as { PF2E?: unknown })?.PF2E;
-  const traitSource = (pf2eConfig as { actionTraits?: unknown })?.actionTraits;
+  const source = (pf2eConfig as Record<string, unknown> | undefined)?.[key];
 
-  const traits = new Set<string>();
+  const values = new Set<string>();
 
   const collect = (value: unknown): void => {
     if (!value) return;
@@ -57,7 +63,7 @@ function getPf2eActionTraits(): Set<string> {
       for (const entry of value) {
         if (typeof entry === "string") {
           const normalized = normalizeTraitKey(entry);
-          if (normalized) traits.add(normalized);
+          if (normalized) values.add(normalized);
         }
       }
       return;
@@ -66,7 +72,7 @@ function getPf2eActionTraits(): Set<string> {
       for (const key of value.keys()) {
         if (typeof key === "string") {
           const normalized = normalizeTraitKey(key);
-          if (normalized) traits.add(normalized);
+          if (normalized) values.add(normalized);
         }
       }
       return;
@@ -74,14 +80,165 @@ function getPf2eActionTraits(): Set<string> {
     if (typeof value === "object") {
       for (const key of Object.keys(value as Record<string, unknown>)) {
         const normalized = normalizeTraitKey(key);
-        if (normalized) traits.add(normalized);
+        if (normalized) values.add(normalized);
       }
     }
   };
 
-  collect(traitSource);
+  collect(source);
 
-  return traits;
+  return values;
+}
+
+function getPf2eActionTraits(): Set<string> {
+  return getPf2eConfigKeySet("actionTraits");
+}
+
+function getPf2eNpcAttackTraits(): Set<string> {
+  return getPf2eConfigKeySet("npcAttackTraits");
+}
+
+function getPf2eDamageTypes(): Set<string> {
+  return getPf2eConfigKeySet("damageTypes");
+}
+
+function normalizeStrikeDamageTypeAlias(value: string): string {
+  return STRIKE_DAMAGE_TYPE_ALIASES[value] ?? value;
+}
+
+function normalizeStrikeDamageCategory(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const normalized = normalizeTraitKey(value);
+  return STRIKE_DAMAGE_CATEGORIES.has(normalized) ? normalized : null;
+}
+
+function getFallbackStrikeDamageType(validDamageTypes: Set<string>): string | null {
+  if (validDamageTypes.has("untyped")) {
+    return "untyped";
+  }
+  if (validDamageTypes.has("bludgeoning")) {
+    return "bludgeoning";
+  }
+  return validDamageTypes.values().next().value ?? null;
+}
+
+function normalizeGeneratedStrikeDamageDescriptor(
+  rawDamageType: unknown,
+  rawCategory: unknown,
+): { damageType: string | null; category: string | null } {
+  const validDamageTypes = getPf2eDamageTypes();
+  const allowUnknown = validDamageTypes.size === 0;
+  const normalizedCategory = normalizeStrikeDamageCategory(rawCategory);
+
+  if (typeof rawDamageType !== "string") {
+    return {
+      damageType: allowUnknown ? null : getFallbackStrikeDamageType(validDamageTypes),
+      category: normalizedCategory,
+    };
+  }
+
+  const normalizedType = normalizeStrikeDamageTypeAlias(normalizeTraitKey(rawDamageType));
+  if (!normalizedType) {
+    return {
+      damageType: allowUnknown ? null : getFallbackStrikeDamageType(validDamageTypes),
+      category: normalizedCategory,
+    };
+  }
+
+  for (const category of STRIKE_DAMAGE_CATEGORIES) {
+    if (normalizedType.startsWith(`${category}-`)) {
+      const candidate = normalizeStrikeDamageTypeAlias(normalizeTraitKey(normalizedType.slice(category.length + 1)));
+      if (candidate && (allowUnknown || validDamageTypes.has(candidate))) {
+        return {
+          damageType: candidate,
+          category: normalizedCategory ?? category,
+        };
+      }
+    }
+
+    if (normalizedType.endsWith(`-${category}`)) {
+      const candidate = normalizeStrikeDamageTypeAlias(
+        normalizeTraitKey(normalizedType.slice(0, normalizedType.length - category.length - 1)),
+      );
+      if (candidate && (allowUnknown || validDamageTypes.has(candidate))) {
+        return {
+          damageType: candidate,
+          category: normalizedCategory ?? category,
+        };
+      }
+    }
+  }
+
+  if (allowUnknown || validDamageTypes.has(normalizedType)) {
+    return {
+      damageType: normalizedType,
+      category: normalizedCategory,
+    };
+  }
+
+  return {
+    damageType: getFallbackStrikeDamageType(validDamageTypes),
+    category: normalizedCategory,
+  };
+}
+
+function sanitizeGeneratedMeleeTraits(source: unknown): { value: string[]; otherTags: string[] } {
+  const record = isRecord(source) ? source : {};
+  const valuesSource = Array.isArray(record.value)
+    ? record.value
+    : Array.isArray(source)
+      ? source
+      : [];
+  const otherTagsSource = Array.isArray(record.otherTags) ? record.otherTags : [];
+  const allowedTraits = getPf2eNpcAttackTraits();
+  const allowUnknown = allowedTraits.size === 0;
+  const value: string[] = [];
+  const otherTags: string[] = [];
+  const seenValue = new Set<string>();
+  const seenOtherTags = new Set<string>();
+
+  for (const entry of valuesSource) {
+    if (typeof entry !== "string") {
+      continue;
+    }
+
+    const normalized = normalizeTraitKey(entry);
+    if (!normalized) {
+      continue;
+    }
+
+    if (allowUnknown || allowedTraits.has(normalized)) {
+      if (!seenValue.has(normalized)) {
+        value.push(normalized);
+        seenValue.add(normalized);
+      }
+      continue;
+    }
+
+    if (!seenOtherTags.has(normalized)) {
+      otherTags.push(normalized);
+      seenOtherTags.add(normalized);
+    }
+  }
+
+  for (const entry of otherTagsSource) {
+    if (typeof entry !== "string") {
+      continue;
+    }
+
+    const normalized = normalizeTraitKey(entry);
+    if (!normalized || seenOtherTags.has(normalized)) {
+      continue;
+    }
+
+    otherTags.push(normalized);
+    seenOtherTags.add(normalized);
+  }
+
+  return { value, otherTags };
 }
 
 type ActorSpellcastingEntry = NonNullable<ActorSchemaData["spellcasting"]>[number];
@@ -2241,6 +2398,23 @@ function sanitizeGeneratedMeleeItemForImport(item: FoundryActorItemSource): Foun
     : "";
 
   system.attackEffects = { value: attackEffects };
+  system.traits = sanitizeGeneratedMeleeTraits(system.traits);
+  if (isRecord(system.damageRolls)) {
+    const damageRolls = clone(system.damageRolls) as Record<string, Record<string, unknown>>;
+    for (const [id, damage] of Object.entries(damageRolls)) {
+      if (!isRecord(damage)) {
+        continue;
+      }
+
+      const { damageType, category } = normalizeGeneratedStrikeDamageDescriptor(damage.damageType, damage.category);
+      damageRolls[id] = {
+        ...damage,
+        damageType,
+        category,
+      };
+    }
+    system.damageRolls = damageRolls;
+  }
   if (descriptionAdditions.length > 0) {
     system.description = {
       value: formatStrikeDescription(existingDescription, descriptionAdditions),
@@ -2252,6 +2426,48 @@ function sanitizeGeneratedMeleeItemForImport(item: FoundryActorItemSource): Foun
       gm: existingDescriptionGm,
     };
   }
+
+  return {
+    ...item,
+    system: system as FoundryActorItemSource["system"],
+  };
+}
+
+function sanitizeGeneratedActionItemForImport(item: FoundryActorItemSource): FoundryActorItemSource {
+  if (item.type !== "action" || !isRecord(item.system)) {
+    return item;
+  }
+
+  const system = clone(item.system) as Record<string, unknown>;
+  const traitsRecord = isRecord(system.traits) ? system.traits : {};
+  const traitValues = Array.isArray(traitsRecord.value)
+    ? traitsRecord.value
+    : Array.isArray(system.traits)
+      ? system.traits
+      : undefined;
+  const sanitizedTraits = sanitizeActionTraits(traitValues);
+  const extraTags = Array.isArray(traitsRecord.otherTags) ? traitsRecord.otherTags : [];
+  const otherTags = [...sanitizedTraits.otherTags];
+  const seenOtherTags = new Set(otherTags);
+
+  for (const entry of extraTags) {
+    if (typeof entry !== "string") {
+      continue;
+    }
+
+    const normalized = normalizeTraitKey(entry);
+    if (!normalized || seenOtherTags.has(normalized)) {
+      continue;
+    }
+
+    otherTags.push(normalized);
+    seenOtherTags.add(normalized);
+  }
+
+  system.traits = {
+    value: sanitizedTraits.value,
+    otherTags,
+  };
 
   return {
     ...item,
@@ -2315,7 +2531,8 @@ function sanitizeGeneratedActorItemsForImport(items: unknown): FoundryActorItemS
   const clonedItems = clone(items) as FoundryActorItemSource[];
   return clonedItems.map((item) => {
     const normalized = remapGeneratedFeatureItemForImport(item);
-    return sanitizeGeneratedMeleeItemForImport(normalized);
+    const sanitizedAction = sanitizeGeneratedActionItemForImport(normalized);
+    return sanitizeGeneratedMeleeItemForImport(sanitizedAction);
   });
 }
 
@@ -2627,10 +2844,11 @@ function createStrikeItem(
   const actorKey = actor.slug || actor.name;
   for (const [damageIndex, damage] of strike.damage.entries()) {
     const id = generateStableId(`strike-damage:${actorKey}:${index}:${damageIndex}`);
+    const normalizedDamage = normalizeGeneratedStrikeDamageDescriptor(damage.damageType, null);
     damageRolls[id] = {
       damage: damage.formula,
-      damageType: damage.damageType ? damage.damageType.toLowerCase() : null,
-      category: null,
+      damageType: normalizedDamage.damageType,
+      category: normalizedDamage.category,
     };
   }
 
@@ -2638,7 +2856,7 @@ function createStrikeItem(
   const { attackEffects, descriptionAdditions } = splitStrikeEffects(strike.effects ?? []);
   const description = formatStrikeDescription(strike.description, descriptionAdditions);
 
-  return {
+  return sanitizeGeneratedMeleeItemForImport({
     _id: generateStableId(`strike:${actorKey}:${index}`),
     name: strike.name,
     type: "melee",
@@ -2660,7 +2878,7 @@ function createStrikeItem(
     folder: null,
     sort: 0,
     flags: {},
-  };
+  }) as FoundryActorStrikeSource;
 }
 
 function createActionItem(
