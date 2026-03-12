@@ -1,4 +1,5 @@
 import type { JsonSchemaDefinition, OpenRouterClient } from "../openrouter/client";
+import { generateStructuredOutput } from "../generation/pipeline";
 
 export const PF2E_RULE_ELEMENT_KEYS = [
   "ActiveEffectLike",
@@ -225,7 +226,8 @@ export async function generateRuleElements(
   request: RuleElementGenerationRequest,
 ): Promise<RuleElementGenerationResult> {
   const prompt = buildRuleElementGenerationPrompt(request);
-  const raw = await openRouterClient.generateWithSchema<unknown>(
+  const raw = await generateStructuredOutput<unknown>(
+    openRouterClient,
     prompt,
     RULE_ELEMENT_GENERATION_SCHEMA,
     { seed: request.seed },
