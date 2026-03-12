@@ -18,8 +18,8 @@ import {
   type SystemId,
 } from "../schemas";
 import { fromFoundryActor, type FoundryActor } from "../mappers/export";
-import { importAction, importActor, importItem, toFoundryActorDataWithCompendium } from "../mappers/import";
-import { ensureValid } from "../validation/ensure-valid";
+import { importAction, importActor, importItem } from "../mappers/import";
+import { mapCanonicalActor, normalizeGeneratedEntity } from "../generation/pipeline";
 
 interface WorkbenchHistoryEntry {
   readonly id: string;
@@ -860,7 +860,7 @@ function createHistoryImporter(
 
 function toGeneratedActorResultFromFoundry(
   source: GeneratedEntityMap["actor"],
-  foundry: Awaited<ReturnType<typeof toFoundryActorDataWithCompendium>>,
+  foundry: Awaited<ReturnType<typeof mapCanonicalActor>>,
 ): GeneratedEntityMap["actor"] {
   return {
     schema_version: source.schema_version,
@@ -884,27 +884,18 @@ async function normalizeGeneratedData(
 ): Promise<GeneratedEntityMap[EntityType]> {
   switch (type) {
     case "action": {
-      const normalized = await ensureValid({
-        type: "action",
-        payload: data,
-      });
+      const normalized = await normalizeGeneratedEntity("action", data);
       return normalized as GeneratedEntityMap[EntityType];
     }
     case "item": {
-      const normalized = await ensureValid({
-        type: "item",
-        payload: data,
-      });
+      const normalized = await normalizeGeneratedEntity("item", data);
       return normalized as GeneratedEntityMap[EntityType];
     }
     case "actor": {
       const actorData = data as GeneratedEntityMap["actor"];
       const canonicalDraft = fromFoundryActor(actorData as unknown as FoundryActor);
-      const canonical = await ensureValid({
-        type: "actor",
-        payload: canonicalDraft,
-      });
-      const foundry = await toFoundryActorDataWithCompendium(canonical);
+      const canonical = await normalizeGeneratedEntity("actor", canonicalDraft);
+      const foundry = await mapCanonicalActor(canonical);
       return toGeneratedActorResultFromFoundry(actorData, foundry) as GeneratedEntityMap[EntityType];
     }
     default:
