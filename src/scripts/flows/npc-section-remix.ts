@@ -1,12 +1,11 @@
 import { CONSTANTS } from "../constants";
 import { generateTransparentTokenImage } from "../generation/token-image";
 import { fromFoundryActor } from "../mappers/export";
-import { toFoundryActorDataWithCompendium } from "../mappers/import";
+import { mapCanonicalActor, normalizeGeneratedEntity, generateStructuredOutput } from "../generation/pipeline";
 import type { JsonSchemaDefinition, OpenRouterClient } from "../openrouter/client";
 import { actorSchema, type ActorSchemaData } from "../schemas";
 import { showGeneratedOutputRecoveryDialog } from "../ui/generated-output-recovery";
 import { showRemixSummaryDialog, type RemixSummaryRow } from "../ui/remix-summary";
-import { ensureValid } from "../validation/ensure-valid";
 
 type MainSheetRemixFormResponse = {
   targetLevel: string;
@@ -123,7 +122,7 @@ interface SectionRemixPatch {
   };
 }
 
-type FoundryActorSourceLike = Awaited<ReturnType<typeof toFoundryActorDataWithCompendium>>;
+type FoundryActorSourceLike = Awaited<ReturnType<typeof mapCanonicalActor>>;
 type FoundryActorItemLike = Record<string, unknown> & {
   _id?: string;
   type?: string;
@@ -1804,16 +1803,17 @@ export async function runNpcMainSheetRemixFlow(actor: Actor): Promise<void> {
 
     const schema = buildSectionRemixSchema(request);
     const prompt = buildSectionRemixPrompt(actor.name ?? canonical.name, canonical, request);
-    generatedPatch = await (openRouterClient as SectionRemixClient).generateWithSchema<unknown>(prompt, schema);
+    generatedPatch = await generateStructuredOutput(
+      openRouterClient as SectionRemixClient,
+      prompt,
+      schema,
+    );
 
     const normalizedPatch = normalizeSectionPatch(generatedPatch);
     mergedCanonical = applySectionPatch(canonical, normalizedPatch, request);
-    const validatedCanonical = await ensureValid({
-      type: "actor",
-      payload: mergedCanonical,
-    });
+    const validatedCanonical = await normalizeGeneratedEntity("actor", mergedCanonical);
 
-    const source = await toFoundryActorDataWithCompendium(validatedCanonical, {
+    const source = await mapCanonicalActor(validatedCanonical, {
       resolveOfficialContent: true,
     });
 
