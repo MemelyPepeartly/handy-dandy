@@ -72,7 +72,6 @@ type WorkbenchFormResponse = {
   readonly itemImagePrompt: string;
   readonly referenceText: string;
   readonly seed: string;
-  readonly maxAttempts: string;
   readonly packId: string;
   readonly folderId: string;
   readonly includeSpellcasting: string | null;
@@ -237,7 +236,6 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
                 itemImagePrompt: String(formData.get("itemImagePrompt") ?? ""),
                 referenceText: String(formData.get("referenceText") ?? ""),
                 seed: String(formData.get("seed") ?? ""),
-                maxAttempts: String(formData.get("maxAttempts") ?? ""),
                 packId: String(formData.get("packId") ?? ""),
                 folderId: String(formData.get("folderId") ?? ""),
                 includeSpellcasting: formData.get("includeSpellcasting") as string | null,
@@ -378,12 +376,6 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
     return null;
   }
 
-  const maxAttempts = parseOptionalPositiveInteger(response.maxAttempts);
-  if (response.maxAttempts.trim() && maxAttempts === undefined) {
-    ui.notifications?.error(`${CONSTANTS.MODULE_NAME} | Max Attempts must be a whole number greater than 0.`);
-    return null;
-  }
-
   return {
     type,
     systemId,
@@ -394,7 +386,6 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
     actorType,
     level,
     seed,
-    maxAttempts,
     packId: response.packId.trim() || undefined,
     folderId: response.folderId.trim() || undefined,
     publication,
@@ -418,15 +409,6 @@ function parseOptionalInteger(value: string): number | undefined {
 
   const parsed = Number(trimmed);
   if (!Number.isFinite(parsed) || !Number.isInteger(parsed)) {
-    return undefined;
-  }
-
-  return parsed;
-}
-
-function parseOptionalPositiveInteger(value: string): number | undefined {
-  const parsed = parseOptionalInteger(value);
-  if (parsed === undefined || parsed < 1) {
     return undefined;
   }
 
@@ -591,7 +573,7 @@ function buildLoadingSteps(request: PromptWorkbenchRequest<EntityType>): Loading
   const steps: LoadingStep[] = [
     { key: "prompt", label: "Preparing prompt" },
     { key: "model", label: "Generating JSON draft" },
-    { key: "validation", label: "Validating and repairing data" },
+    { key: "validation", label: "Normalizing and validating data" },
   ];
 
   if (request.type === "actor") {
@@ -896,28 +878,24 @@ function toGeneratedActorResultFromFoundry(
   } satisfies GeneratedEntityMap["actor"];
 }
 
-async function repairGeneratedData(
+async function normalizeGeneratedData(
   type: EntityType,
   data: GeneratedEntityMap[EntityType],
 ): Promise<GeneratedEntityMap[EntityType]> {
-  const openRouterClient = game.handyDandy?.openRouterClient ?? undefined;
-
   switch (type) {
     case "action": {
-      const repaired = await ensureValid({
+      const normalized = await ensureValid({
         type: "action",
         payload: data,
-        openRouterClient,
       });
-      return repaired as GeneratedEntityMap[EntityType];
+      return normalized as GeneratedEntityMap[EntityType];
     }
     case "item": {
-      const repaired = await ensureValid({
+      const normalized = await ensureValid({
         type: "item",
         payload: data,
-        openRouterClient,
       });
-      return repaired as GeneratedEntityMap[EntityType];
+      return normalized as GeneratedEntityMap[EntityType];
     }
     case "actor": {
       const actorData = data as GeneratedEntityMap["actor"];
@@ -925,7 +903,6 @@ async function repairGeneratedData(
       const canonical = await ensureValid({
         type: "actor",
         payload: canonicalDraft,
-        openRouterClient,
       });
       const foundry = await toFoundryActorDataWithCompendium(canonical);
       return toGeneratedActorResultFromFoundry(actorData, foundry) as GeneratedEntityMap[EntityType];
@@ -951,22 +928,22 @@ function replaceHistoryEntry(
   void persistWorkbenchHistory();
 }
 
-async function repairHistoryEntry(
+async function normalizeHistoryEntry(
   entry: WorkbenchHistoryEntry,
 ): Promise<WorkbenchHistoryEntry> {
-  const repairedData = await repairGeneratedData(entry.result.type, entry.result.data);
-  const importer = createHistoryImporter(entry.result.type, repairedData);
-  const resolvedName = repairedData.name?.trim() || entry.result.name;
+  const normalizedData = await normalizeGeneratedData(entry.result.type, entry.result.data);
+  const importer = createHistoryImporter(entry.result.type, normalizedData);
+  const resolvedName = normalizedData.name?.trim() || entry.result.name;
 
   const updated: WorkbenchHistoryEntry = {
     id: entry.id,
     timestamp: Date.now(),
     importerAvailable: typeof importer === "function",
-    json: JSON.stringify(repairedData, null, 2),
+    json: JSON.stringify(normalizedData, null, 2),
     result: {
       ...entry.result,
       name: resolvedName,
-      data: repairedData,
+      data: normalizedData,
       importer,
     },
   };
@@ -1571,8 +1548,8 @@ async function handleWorkbenchAction(
     case "download":
       handleDownloadAction(entry);
       break;
-    case "repair":
-      await handleRepairAction(entry, container);
+    case "normalize":
+      await handleNormalizeAction(entry, container);
       break;
     case "import":
       await handleImportAction(entry);
@@ -1634,17 +1611,17 @@ async function refreshHistoryViews(container: HTMLElement, preferredEntryId?: st
   }
 }
 
-async function handleRepairAction(entry: WorkbenchHistoryEntry, container?: HTMLElement): Promise<void> {
+async function handleNormalizeAction(entry: WorkbenchHistoryEntry, container?: HTMLElement): Promise<void> {
   try {
-    const repaired = await repairHistoryEntry(entry);
-    ui.notifications?.info(`${CONSTANTS.MODULE_NAME} | Repaired generation JSON for ${repaired.result.name}.`);
+    const normalized = await normalizeHistoryEntry(entry);
+    ui.notifications?.info(`${CONSTANTS.MODULE_NAME} | Normalized generation JSON for ${normalized.result.name}.`);
     if (container) {
-      await refreshHistoryViews(container, repaired.id);
+      await refreshHistoryViews(container, normalized.id);
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    ui.notifications?.error(`${CONSTANTS.MODULE_NAME} | Repair failed: ${message}`);
-    console.error(`${CONSTANTS.MODULE_NAME} | Repair failed`, error);
+    ui.notifications?.error(`${CONSTANTS.MODULE_NAME} | Normalization failed: ${message}`);
+    console.error(`${CONSTANTS.MODULE_NAME} | History normalization failed`, error);
   }
 }
 

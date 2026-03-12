@@ -37,7 +37,6 @@ export interface PromptWorkbenchRequest<T extends EntityType> extends ImporterOp
   readonly actorType?: ActorCategory;
   readonly level?: number;
   readonly seed?: number;
-  readonly maxAttempts?: number;
   readonly dependencies?: GenerationDependencyOverrides;
   readonly img?: string;
   readonly publication?: PublicationData;
@@ -88,7 +87,6 @@ const DEFAULT_IMPORTERS: Partial<ImporterMap> = {
 
 interface BoundGenerationOptions {
   readonly seed?: number;
-  readonly maxAttempts?: number;
   readonly onProgress?: (update: GenerationProgressUpdate) => void;
 }
 
@@ -105,7 +103,6 @@ export async function generateWorkbenchEntry<T extends EntityType>(
     actorType,
     level,
     seed,
-    maxAttempts,
     packId,
     folderId,
     dependencies = {},
@@ -144,7 +141,7 @@ export async function generateWorkbenchEntry<T extends EntityType>(
     itemImagePrompt,
   });
 
-  const data = await generator(input, { seed, maxAttempts, onProgress });
+  const data = await generator(input, { seed, onProgress });
   const resolvedName = data.name.trim() || inferInputName(type, input);
 
   const importerFn = importer
