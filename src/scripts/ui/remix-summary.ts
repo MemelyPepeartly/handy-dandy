@@ -1,4 +1,5 @@
 import { CONSTANTS } from "../constants";
+import { renderTemplateCompat } from "../foundry/compat";
 
 const REMIX_SUMMARY_TEMPLATE = `${CONSTANTS.TEMPLATE_PATH}/remix-summary-dialog.hbs`;
 
@@ -17,7 +18,7 @@ interface ShowRemixSummaryDialogOptions {
 }
 
 export async function showRemixSummaryDialog(options: ShowRemixSummaryDialogOptions): Promise<void> {
-  const content = await renderTemplate(REMIX_SUMMARY_TEMPLATE, {
+  const content = await renderTemplateCompat(REMIX_SUMMARY_TEMPLATE, {
     subtitle: options.subtitle ?? "",
     rows: options.rows.map((row) => ({
       label: row.label,
@@ -49,4 +50,3 @@ export async function showRemixSummaryDialog(options: ShowRemixSummaryDialogOpti
     dialog.render(true);
   });
 }
-

@@ -1,4 +1,5 @@
 import { CONSTANTS } from "../constants";
+import { renderTemplateCompat } from "../foundry/compat";
 
 const BUTTON_CLASS = "handy-dandy-npc-rule-elements-button" as const;
 const BUTTON_ICON_CLASS = "fas fa-code" as const;
@@ -240,7 +241,7 @@ async function promptRuleElements(
     targets.map((target) => [target.key, JSON.stringify(target.rules, null, 2)]),
   );
 
-  const content = await renderTemplate(RULE_ELEMENT_EDITOR_TEMPLATE, {
+  const content = await renderTemplateCompat(RULE_ELEMENT_EDITOR_TEMPLATE, {
     actorName: actor.name,
     targetOptions: targets.map((target) => ({
       key: target.key,

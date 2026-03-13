@@ -1,4 +1,5 @@
 import { CONSTANTS } from "../constants";
+import { renderTemplateCompat } from "../foundry/compat";
 
 const GENERATION_RECOVERY_TEMPLATE = `${CONSTANTS.TEMPLATE_PATH}/generation-recovery-dialog.hbs`;
 
@@ -51,7 +52,7 @@ export async function showGeneratedOutputRecoveryDialog(
 ): Promise<void> {
   const json = JSON.stringify(options.payload, null, 2);
   const filename = buildFilename(options.filenameBase);
-  const content = await renderTemplate(GENERATION_RECOVERY_TEMPLATE, {
+  const content = await renderTemplateCompat(GENERATION_RECOVERY_TEMPLATE, {
     summary: options.summary,
     json,
   });
@@ -98,4 +99,3 @@ export async function showGeneratedOutputRecoveryDialog(
     dialog.render(true);
   });
 }
-
