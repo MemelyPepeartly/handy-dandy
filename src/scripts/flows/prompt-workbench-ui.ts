@@ -229,7 +229,7 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
   const response = await waitForDialog<WorkbenchFormResponse>({
     title: `${CONSTANTS.MODULE_NAME} | Prompt Workbench`,
     content,
-    width: 820,
+    width: 960,
     render: (root) => {
       setupWorkbenchRequestDialog(root);
     },
@@ -1100,14 +1100,26 @@ function formatTimestamp(value: number): string {
   return date.toLocaleString();
 }
 
+function decorateWorkbenchDialogShell(root: HTMLElement): HTMLElement {
+  const shell = root.matches(".window-app, dialog")
+    ? root
+    : (root.closest<HTMLElement>(".window-app, dialog") ?? root);
+  shell.classList.add("handy-dandy-workbench-window");
+
+  const content = shell.querySelector<HTMLElement>(".window-content, [data-application-part='content']");
+  content?.classList.add("handy-dandy-workbench-window-content");
+
+  return shell;
+}
+
 function setupWorkbenchRequestDialog(root: HTMLElement): void {
+  const shell = decorateWorkbenchDialogShell(root);
   const container = root.querySelector<HTMLElement>(".handy-dandy-workbench-request");
   if (!container) {
     return;
   }
 
-  const dialogApp = root.closest<HTMLElement>(".window-app") ?? root;
-  const dialogButtons = dialogApp.querySelector<HTMLElement>(
+  const dialogButtons = shell.querySelector<HTMLElement>(
     ".dialog-buttons, .window-footer, footer, [data-application-part='footer']",
   );
 
@@ -1318,6 +1330,7 @@ function setupWorkbenchRequestDialog(root: HTMLElement): void {
 }
 
 function setupWorkbenchResultDialog(root: HTMLElement, currentEntry: WorkbenchHistoryEntry): void {
+  decorateWorkbenchDialogShell(root);
   const container = root.querySelector<HTMLElement>(".handy-dandy-workbench-dialog");
   if (!container) {
     return;
