@@ -1,6 +1,7 @@
 import { CONSTANTS } from "../constants";
 import { DEFAULT_GENERATION_SEED } from "../generation";
 import { readOpenRouterSettings } from "../openrouter/client";
+import { renderTemplateCompat } from "../foundry/compat";
 import {
   generateRuleElements,
   PF2E_RULE_ELEMENT_KEYS,
@@ -109,7 +110,7 @@ function sanitizeRequest(response: RuleElementGeneratorFormResponse): RuleElemen
 async function promptRuleElementGenerationRequest(): Promise<RuleElementGenerationRequest | null> {
   const settings = readOpenRouterSettings();
   const defaultSeed = typeof settings.seed === "number" ? settings.seed : DEFAULT_GENERATION_SEED;
-  const content = await renderTemplate(RULE_ELEMENT_GENERATOR_REQUEST_TEMPLATE, {
+  const content = await renderTemplateCompat(RULE_ELEMENT_GENERATOR_REQUEST_TEMPLATE, {
     connected: Boolean(game.handyDandy?.openRouterClient),
     textModel: settings.model,
     temperature: settings.temperature,
@@ -177,7 +178,7 @@ async function promptRuleElementGenerationRequest(): Promise<RuleElementGenerati
 }
 
 async function showRuleElementLoadingDialog(): Promise<Dialog> {
-  const content = await renderTemplate(RULE_ELEMENT_GENERATOR_LOADING_TEMPLATE, {});
+  const content = await renderTemplateCompat(RULE_ELEMENT_GENERATOR_LOADING_TEMPLATE, {});
   const dialog = new Dialog(
     {
       title: `${CONSTANTS.MODULE_NAME} | Generating Rule Elements`,
@@ -224,7 +225,7 @@ function buildResultFilename(): string {
 async function showRuleElementResultDialog(result: RuleElementGenerationResult): Promise<void> {
   const rulesJson = JSON.stringify(result.rules, null, 2);
   const fullPayloadJson = JSON.stringify(result, null, 2);
-  const content = await renderTemplate(RULE_ELEMENT_GENERATOR_RESULT_TEMPLATE, {
+  const content = await renderTemplateCompat(RULE_ELEMENT_GENERATOR_RESULT_TEMPLATE, {
     summary: result.summary,
     assumptions: result.assumptions,
     validationChecks: result.validationChecks,

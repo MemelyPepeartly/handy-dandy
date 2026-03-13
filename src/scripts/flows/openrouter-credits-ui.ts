@@ -1,6 +1,7 @@
 import { CONSTANTS } from "../constants";
 import { fetchOpenRouterCreditsSummary, type OpenRouterCreditsSummary } from "../openrouter/credits";
 import { readConfiguredApiKey } from "../openrouter/runtime";
+import { renderTemplateCompat } from "../foundry/compat";
 
 const OPENROUTER_CREDITS_TEMPLATE = `${CONSTANTS.TEMPLATE_PATH}/openrouter-credits.hbs`;
 
@@ -59,7 +60,7 @@ function toDialogData(summary: OpenRouterCreditsSummary): OpenRouterCreditsDialo
 }
 
 async function renderCreditsDialog(data: OpenRouterCreditsDialogData): Promise<void> {
-  const content = await renderTemplate(OPENROUTER_CREDITS_TEMPLATE, data);
+  const content = await renderTemplateCompat(OPENROUTER_CREDITS_TEMPLATE, data);
 
   await new Promise<void>((resolve) => {
     const dialog = new Dialog(
@@ -109,4 +110,3 @@ export async function runOpenRouterCreditsFlow(): Promise<void> {
     console.error(`${CONSTANTS.MODULE_NAME} | Failed to fetch OpenRouter credits`, error);
   }
 }
-
