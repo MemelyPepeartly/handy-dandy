@@ -1,5 +1,6 @@
 import { CONSTANTS } from "../constants";
-import { renderTemplateCompat } from "../foundry/compat";
+import { waitForDialog } from "../foundry/dialog";
+import { renderApplicationTemplate } from "../foundry/templates";
 
 const GENERATION_RECOVERY_TEMPLATE = `${CONSTANTS.TEMPLATE_PATH}/generation-recovery-dialog.hbs`;
 
@@ -52,50 +53,50 @@ export async function showGeneratedOutputRecoveryDialog(
 ): Promise<void> {
   const json = JSON.stringify(options.payload, null, 2);
   const filename = buildFilename(options.filenameBase);
-  const content = await renderTemplateCompat(GENERATION_RECOVERY_TEMPLATE, {
+  const content = await renderApplicationTemplate(GENERATION_RECOVERY_TEMPLATE, {
     summary: options.summary,
     json,
   });
 
-  await new Promise<void>((resolve) => {
-    const dialog = new Dialog(
+  await waitForDialog<"close">({
+    title: options.title,
+    content,
+    width: 780,
+    closeResult: "close",
+    buttons: [
       {
-        title: options.title,
-        content,
-        buttons: {
-          copy: {
-            icon: '<i class="fas fa-copy"></i>',
-            label: "Copy JSON",
-            callback: () => {
-              void copyToClipboard(json).then((copied) => {
-                if (copied) {
-                  ui.notifications?.info(`${CONSTANTS.MODULE_NAME} | Copied generated JSON to clipboard.`);
-                } else {
-                  ui.notifications?.warn(`${CONSTANTS.MODULE_NAME} | Clipboard copy failed.`);
-                }
-              });
-            },
-          },
-          download: {
-            icon: '<i class="fas fa-download"></i>',
-            label: "Download JSON",
-            callback: () => {
-              downloadJson(json, filename);
-              ui.notifications?.info(`${CONSTANTS.MODULE_NAME} | Downloaded generated JSON.`);
-            },
-          },
-          close: {
-            icon: '<i class="fas fa-times"></i>',
-            label: "Close",
-            callback: () => resolve(),
-          },
+        action: "copy",
+        icon: '<i class="fas fa-copy"></i>',
+        label: "Copy JSON",
+        callback: () => {
+          void copyToClipboard(json).then((copied) => {
+            if (copied) {
+              ui.notifications?.info(`${CONSTANTS.MODULE_NAME} | Copied generated JSON to clipboard.`);
+            } else {
+              ui.notifications?.warn(`${CONSTANTS.MODULE_NAME} | Clipboard copy failed.`);
+            }
+          });
+          return false;
         },
-        default: "close",
-        close: () => resolve(),
       },
-      { jQuery: true, width: 780 },
-    );
-
-    dialog.render(true);
+      {
+        action: "download",
+        icon: '<i class="fas fa-download"></i>',
+        label: "Download JSON",
+        callback: () => {
+          downloadJson(json, filename);
+          ui.notifications?.info(`${CONSTANTS.MODULE_NAME} | Downloaded generated JSON.`);
+          return false;
+        },
+      },
+      {
+        action: "close",
+        icon: '<i class="fas fa-times"></i>',
+        label: "Close",
+        default: true,
+        callback: () => "close",
+      },
+    ],
   });
 }
+

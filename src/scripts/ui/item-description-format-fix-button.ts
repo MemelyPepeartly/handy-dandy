@@ -4,6 +4,7 @@ import { generateStructuredOutput } from "../generation/pipeline";
 import type { JsonSchemaDefinition } from "../openrouter/client";
 import { repairPf2eInlineMacros, toPf2eRichText } from "../text/pf2e-rich-text";
 import { runItemRemixWithRequest } from "../flows/item-remix";
+import { waitForDialog } from "../foundry/dialog";
 
 const BUTTON_CLASS = "handy-dandy-item-remix-button" as const;
 const BUTTON_ICON = "fas fa-random" as const;
@@ -194,59 +195,43 @@ async function promptItemToolChoice(item: Item): Promise<ItemRemixPlannerRequest
     </div>
   `;
 
-  const response = await new Promise<ItemRemixPlannerRequest | null>((resolve) => {
-    let settled = false;
-    const finish = (value: ItemRemixPlannerRequest | null): void => {
-      if (!settled) {
-        settled = true;
-        resolve(value);
-      }
-    };
-
-    const dialog = new Dialog(
+  const response = await waitForDialog<ItemRemixPlannerRequest>({
+    title: `${CONSTANTS.MODULE_NAME} | Item Remixer`,
+    content,
+    width: 820,
+    buttons: [
       {
-        title: `${CONSTANTS.MODULE_NAME} | Item Remixer`,
-        content,
-        buttons: {
-          repair: {
-            icon: '<i class="fas fa-wand-magic-sparkles"></i>',
-            label: BUTTON_TEXT_FORMAT,
-            callback: (html) => {
-              const form = html[0]?.querySelector("form");
-              if (!(form instanceof HTMLFormElement)) {
-                finish(null);
-                return;
-              }
-              const formData = new FormData(form);
-              finish(parsePlannerFormRequest(formData, "repair-links"));
-            },
-          },
-          remix: {
-            icon: '<i class="fas fa-random"></i>',
-            label: BUTTON_TEXT_REMIX,
-            callback: (html) => {
-              const form = html[0]?.querySelector("form");
-              if (!(form instanceof HTMLFormElement)) {
-                finish(null);
-                return;
-              }
-              const formData = new FormData(form);
-              finish(parsePlannerFormRequest(formData, "run-remix"));
-            },
-          },
-          cancel: {
-            icon: '<i class="fas fa-times"></i>',
-            label: "Cancel",
-            callback: () => finish(null),
-          },
+        action: "repair",
+        icon: '<i class="fas fa-wand-magic-sparkles"></i>',
+        label: BUTTON_TEXT_FORMAT,
+        callback: ({ form }) => {
+          if (!(form instanceof HTMLFormElement)) {
+            return null;
+          }
+          const formData = new FormData(form);
+          return parsePlannerFormRequest(formData, "repair-links");
         },
-        default: "remix",
-        close: () => finish(null),
       },
-      { jQuery: true, width: 820 },
-    );
-
-    dialog.render(true);
+      {
+        action: "remix",
+        icon: '<i class="fas fa-random"></i>',
+        label: BUTTON_TEXT_REMIX,
+        default: true,
+        callback: ({ form }) => {
+          if (!(form instanceof HTMLFormElement)) {
+            return null;
+          }
+          const formData = new FormData(form);
+          return parsePlannerFormRequest(formData, "run-remix");
+        },
+      },
+      {
+        action: "cancel",
+        icon: '<i class="fas fa-times"></i>',
+        label: "Cancel",
+        callback: () => null,
+      },
+    ],
   });
 
   return response;
@@ -546,3 +531,4 @@ export function registerItemDescriptionFormatFixButton(): void {
     }
   });
 }
+

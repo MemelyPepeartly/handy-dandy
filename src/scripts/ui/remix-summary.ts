@@ -1,5 +1,6 @@
 import { CONSTANTS } from "../constants";
-import { renderTemplateCompat } from "../foundry/compat";
+import { waitForDialog } from "../foundry/dialog";
+import { renderApplicationTemplate } from "../foundry/templates";
 
 const REMIX_SUMMARY_TEMPLATE = `${CONSTANTS.TEMPLATE_PATH}/remix-summary-dialog.hbs`;
 
@@ -18,7 +19,7 @@ interface ShowRemixSummaryDialogOptions {
 }
 
 export async function showRemixSummaryDialog(options: ShowRemixSummaryDialogOptions): Promise<void> {
-  const content = await renderTemplateCompat(REMIX_SUMMARY_TEMPLATE, {
+  const content = await renderApplicationTemplate(REMIX_SUMMARY_TEMPLATE, {
     subtitle: options.subtitle ?? "",
     rows: options.rows.map((row) => ({
       label: row.label,
@@ -29,24 +30,18 @@ export async function showRemixSummaryDialog(options: ShowRemixSummaryDialogOpti
     notes: options.notes ?? [],
   });
 
-  await new Promise<void>((resolve) => {
-    const dialog = new Dialog(
+  await waitForDialog<void>({
+    title: options.title,
+    content,
+    width: 720,
+    buttons: [
       {
-        title: options.title,
-        content,
-        buttons: {
-          close: {
-            icon: '<i class="fas fa-times"></i>',
-            label: "Close",
-            callback: () => resolve(),
-          },
-        },
-        default: "close",
-        close: () => resolve(),
+        action: "close",
+        icon: '<i class="fas fa-times"></i>',
+        label: "Close",
+        default: true,
       },
-      { jQuery: true, width: 720 },
-    );
-
-    dialog.render(true);
+    ],
   });
 }
+

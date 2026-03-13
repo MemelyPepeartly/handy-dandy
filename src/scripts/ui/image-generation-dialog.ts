@@ -1,4 +1,5 @@
 import { CONSTANTS } from "../constants";
+import { waitForDialog } from "../foundry/dialog";
 
 export type ImageGenerationRequest = {
   prompt: string;
@@ -51,54 +52,40 @@ export async function promptImageGenerationRequest(
     </form>
   `;
 
-  return await new Promise<ImageGenerationRequest | null>((resolve) => {
-    let settled = false;
-    const finish = (value: ImageGenerationRequest | null): void => {
-      if (!settled) {
-        settled = true;
-        resolve(value);
-      }
-    };
-
-    const dialog = new Dialog(
+  return await waitForDialog<ImageGenerationRequest>({
+    title: options.title || `${CONSTANTS.MODULE_NAME} | Image Generation`,
+    content,
+    width: 780,
+    buttons: [
       {
-        title: options.title || `${CONSTANTS.MODULE_NAME} | Image Generation`,
-        content,
-        buttons: {
-          generate: {
-            icon: '<i class="fas fa-wand-magic-sparkles"></i>',
-            label: "Generate",
-            callback: (html) => {
-              const form = html[0]?.querySelector("form");
-              if (!(form instanceof HTMLFormElement)) {
-                finish(null);
-                return;
-              }
+        action: "generate",
+        icon: '<i class="fas fa-wand-magic-sparkles"></i>',
+        label: "Generate",
+        default: true,
+        callback: ({ form }) => {
+          if (!(form instanceof HTMLFormElement)) {
+            return null;
+          }
 
-              const formData = new FormData(form);
-              const input = form.querySelector('input[name="referenceImage"]');
-              const referenceImage = input instanceof HTMLInputElement
-                ? input.files?.[0] ?? null
-                : null;
+          const formData = new FormData(form);
+          const input = form.querySelector('input[name="referenceImage"]');
+          const referenceImage = input instanceof HTMLInputElement
+            ? input.files?.[0] ?? null
+            : null;
 
-              finish({
-                prompt: String(formData.get("prompt") ?? options.defaultPrompt),
-                referenceImage,
-              });
-            },
-          },
-          cancel: {
-            icon: '<i class="fas fa-times"></i>',
-            label: "Cancel",
-            callback: () => finish(null),
-          },
+          return {
+            prompt: String(formData.get("prompt") ?? options.defaultPrompt),
+            referenceImage,
+          };
         },
-        default: "generate",
-        close: () => finish(null),
       },
-      { jQuery: true, width: 780 },
-    );
-
-    dialog.render(true);
+      {
+        action: "cancel",
+        icon: '<i class="fas fa-times"></i>',
+        label: "Cancel",
+        callback: () => null,
+      },
+    ],
   });
 }
+

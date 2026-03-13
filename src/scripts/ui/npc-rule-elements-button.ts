@@ -1,5 +1,6 @@
 import { CONSTANTS } from "../constants";
-import { renderTemplateCompat } from "../foundry/compat";
+import { waitForDialog } from "../foundry/dialog";
+import { renderApplicationTemplate } from "../foundry/templates";
 
 const BUTTON_CLASS = "handy-dandy-npc-rule-elements-button" as const;
 const BUTTON_ICON_CLASS = "fas fa-code" as const;
@@ -241,7 +242,7 @@ async function promptRuleElements(
     targets.map((target) => [target.key, JSON.stringify(target.rules, null, 2)]),
   );
 
-  const content = await renderTemplateCompat(RULE_ELEMENT_EDITOR_TEMPLATE, {
+  const content = await renderApplicationTemplate(RULE_ELEMENT_EDITOR_TEMPLATE, {
     actorName: actor.name,
     targetOptions: targets.map((target) => ({
       key: target.key,
@@ -251,68 +252,13 @@ async function promptRuleElements(
     rulesJson: rulesByTarget.get(defaultTarget.key) ?? "[]",
   });
 
-  return await new Promise<RuleElementDialogResult | null>((resolve) => {
-    let settled = false;
-    const finish = (value: RuleElementDialogResult | null): void => {
-      if (!settled) {
-        settled = true;
-        resolve(value);
-      }
-    };
-
-    const dialog = new Dialog(
-      {
-        title: `${CONSTANTS.MODULE_NAME} | NPC Rule Elements`,
-        content,
-        buttons: {
-          save: {
-            icon: '<i class="fas fa-save"></i>',
-            label: "Save",
-            callback: (html) => {
-              const targetSelect = html[0]?.querySelector<HTMLSelectElement>("select[name='targetKey']");
-              const textarea = html[0]?.querySelector<HTMLTextAreaElement>("textarea[name='rulesJson']");
-              const targetKey = targetSelect?.value?.trim() ?? "";
-              if (!targetKey || !targets.some((target) => target.key === targetKey)) {
-                ui.notifications?.error(`${CONSTANTS.MODULE_NAME} | Select a valid rule target.`);
-                return false;
-              }
-
-              const raw = textarea?.value ?? "";
-              try {
-                const parsed = parseRuleElementsInput(raw);
-                finish({
-                  targetKey,
-                  rules: parsed,
-                });
-              } catch (error) {
-                const message = error instanceof Error ? error.message : String(error);
-                ui.notifications?.error(`${CONSTANTS.MODULE_NAME} | ${message}`);
-                return false;
-              }
-            },
-          },
-          cancel: {
-            icon: '<i class="fas fa-times"></i>',
-            label: "Cancel",
-            callback: () => finish(null),
-          },
-        },
-        default: "save",
-        close: () => finish(null),
-      },
-      { jQuery: true, width: 760 },
-    );
-
-    const hookId = Hooks.on("renderDialog", (app: Dialog, html: JQuery<HTMLElement>) => {
-      if (app !== dialog) {
-        return;
-      }
-
-      Hooks.off("renderDialog", hookId);
-
-      const root = html[0];
-      const targetSelect = root?.querySelector<HTMLSelectElement>("select[name='targetKey']");
-      const textarea = root?.querySelector<HTMLTextAreaElement>("textarea[name='rulesJson']");
+  return await waitForDialog<RuleElementDialogResult>({
+    title: `${CONSTANTS.MODULE_NAME} | NPC Rule Elements`,
+    content,
+    width: 760,
+    render: (root) => {
+      const targetSelect = root.querySelector<HTMLSelectElement>("select[name='targetKey']");
+      const textarea = root.querySelector<HTMLTextAreaElement>("textarea[name='rulesJson']");
       if (!(targetSelect instanceof HTMLSelectElement) || !(textarea instanceof HTMLTextAreaElement)) {
         return;
       }
@@ -328,9 +274,43 @@ async function promptRuleElements(
         const nextValue = draftByTarget.get(targetSelect.value) ?? "[]";
         textarea.value = nextValue;
       });
-    });
+    },
+    buttons: [
+      {
+        action: "save",
+        icon: '<i class="fas fa-save"></i>',
+        label: "Save",
+        default: true,
+        callback: ({ root }) => {
+          const targetSelect = root.querySelector<HTMLSelectElement>("select[name='targetKey']");
+          const textarea = root.querySelector<HTMLTextAreaElement>("textarea[name='rulesJson']");
+          const targetKey = targetSelect?.value?.trim() ?? "";
+          if (!targetKey || !targets.some((target) => target.key === targetKey)) {
+            ui.notifications?.error(`${CONSTANTS.MODULE_NAME} | Select a valid rule target.`);
+            return false;
+          }
 
-    dialog.render(true);
+          const raw = textarea?.value ?? "";
+          try {
+            const parsed = parseRuleElementsInput(raw);
+            return {
+              targetKey,
+              rules: parsed,
+            };
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            ui.notifications?.error(`${CONSTANTS.MODULE_NAME} | ${message}`);
+            return false;
+          }
+        },
+      },
+      {
+        action: "cancel",
+        icon: '<i class="fas fa-times"></i>',
+        label: "Cancel",
+        callback: () => null,
+      },
+    ],
   });
 }
 
@@ -418,3 +398,4 @@ export function registerNpcRuleElementsButton(): void {
     }
   });
 }
+
