@@ -10,6 +10,7 @@ import {
   type MapMarkerTone,
 } from "./types";
 import { generateMapMarkerBoxText } from "./generation";
+import { waitForDialog } from "../foundry/dialog";
 
 type MapMarkerDialogAction = "save" | "delete" | "cancel";
 
@@ -407,28 +408,13 @@ function resolveTextareaLabel(root: HTMLElement, textarea: HTMLTextAreaElement):
   return "Long-Form Text";
 }
 
-function readExpandedEditorValue(html: JQuery, fallback: string): string {
-  const root = html[0];
-  if (!(root instanceof HTMLElement)) {
-    return fallback;
-  }
-
+function readExpandedEditorValue(root: HTMLElement, fallback: string): string {
   const field = root.querySelector<HTMLTextAreaElement>("textarea[name=\"expandedValue\"]");
   return field ? field.value : fallback;
 }
 
 async function promptExpandedTextEditor(label: string, value: string): Promise<string | null> {
-  return new Promise((resolve) => {
-    let settled = false;
-    const finish = (result: string | null): void => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      resolve(result);
-    };
-
-    const content = `
+  const content = `
       <style>
         .handy-dandy-map-marker-expanded-editor {
           display: flex;
@@ -456,48 +442,12 @@ async function promptExpandedTextEditor(label: string, value: string): Promise<s
       </form>
     `;
 
-    const dialog = new Dialog(
-      {
-        title: `${CONSTANTS.MODULE_NAME} | ${label}`,
-        content,
-        buttons: {
-          apply: {
-            label: "Apply",
-            icon: "<i class=\"fas fa-check\"></i>",
-            callback: (html) => {
-              finish(readExpandedEditorValue(html, value));
-            },
-          },
-          cancel: {
-            label: "Cancel",
-            icon: "<i class=\"fas fa-times\"></i>",
-            callback: () => {
-              finish(null);
-            },
-          },
-        },
-        default: "apply",
-        close: () => {
-          finish(null);
-        },
-      },
-      {
-        width: Math.max(760, Math.min(window.innerWidth - 80, 1320)),
-        resizable: true,
-      },
-    );
-
-    const hookId = Hooks.on("renderDialog", (app: Dialog, html: JQuery) => {
-      if (app !== dialog) {
-        return;
-      }
-
-      Hooks.off("renderDialog", hookId);
-      const root = html[0];
-      if (!(root instanceof HTMLElement)) {
-        return;
-      }
-
+  return await waitForDialog<string>({
+    title: `${CONSTANTS.MODULE_NAME} | ${label}`,
+    content,
+    width: Math.max(760, Math.min(window.innerWidth - 80, 1320)),
+    resizable: true,
+    render: (root) => {
       const field = root.querySelector<HTMLTextAreaElement>("textarea[name=\"expandedValue\"]");
       if (!field) {
         return;
@@ -508,13 +458,28 @@ async function promptExpandedTextEditor(label: string, value: string): Promise<s
       field.addEventListener("keydown", (event) => {
         if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
           event.preventDefault();
-          finish(field.value);
-          dialog.close({ force: true });
+          const applyButton = root.querySelector<HTMLButtonElement>("[data-action='apply'], button[name='apply']");
+          if (applyButton) {
+            applyButton.click();
+          }
         }
       });
-    });
-
-    dialog.render(true);
+    },
+    buttons: [
+      {
+        action: "apply",
+        label: "Apply",
+        icon: "<i class=\"fas fa-check\"></i>",
+        default: true,
+        callback: ({ root }) => readExpandedEditorValue(root, value),
+      },
+      {
+        action: "cancel",
+        label: "Cancel",
+        icon: "<i class=\"fas fa-times\"></i>",
+        callback: () => null,
+      },
+    ],
   });
 }
 
@@ -558,12 +523,7 @@ function attachExpandedEditors(root: HTMLElement): void {
   }
 }
 
-function setupDialogInteractions(html: JQuery, marker: MapMarkerData): void {
-  const root = html[0];
-  if (!(root instanceof HTMLElement)) {
-    return;
-  }
-
+function setupDialogInteractions(root: HTMLElement, marker: MapMarkerData): void {
   const form = root.querySelector<HTMLFormElement>(".handy-dandy-map-marker-form");
   if (!form) {
     return;
@@ -706,20 +666,7 @@ function parseMarkerFromFormData(
   };
 }
 
-function readDialogForm(html: JQuery, marker: MapMarkerData): { marker: MapMarkerData; defaults: MapMarkerDefaults } {
-  const root = html[0];
-  if (!(root instanceof HTMLElement)) {
-    return {
-      marker,
-      defaults: {
-        prompt: marker.prompt,
-        areaTheme: marker.areaTheme,
-        tone: marker.tone,
-        boxTextLength: marker.boxTextLength,
-      },
-    };
-  }
-
+function readDialogForm(root: HTMLElement, marker: MapMarkerData): { marker: MapMarkerData; defaults: MapMarkerDefaults } {
   const form = root.querySelector<HTMLFormElement>(".handy-dandy-map-marker-form");
   if (!form) {
     return {
@@ -738,64 +685,39 @@ function readDialogForm(html: JQuery, marker: MapMarkerData): { marker: MapMarke
 }
 
 export async function promptMapMarkerDialog(marker: MapMarkerData): Promise<MapMarkerDialogResult> {
-  return new Promise((resolve) => {
-    let settled = false;
-    const finish = (result: MapMarkerDialogResult): void => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      resolve(result);
-    };
-
-    const dialog = new Dialog(
+  return (await waitForDialog<MapMarkerDialogResult>({
+    title: `${CONSTANTS.MODULE_NAME} | Map Note / Room Prep`,
+    content: buildDialogContent(marker),
+    width: 980,
+    resizable: true,
+    closeResult: { action: "cancel" },
+    render: (root) => {
+      setupDialogInteractions(root, marker);
+    },
+    buttons: [
       {
-        title: `${CONSTANTS.MODULE_NAME} | Map Note / Room Prep`,
-        content: buildDialogContent(marker),
-        buttons: {
-          save: {
-            label: "Save",
-            icon: "<i class=\"fas fa-save\"></i>",
-            callback: (html) => {
-              const parsed = readDialogForm(html, marker);
-              finish({ action: "save", marker: parsed.marker, defaults: parsed.defaults });
-            },
-          },
-          delete: {
-            label: "Delete",
-            icon: "<i class=\"fas fa-trash\"></i>",
-            callback: () => {
-              finish({ action: "delete" });
-            },
-          },
-          cancel: {
-            label: "Cancel",
-            icon: "<i class=\"fas fa-times\"></i>",
-            callback: () => {
-              finish({ action: "cancel" });
-            },
-          },
-        },
-        default: "save",
-        close: () => {
-          finish({ action: "cancel" });
+        action: "save",
+        label: "Save",
+        icon: "<i class=\"fas fa-save\"></i>",
+        default: true,
+        callback: ({ root }) => {
+          const parsed = readDialogForm(root, marker);
+          return { action: "save", marker: parsed.marker, defaults: parsed.defaults };
         },
       },
       {
-        width: 980,
-        resizable: true,
+        action: "delete",
+        label: "Delete",
+        icon: "<i class=\"fas fa-trash\"></i>",
+        callback: () => ({ action: "delete" }),
       },
-    );
-
-    const hookId = Hooks.on("renderDialog", (app: Dialog, html: JQuery) => {
-      if (app !== dialog) {
-        return;
-      }
-
-      Hooks.off("renderDialog", hookId);
-      setupDialogInteractions(html, marker);
-    });
-
-    dialog.render(true);
-  });
+      {
+        action: "cancel",
+        label: "Cancel",
+        icon: "<i class=\"fas fa-times\"></i>",
+        callback: () => ({ action: "cancel" }),
+      },
+    ],
+  })) ?? { action: "cancel" };
 }
+
