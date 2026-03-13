@@ -20,7 +20,8 @@ import {
 import { fromFoundryActor, type FoundryActor } from "../mappers/export";
 import { importAction, importActor, importItem } from "../mappers/import";
 import { mapCanonicalActor, normalizeGeneratedEntity } from "../generation/pipeline";
-import { getDialogV2Class, renderTemplateCompat } from "../foundry/compat";
+import { openDialog, waitForDialog } from "../foundry/dialog";
+import { renderApplicationTemplate } from "../foundry/templates";
 
 interface WorkbenchHistoryEntry {
   readonly id: string;
@@ -39,7 +40,6 @@ const PROMPT_WORKBENCH_HISTORY_PLACEHOLDER_TEMPLATE = `${CONSTANTS.TEMPLATE_PATH
 const PROMPT_WORKBENCH_ENTRY_DETAIL_TEMPLATE = `${CONSTANTS.TEMPLATE_PATH}/prompt-workbench-entry-detail.hbs`;
 const PROMPT_WORKBENCH_REQUEST_TEMPLATE = `${CONSTANTS.TEMPLATE_PATH}/prompt-workbench-request.hbs`;
 const PROMPT_WORKBENCH_RESULT_TEMPLATE = `${CONSTANTS.TEMPLATE_PATH}/prompt-workbench-result.hbs`;
-const DialogV2 = getDialogV2Class();
 
 type SerializableWorkbenchResult = Pick<
   PromptWorkbenchResult<EntityType>,
@@ -177,7 +177,7 @@ export async function runPromptWorkbenchFlow(): Promise<void> {
       ...request,
       onProgress: (update) => loading?.update(update),
     });
-    loading.close();
+    await loading.close();
     loading = null;
     await showWorkbenchResult(result);
   } catch (error) {
@@ -185,7 +185,7 @@ export async function runPromptWorkbenchFlow(): Promise<void> {
     ui.notifications?.error(`${CONSTANTS.MODULE_NAME} | Prompt workbench failed: ${message}`);
     console.error(`${CONSTANTS.MODULE_NAME} | Prompt workbench failed`, error);
   } finally {
-    loading?.close();
+    await loading?.close();
   }
 }
 
@@ -215,7 +215,7 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
     buildHistoryViewPlaceholder(),
   ]);
 
-  const content = await renderTemplateCompat(PROMPT_WORKBENCH_REQUEST_TEMPLATE, {
+  const content = await renderApplicationTemplate(PROMPT_WORKBENCH_REQUEST_TEMPLATE, {
     generationSetupMarkup,
     itemTypeOptions,
     actorTypeOptions,
@@ -226,80 +226,27 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
     historyPlaceholder,
   });
 
-  const response = DialogV2
-    ? await DialogV2.wait({
-      window: { title: `${CONSTANTS.MODULE_NAME} | Prompt Workbench` } as never,
-      position: { width: 820 },
-      content,
-      buttons: [
-        {
-          action: "generate",
-          label: "Generate",
-          default: true,
-          callback: (_event, button) => {
-            const form = button.form ?? button.closest("form");
-            return form instanceof HTMLFormElement
-              ? extractWorkbenchFormResponse(form)
-              : null;
-          },
-        },
-        {
-          action: "cancel",
-          label: "Cancel",
-          callback: () => null,
-        },
-      ],
-      rejectClose: false,
-      render: (_event, dialog) => {
-        setupWorkbenchRequestDialog(dialog);
+  const response = await waitForDialog<WorkbenchFormResponse>({
+    title: `${CONSTANTS.MODULE_NAME} | Prompt Workbench`,
+    content,
+    width: 820,
+    render: (root) => {
+      setupWorkbenchRequestDialog(root);
+    },
+    buttons: [
+      {
+        action: "generate",
+        label: "Generate",
+        default: true,
+        callback: ({ form }) => form instanceof HTMLFormElement ? extractWorkbenchFormResponse(form) : null,
       },
-    }) as WorkbenchFormResponse | null
-    : await new Promise<WorkbenchFormResponse | null>((resolve) => {
-      let settled = false;
-      const finish = (value: WorkbenchFormResponse | null): void => {
-        if (!settled) {
-          settled = true;
-          resolve(value);
-        }
-      };
-
-      const dialog = new Dialog(
-        {
-          title: `${CONSTANTS.MODULE_NAME} | Prompt Workbench`,
-          content,
-          buttons: {
-            generate: {
-              label: "Generate",
-              callback: (html) => {
-                const form = html[0]?.querySelector("form");
-                finish(form instanceof HTMLFormElement ? extractWorkbenchFormResponse(form) : null);
-              },
-            },
-            cancel: {
-              label: "Cancel",
-              callback: () => finish(null),
-            },
-          },
-          default: "generate",
-          close: () => finish(null),
-        },
-        { jQuery: true, width: 820 },
-      );
-
-      const hookId = Hooks.on("renderDialog", (app: Dialog, html: JQuery) => {
-        if (app !== dialog) {
-          return;
-        }
-
-        Hooks.off("renderDialog", hookId);
-        const root = html[0];
-        if (root instanceof HTMLElement) {
-          setupWorkbenchRequestDialog(root);
-        }
-      });
-
-      dialog.render(true);
-    });
+      {
+        action: "cancel",
+        label: "Cancel",
+        callback: () => null,
+      },
+    ],
+  });
 
   if (!response) {
     return null;
@@ -489,7 +436,7 @@ async function buildGenerationSetupMarkup(setup: PromptWorkbenchGenerationSetup)
     ? String(setup.configuredSeed)
     : `Default (${DEFAULT_GENERATION_SEED})`;
 
-  return renderTemplateCompat(PROMPT_WORKBENCH_GENERATION_SETUP_TEMPLATE, {
+  return renderApplicationTemplate(PROMPT_WORKBENCH_GENERATION_SETUP_TEMPLATE, {
     connectionClass,
     connectionLabel,
     textModel: setup.textModel,
@@ -598,7 +545,7 @@ type LoadingStep = {
 
 interface WorkbenchLoadingController {
   update: (update: GenerationProgressUpdate) => void;
-  close: () => void;
+  close: () => Promise<void>;
 }
 
 function buildLoadingSteps(request: PromptWorkbenchRequest<EntityType>): LoadingStep[] {
@@ -646,7 +593,7 @@ function applyLoadingProgress(
 async function showGeneratingDialog(request: PromptWorkbenchRequest<EntityType>): Promise<WorkbenchLoadingController> {
   const entryName = request.entryName.trim() || "entry";
   const loadingSteps = buildLoadingSteps(request);
-  const content = await renderTemplateCompat(PROMPT_WORKBENCH_LOADING_TEMPLATE, {
+  const content = await renderApplicationTemplate(PROMPT_WORKBENCH_LOADING_TEMPLATE, {
     safeEntryName: entryName,
     loadingSteps: loadingSteps.map((step, index) => ({
       index,
@@ -678,66 +625,24 @@ async function showGeneratingDialog(request: PromptWorkbenchRequest<EntityType>)
     applyLoadingProgress(root, loadingSteps, latestProgress);
   };
 
-  if (DialogV2) {
-    const dialog = new DialogV2({
-      window: { title: `${CONSTANTS.MODULE_NAME} | Working` } as never,
-      content,
-      buttons: [],
-    });
+  const dialog = await openDialog({
+    title: `${CONSTANTS.MODULE_NAME} | Working`,
+    content,
+    render: (dialogRoot) => {
+      root = dialogRoot.querySelector<HTMLElement>("[data-loading-root]") ?? null;
+      if (!root) {
+        return;
+      }
 
-    await dialog.render({ force: true });
-    root = dialog.element.querySelector<HTMLElement>("[data-loading-root]") ?? null;
-    if (root) {
       applyLoadingProgress(root, loadingSteps, latestProgress);
       refreshElapsed();
       intervalId = window.setInterval(refreshElapsed, 1000);
-    }
-
-    return {
-      update,
-      close: () => {
-        if (closed) {
-          return;
-        }
-        closed = true;
-        if (intervalId !== null) {
-          window.clearInterval(intervalId);
-          intervalId = null;
-        }
-        void dialog.close();
-      },
-    };
-  }
-
-  const dialog = new Dialog({
-    title: `${CONSTANTS.MODULE_NAME} | Working`,
-    content,
-    buttons: {},
-    close: () => {
-      /* no-op while loading */
     },
-  }, { jQuery: true });
-
-  const hookId = Hooks.on("renderDialog", (app: Dialog, html: JQuery) => {
-    if (app !== dialog) {
-      return;
-    }
-
-    Hooks.off("renderDialog", hookId);
-    root = html[0]?.querySelector<HTMLElement>("[data-loading-root]") ?? null;
-    if (!root) {
-      return;
-    }
-
-    applyLoadingProgress(root, loadingSteps, latestProgress);
-    refreshElapsed();
-    intervalId = window.setInterval(refreshElapsed, 1000);
   });
 
-  dialog.render(true);
   return {
     update,
-    close: () => {
+    close: async () => {
       if (closed) {
         return;
       }
@@ -746,7 +651,7 @@ async function showGeneratingDialog(request: PromptWorkbenchRequest<EntityType>)
         window.clearInterval(intervalId);
         intervalId = null;
       }
-      dialog.close({ force: true });
+      await dialog.close();
     },
   };
 }
@@ -758,52 +663,20 @@ async function showWorkbenchResult(result: PromptWorkbenchResult<EntityType>): P
 
   const content = await buildWorkbenchDialogContent(currentEntry);
 
-  if (DialogV2) {
-    await DialogV2.wait({
-      window: { title: `${CONSTANTS.MODULE_NAME} | Prompt Workbench` } as never,
-      position: { width: 760 },
-      content,
-      buttons: [
-        {
-          action: "close",
-          label: "Close",
-          default: true,
-        },
-      ],
-      rejectClose: false,
-      render: (_event, dialog) => {
-        setupWorkbenchResultDialog(dialog, currentEntry);
+  await waitForDialog<void>({
+    title: `${CONSTANTS.MODULE_NAME} | Prompt Workbench`,
+    content,
+    width: 760,
+    render: (root) => {
+      setupWorkbenchResultDialog(root, currentEntry);
+    },
+    buttons: [
+      {
+        action: "close",
+        label: "Close",
+        default: true,
       },
-    });
-    return;
-  }
-
-  return new Promise((resolve) => {
-    const dialog = new Dialog({
-      title: `${CONSTANTS.MODULE_NAME} | Prompt Workbench`,
-      content,
-      buttons: {
-        close: {
-          label: "Close",
-        },
-      },
-      close: () => resolve(),
-      default: "close",
-    }, { jQuery: true, width: 760 });
-
-    const hookId = Hooks.on("renderDialog", (app: Dialog, html: JQuery) => {
-      if (app !== dialog) {
-        return;
-      }
-
-      Hooks.off("renderDialog", hookId);
-      const root = html[0];
-      if (root instanceof HTMLElement) {
-        setupWorkbenchResultDialog(root, currentEntry);
-      }
-    });
-
-    dialog.render(true);
+    ],
   });
 }
 
@@ -1063,7 +936,7 @@ async function buildWorkbenchDialogContent(currentEntry: WorkbenchHistoryEntry):
     buildHistoryViewPlaceholder(),
   ]);
 
-  return renderTemplateCompat(PROMPT_WORKBENCH_RESULT_TEMPLATE, {
+  return renderApplicationTemplate(PROMPT_WORKBENCH_RESULT_TEMPLATE, {
     currentEntryId: currentEntry.id,
     latestMarkup,
     historyListMarkup,
@@ -1101,7 +974,7 @@ function buildHistorySummaryLabel(visibleCount: number, totalCount: number, hasF
 
 async function buildHistoryListMarkup(activeEntryId?: string, filterText?: string): Promise<string> {
   if (!workbenchHistory.length) {
-    return renderTemplateCompat(PROMPT_WORKBENCH_HISTORY_LIST_TEMPLATE, {
+    return renderApplicationTemplate(PROMPT_WORKBENCH_HISTORY_LIST_TEMPLATE, {
       hasEntries: false,
       emptyMessage: "No generations yet.",
       entries: [],
@@ -1110,14 +983,14 @@ async function buildHistoryListMarkup(activeEntryId?: string, filterText?: strin
 
   const filteredEntries = getFilteredHistoryEntries(filterText);
   if (!filteredEntries.length) {
-    return renderTemplateCompat(PROMPT_WORKBENCH_HISTORY_LIST_TEMPLATE, {
+    return renderApplicationTemplate(PROMPT_WORKBENCH_HISTORY_LIST_TEMPLATE, {
       hasEntries: false,
       emptyMessage: "No entries match this filter.",
       entries: [],
     });
   }
 
-  return renderTemplateCompat(PROMPT_WORKBENCH_HISTORY_LIST_TEMPLATE, {
+  return renderApplicationTemplate(PROMPT_WORKBENCH_HISTORY_LIST_TEMPLATE, {
     hasEntries: true,
     entries: filteredEntries.map((entry) => ({
       id: entry.id,
@@ -1131,20 +1004,20 @@ async function buildHistoryListMarkup(activeEntryId?: string, filterText?: strin
 
 async function buildHistoryViewPlaceholder(filterText?: string): Promise<string> {
   if (!workbenchHistory.length) {
-    return renderTemplateCompat(PROMPT_WORKBENCH_HISTORY_PLACEHOLDER_TEMPLATE, {
+    return renderApplicationTemplate(PROMPT_WORKBENCH_HISTORY_PLACEHOLDER_TEMPLATE, {
       className: "handy-dandy-workbench-history-empty",
       message: "No generations yet.",
     });
   }
 
   if (!getFilteredHistoryEntries(filterText).length) {
-    return renderTemplateCompat(PROMPT_WORKBENCH_HISTORY_PLACEHOLDER_TEMPLATE, {
+    return renderApplicationTemplate(PROMPT_WORKBENCH_HISTORY_PLACEHOLDER_TEMPLATE, {
       className: "handy-dandy-workbench-history-empty",
       message: "No entries match this filter.",
     });
   }
 
-  return renderTemplateCompat(PROMPT_WORKBENCH_HISTORY_PLACEHOLDER_TEMPLATE, {
+  return renderApplicationTemplate(PROMPT_WORKBENCH_HISTORY_PLACEHOLDER_TEMPLATE, {
     className: "notes",
     message: "Select a previous generation to review its details.",
   });
@@ -1157,7 +1030,7 @@ async function buildEntryDetailMarkup(entry: WorkbenchHistoryEntry): Promise<str
   const importLabel = entry.result.type === "actor" ? "Create Actor" : "Import to World";
   const meta = `${typeLabel}${systemLabel ? ` - ${systemLabel}` : ""} - ${timestamp}`;
 
-  return renderTemplateCompat(PROMPT_WORKBENCH_ENTRY_DETAIL_TEMPLATE, {
+  return renderApplicationTemplate(PROMPT_WORKBENCH_ENTRY_DETAIL_TEMPLATE, {
     id: entry.id,
     name: entry.result.name.trim() || entry.result.data.name || "Generated Entry",
     meta,
@@ -1739,4 +1612,5 @@ function downloadJson(json: string, filename: string): void {
   link.click();
   URL.revokeObjectURL(url);
 }
+
 

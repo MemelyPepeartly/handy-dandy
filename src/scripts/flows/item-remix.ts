@@ -3,6 +3,7 @@ import { fromFoundryItem } from "../mappers/export";
 import { importItem } from "../mappers/import";
 import { showGeneratedOutputRecoveryDialog } from "../ui/generated-output-recovery";
 import { showRemixSummaryDialog, type RemixSummaryRow } from "../ui/remix-summary";
+import { openDialog, waitForDialog, type OpenDialogHandle } from "../foundry/dialog";
 
 export interface ItemRemixRequest {
   instructions: string;
@@ -79,51 +80,36 @@ async function promptItemRemixRequest(item: Item): Promise<ItemRemixRequest | nu
     </form>
   `;
 
-  const response = await new Promise<ItemRemixFormResponse | null>((resolve) => {
-    let settled = false;
-    const finish = (value: ItemRemixFormResponse | null): void => {
-      if (!settled) {
-        settled = true;
-        resolve(value);
-      }
-    };
-
-    const dialog = new Dialog(
+  const response = await waitForDialog<ItemRemixFormResponse>({
+    title: `${CONSTANTS.MODULE_NAME} | Remix ${item.name ?? "Item"}`,
+    content,
+    width: 700,
+    buttons: [
       {
-        title: `${CONSTANTS.MODULE_NAME} | Remix ${item.name ?? "Item"}`,
-        content,
-        buttons: {
-          remix: {
-            icon: '<i class="fas fa-random"></i>',
-            label: "Remix",
-            callback: (html) => {
-              const form = html[0]?.querySelector("form");
-              if (!(form instanceof HTMLFormElement)) {
-                finish(null);
-                return;
-              }
+        action: "remix",
+        icon: '<i class="fas fa-random"></i>',
+        label: "Remix",
+        default: true,
+        callback: ({ form }) => {
+          if (!(form instanceof HTMLFormElement)) {
+            return null;
+          }
 
-              const formData = new FormData(form);
-              finish({
-                instructions: String(formData.get("instructions") ?? ""),
-                generateItemImage: formData.get("generateItemImage") as string | null,
-                itemImagePrompt: String(formData.get("itemImagePrompt") ?? ""),
-              });
-            },
-          },
-          cancel: {
-            icon: '<i class="fas fa-times"></i>',
-            label: "Cancel",
-            callback: () => finish(null),
-          },
+          const formData = new FormData(form);
+          return {
+            instructions: String(formData.get("instructions") ?? ""),
+            generateItemImage: formData.get("generateItemImage") as string | null,
+            itemImagePrompt: String(formData.get("itemImagePrompt") ?? ""),
+          };
         },
-        default: "remix",
-        close: () => finish(null),
       },
-      { jQuery: true, width: 700 },
-    );
-
-    dialog.render(true);
+      {
+        action: "cancel",
+        icon: '<i class="fas fa-times"></i>',
+        label: "Cancel",
+        callback: () => null,
+      },
+    ],
   });
 
   if (!response) {
@@ -143,27 +129,17 @@ async function promptItemRemixRequest(item: Item): Promise<ItemRemixRequest | nu
   };
 }
 
-function showWorkingDialog(itemName: string): Dialog {
+async function showWorkingDialog(itemName: string): Promise<OpenDialogHandle> {
   const safeName = escapeHtml(itemName);
-  const dialog = new Dialog(
-    {
-      title: `${CONSTANTS.MODULE_NAME} | Remixing`,
-      content: `
-        <div class="handy-dandy-remix-loading">
-          <p><i class="fas fa-spinner fa-spin"></i> Remixing ${safeName}...</p>
-          <p class="notes">Generating updated item data and applying it to this sheet.</p>
-        </div>
-      `,
-      buttons: {},
-      close: () => {
-        /* no-op while loading */
-      },
-    },
-    { jQuery: true },
-  );
-
-  dialog.render(true);
-  return dialog;
+  return await openDialog({
+    title: `${CONSTANTS.MODULE_NAME} | Remixing`,
+    content: `
+      <div class="handy-dandy-remix-loading">
+        <p><i class="fas fa-spinner fa-spin"></i> Remixing ${safeName}...</p>
+        <p class="notes">Generating updated item data and applying it to this sheet.</p>
+      </div>
+    `,
+  });
 }
 
 function coerceRemixItemTypeToExisting(
@@ -241,10 +217,10 @@ export async function runItemRemixWithRequest(item: Item, request: ItemRemixRequ
   const itemName = item.name ?? canonical.name;
   const sourceFoundryType = String(item.type ?? "item");
 
-  let workingDialog: Dialog | null = null;
+  let workingDialog: OpenDialogHandle | null = null;
   let generatedForUpdate: Parameters<typeof importItem>[0] | null = null;
   try {
-    workingDialog = showWorkingDialog(itemName);
+    workingDialog = await showWorkingDialog(itemName);
     const referenceText = buildRemixReferenceText(itemName, canonical, sourceFoundryType, request);
     const generated = await generation({
       systemId: canonical.systemId,
@@ -316,7 +292,7 @@ export async function runItemRemixWithRequest(item: Item, request: ItemRemixRequ
       highlights.push("Image path changed.");
     }
 
-    workingDialog.close({ force: true });
+    await workingDialog.close();
     workingDialog = null;
 
     ui.notifications?.info(`${CONSTANTS.MODULE_NAME} | Remixed ${imported.name}.`);
@@ -342,7 +318,7 @@ export async function runItemRemixWithRequest(item: Item, request: ItemRemixRequ
 
     console.error(`${CONSTANTS.MODULE_NAME} | Item remix failed`, error);
   } finally {
-    workingDialog?.close({ force: true });
+    await workingDialog?.close();
   }
 }
 
@@ -354,3 +330,4 @@ export async function runItemRemixFlow(item: Item): Promise<void> {
 
   await runItemRemixWithRequest(item, request);
 }
+

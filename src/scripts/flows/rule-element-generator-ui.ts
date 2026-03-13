@@ -1,7 +1,8 @@
 import { CONSTANTS } from "../constants";
 import { DEFAULT_GENERATION_SEED } from "../generation";
 import { readOpenRouterSettings } from "../openrouter/client";
-import { renderTemplateCompat } from "../foundry/compat";
+import { openDialog, waitForDialog, type OpenDialogHandle } from "../foundry/dialog";
+import { renderApplicationTemplate } from "../foundry/templates";
 import {
   generateRuleElements,
   PF2E_RULE_ELEMENT_KEYS,
@@ -110,7 +111,7 @@ function sanitizeRequest(response: RuleElementGeneratorFormResponse): RuleElemen
 async function promptRuleElementGenerationRequest(): Promise<RuleElementGenerationRequest | null> {
   const settings = readOpenRouterSettings();
   const defaultSeed = typeof settings.seed === "number" ? settings.seed : DEFAULT_GENERATION_SEED;
-  const content = await renderTemplateCompat(RULE_ELEMENT_GENERATOR_REQUEST_TEMPLATE, {
+  const content = await renderApplicationTemplate(RULE_ELEMENT_GENERATOR_REQUEST_TEMPLATE, {
     connected: Boolean(game.handyDandy?.openRouterClient),
     textModel: settings.model,
     temperature: settings.temperature,
@@ -119,55 +120,40 @@ async function promptRuleElementGenerationRequest(): Promise<RuleElementGenerati
     supportedRuleKeys: PF2E_RULE_ELEMENT_KEYS,
   });
 
-  const response = await new Promise<RuleElementGeneratorFormResponse | null>((resolve) => {
-    let settled = false;
-    const finish = (value: RuleElementGeneratorFormResponse | null): void => {
-      if (!settled) {
-        settled = true;
-        resolve(value);
-      }
-    };
-
-    const dialog = new Dialog(
+  const response = await waitForDialog<RuleElementGeneratorFormResponse>({
+    title: `${CONSTANTS.MODULE_NAME} | Rule Element Generator`,
+    content,
+    width: 860,
+    buttons: [
       {
-        title: `${CONSTANTS.MODULE_NAME} | Rule Element Generator`,
-        content,
-        buttons: {
-          generate: {
-            icon: '<i class="fas fa-gears"></i>',
-            label: "Generate",
-            callback: (html) => {
-              const form = html[0]?.querySelector("form");
-              if (!(form instanceof HTMLFormElement)) {
-                finish(null);
-                return;
-              }
+        action: "generate",
+        icon: '<i class="fas fa-gears"></i>',
+        label: "Generate",
+        default: true,
+        callback: ({ form }) => {
+          if (!(form instanceof HTMLFormElement)) {
+            return null;
+          }
 
-              const formData = new FormData(form);
-              finish({
-                objective: String(formData.get("objective") ?? ""),
-                targetItemType: String(formData.get("targetItemType") ?? ""),
-                preferredRuleKeys: String(formData.get("preferredRuleKeys") ?? ""),
-                desiredRuleCount: String(formData.get("desiredRuleCount") ?? ""),
-                contextJson: String(formData.get("contextJson") ?? ""),
-                constraints: String(formData.get("constraints") ?? ""),
-                seed: String(formData.get("seed") ?? ""),
-              });
-            },
-          },
-          cancel: {
-            icon: '<i class="fas fa-times"></i>',
-            label: "Cancel",
-            callback: () => finish(null),
-          },
+          const formData = new FormData(form);
+          return {
+            objective: String(formData.get("objective") ?? ""),
+            targetItemType: String(formData.get("targetItemType") ?? ""),
+            preferredRuleKeys: String(formData.get("preferredRuleKeys") ?? ""),
+            desiredRuleCount: String(formData.get("desiredRuleCount") ?? ""),
+            contextJson: String(formData.get("contextJson") ?? ""),
+            constraints: String(formData.get("constraints") ?? ""),
+            seed: String(formData.get("seed") ?? ""),
+          };
         },
-        default: "generate",
-        close: () => finish(null),
       },
-      { jQuery: true, width: 860 },
-    );
-
-    dialog.render(true);
+      {
+        action: "cancel",
+        icon: '<i class="fas fa-times"></i>',
+        label: "Cancel",
+        callback: () => null,
+      },
+    ],
   });
 
   if (!response) {
@@ -177,22 +163,12 @@ async function promptRuleElementGenerationRequest(): Promise<RuleElementGenerati
   return sanitizeRequest(response);
 }
 
-async function showRuleElementLoadingDialog(): Promise<Dialog> {
-  const content = await renderTemplateCompat(RULE_ELEMENT_GENERATOR_LOADING_TEMPLATE, {});
-  const dialog = new Dialog(
-    {
-      title: `${CONSTANTS.MODULE_NAME} | Generating Rule Elements`,
-      content,
-      buttons: {},
-      close: () => {
-        /* no-op while loading */
-      },
-    },
-    { jQuery: true },
-  );
-
-  dialog.render(true);
-  return dialog;
+async function showRuleElementLoadingDialog(): Promise<OpenDialogHandle> {
+  const content = await renderApplicationTemplate(RULE_ELEMENT_GENERATOR_LOADING_TEMPLATE, {});
+  return await openDialog({
+    title: `${CONSTANTS.MODULE_NAME} | Generating Rule Elements`,
+    content,
+  });
 }
 
 async function copyToClipboard(value: string): Promise<boolean> {
@@ -225,7 +201,7 @@ function buildResultFilename(): string {
 async function showRuleElementResultDialog(result: RuleElementGenerationResult): Promise<void> {
   const rulesJson = JSON.stringify(result.rules, null, 2);
   const fullPayloadJson = JSON.stringify(result, null, 2);
-  const content = await renderTemplateCompat(RULE_ELEMENT_GENERATOR_RESULT_TEMPLATE, {
+  const content = await renderApplicationTemplate(RULE_ELEMENT_GENERATOR_RESULT_TEMPLATE, {
     summary: result.summary,
     assumptions: result.assumptions,
     validationChecks: result.validationChecks,
@@ -233,36 +209,11 @@ async function showRuleElementResultDialog(result: RuleElementGenerationResult):
     rulesJson,
   });
 
-  await new Promise<void>((resolve) => {
-    const dialog = new Dialog(
-      {
-        title: `${CONSTANTS.MODULE_NAME} | Rule Element Generator Result`,
-        content,
-        buttons: {
-          close: {
-            icon: '<i class="fas fa-times"></i>',
-            label: "Close",
-            callback: () => resolve(),
-          },
-        },
-        default: "close",
-        close: () => resolve(),
-      },
-      { jQuery: true, width: 900 },
-    );
-
-    const hookId = Hooks.on("renderDialog", (app: Dialog, html: JQuery) => {
-      if (app !== dialog) {
-        return;
-      }
-
-      Hooks.off("renderDialog", hookId);
-
-      const root = html[0];
-      if (!(root instanceof HTMLElement)) {
-        return;
-      }
-
+  await waitForDialog<void>({
+    title: `${CONSTANTS.MODULE_NAME} | Rule Element Generator Result`,
+    content,
+    width: 900,
+    render: (root) => {
       const copyRulesButton = root.querySelector<HTMLButtonElement>("button[data-action='copy-rules']");
       const copyFullButton = root.querySelector<HTMLButtonElement>("button[data-action='copy-full']");
       const downloadButton = root.querySelector<HTMLButtonElement>("button[data-action='download']");
@@ -291,9 +242,15 @@ async function showRuleElementResultDialog(result: RuleElementGenerationResult):
         downloadJson(rulesJson, buildResultFilename());
         ui.notifications?.info(`${CONSTANTS.MODULE_NAME} | Downloaded generated rules JSON.`);
       });
-    });
-
-    dialog.render(true);
+    },
+    buttons: [
+      {
+        action: "close",
+        icon: '<i class="fas fa-times"></i>',
+        label: "Close",
+        default: true,
+      },
+    ],
   });
 }
 
@@ -317,11 +274,11 @@ export async function runRuleElementGeneratorFlow(): Promise<void> {
     return;
   }
 
-  let loadingDialog: Dialog | null = null;
+  let loadingDialog: OpenDialogHandle | null = null;
   try {
     loadingDialog = await showRuleElementLoadingDialog();
     const result = await generateRuleElements(openRouterClient, request);
-    loadingDialog.close({ force: true });
+    await loadingDialog.close();
     loadingDialog = null;
     await showRuleElementResultDialog(result);
   } catch (error) {
@@ -329,6 +286,7 @@ export async function runRuleElementGeneratorFlow(): Promise<void> {
     ui.notifications?.error(`${CONSTANTS.MODULE_NAME} | Rule Element generation failed: ${message}`);
     console.error(`${CONSTANTS.MODULE_NAME} | Rule Element generation failed`, error);
   } finally {
-    loadingDialog?.close({ force: true });
+    await loadingDialog?.close();
   }
 }
+

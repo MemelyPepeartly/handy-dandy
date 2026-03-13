@@ -6,6 +6,7 @@ import type { JsonSchemaDefinition, OpenRouterClient } from "../openrouter/clien
 import { actorSchema, type ActorSchemaData } from "../schemas";
 import { showGeneratedOutputRecoveryDialog } from "../ui/generated-output-recovery";
 import { showRemixSummaryDialog, type RemixSummaryRow } from "../ui/remix-summary";
+import { openDialog, waitForDialog, type OpenDialogHandle } from "../foundry/dialog";
 
 type MainSheetRemixFormResponse = {
   targetLevel: string;
@@ -673,80 +674,65 @@ async function promptMainSheetRemixRequest(
     </form>
   `;
 
-  const response = await new Promise<MainSheetRemixFormResponse | null>((resolve) => {
-    let settled = false;
-    const finish = (value: MainSheetRemixFormResponse | null): void => {
-      if (!settled) {
-        settled = true;
-        resolve(value);
-      }
-    };
-
-    const dialog = new Dialog(
+  const response = await waitForDialog<MainSheetRemixFormResponse>({
+    title: `${CONSTANTS.MODULE_NAME} | Main Sheet Remix`,
+    content,
+    width: 820,
+    buttons: [
       {
-        title: `${CONSTANTS.MODULE_NAME} | Main Sheet Remix`,
-        content,
-        buttons: {
-          remix: {
-            icon: '<i class="fas fa-sliders-h"></i>',
-            label: "Run Remix",
-            callback: (html) => {
-              const form = html[0]?.querySelector("form");
-              if (!(form instanceof HTMLFormElement)) {
-                finish(null);
-                return;
-              }
+        action: "remix",
+        icon: '<i class="fas fa-sliders-h"></i>',
+        label: "Run Remix",
+        default: true,
+        callback: ({ form }) => {
+          if (!(form instanceof HTMLFormElement)) {
+            return null;
+          }
 
-              const formData = new FormData(form);
-              finish({
-                targetLevel: String(formData.get("targetLevel") ?? ""),
-                regenerateCore: formData.get("regenerateCore") as string | null,
-                regenerateDefenses: formData.get("regenerateDefenses") as string | null,
-                regenerateSkills: formData.get("regenerateSkills") as string | null,
-                regenerateStrikes: formData.get("regenerateStrikes") as string | null,
-                regenerateActions: formData.get("regenerateActions") as string | null,
-                regenerateInventory: formData.get("regenerateInventory") as string | null,
-                regenerateSpells: formData.get("regenerateSpells") as string | null,
-                regenerateNarrative: formData.get("regenerateNarrative") as string | null,
-                inventoryGoal: String(formData.get("inventoryGoal") ?? ""),
-                minimumInventoryItems: String(formData.get("minimumInventoryItems") ?? ""),
-                preserveExistingInventory: formData.get("preserveExistingInventory") as string | null,
-                includeWeapon: formData.get("includeWeapon") as string | null,
-                includeArmor: formData.get("includeArmor") as string | null,
-                includeConsumable: formData.get("includeConsumable") as string | null,
-                includeEquipment: formData.get("includeEquipment") as string | null,
-                inventoryMustInclude: String(formData.get("inventoryMustInclude") ?? ""),
-                inventoryAvoid: String(formData.get("inventoryAvoid") ?? ""),
-                spellGoal: String(formData.get("spellGoal") ?? ""),
-                minimumSpellEntries: String(formData.get("minimumSpellEntries") ?? ""),
-                minimumSpells: String(formData.get("minimumSpells") ?? ""),
-                preserveExistingSpellcasting: formData.get("preserveExistingSpellcasting") as string | null,
-                includeCantrips: formData.get("includeCantrips") as string | null,
-                focusOffense: formData.get("focusOffense") as string | null,
-                focusControl: formData.get("focusControl") as string | null,
-                focusDefense: formData.get("focusDefense") as string | null,
-                focusUtility: formData.get("focusUtility") as string | null,
-                spellMustInclude: String(formData.get("spellMustInclude") ?? ""),
-                spellAvoid: String(formData.get("spellAvoid") ?? ""),
-                generateTokenImage: formData.get("generateTokenImage") as string | null,
-                tokenPrompt: String(formData.get("tokenPrompt") ?? ""),
-                instructions: String(formData.get("instructions") ?? ""),
-              });
-            },
-          },
-          cancel: {
-            icon: '<i class="fas fa-times"></i>',
-            label: "Cancel",
-            callback: () => finish(null),
-          },
+          const formData = new FormData(form);
+          return {
+            targetLevel: String(formData.get("targetLevel") ?? ""),
+            regenerateCore: formData.get("regenerateCore") as string | null,
+            regenerateDefenses: formData.get("regenerateDefenses") as string | null,
+            regenerateSkills: formData.get("regenerateSkills") as string | null,
+            regenerateStrikes: formData.get("regenerateStrikes") as string | null,
+            regenerateActions: formData.get("regenerateActions") as string | null,
+            regenerateInventory: formData.get("regenerateInventory") as string | null,
+            regenerateSpells: formData.get("regenerateSpells") as string | null,
+            regenerateNarrative: formData.get("regenerateNarrative") as string | null,
+            inventoryGoal: String(formData.get("inventoryGoal") ?? ""),
+            minimumInventoryItems: String(formData.get("minimumInventoryItems") ?? ""),
+            preserveExistingInventory: formData.get("preserveExistingInventory") as string | null,
+            includeWeapon: formData.get("includeWeapon") as string | null,
+            includeArmor: formData.get("includeArmor") as string | null,
+            includeConsumable: formData.get("includeConsumable") as string | null,
+            includeEquipment: formData.get("includeEquipment") as string | null,
+            inventoryMustInclude: String(formData.get("inventoryMustInclude") ?? ""),
+            inventoryAvoid: String(formData.get("inventoryAvoid") ?? ""),
+            spellGoal: String(formData.get("spellGoal") ?? ""),
+            minimumSpellEntries: String(formData.get("minimumSpellEntries") ?? ""),
+            minimumSpells: String(formData.get("minimumSpells") ?? ""),
+            preserveExistingSpellcasting: formData.get("preserveExistingSpellcasting") as string | null,
+            includeCantrips: formData.get("includeCantrips") as string | null,
+            focusOffense: formData.get("focusOffense") as string | null,
+            focusControl: formData.get("focusControl") as string | null,
+            focusDefense: formData.get("focusDefense") as string | null,
+            focusUtility: formData.get("focusUtility") as string | null,
+            spellMustInclude: String(formData.get("spellMustInclude") ?? ""),
+            spellAvoid: String(formData.get("spellAvoid") ?? ""),
+            generateTokenImage: formData.get("generateTokenImage") as string | null,
+            tokenPrompt: String(formData.get("tokenPrompt") ?? ""),
+            instructions: String(formData.get("instructions") ?? ""),
+          };
         },
-        default: "remix",
-        close: () => finish(null),
       },
-      { jQuery: true, width: 820 },
-    );
-
-    dialog.render(true);
+      {
+        action: "cancel",
+        icon: '<i class="fas fa-times"></i>',
+        label: "Cancel",
+        callback: () => null,
+      },
+    ],
   });
 
   if (!response) {
@@ -1309,27 +1295,17 @@ function applySectionPatch(
   return next;
 }
 
-function showWorkingDialog(actorName: string): Dialog {
+async function showWorkingDialog(actorName: string): Promise<OpenDialogHandle> {
   const safeName = escapeHtml(actorName);
-  const dialog = new Dialog(
-    {
-      title: `${CONSTANTS.MODULE_NAME} | Remixing`,
-      content: `
-        <div class="handy-dandy-remix-loading">
-          <p><i class="fas fa-spinner fa-spin"></i> Remixing selected sections for ${safeName}...</p>
-          <p class="notes">Generating section JSON and applying targeted updates only.</p>
-        </div>
-      `,
-      buttons: {},
-      close: () => {
-        /* no-op while loading */
-      },
-    },
-    { jQuery: true },
-  );
-
-  dialog.render(true);
-  return dialog;
+  return await openDialog({
+    title: `${CONSTANTS.MODULE_NAME} | Remixing`,
+    content: `
+      <div class="handy-dandy-remix-loading">
+        <p><i class="fas fa-spinner fa-spin"></i> Remixing selected sections for ${safeName}...</p>
+        <p class="notes">Generating section JSON and applying targeted updates only.</p>
+      </div>
+    `,
+  });
 }
 
 function collectEmbeddedDocuments<T extends ClientDocument>(collection: unknown): T[] {
@@ -1794,12 +1770,12 @@ export async function runNpcMainSheetRemixFlow(actor: Actor): Promise<void> {
     return;
   }
 
-  let workingDialog: Dialog | null = null;
+  let workingDialog: OpenDialogHandle | null = null;
   let generatedPatch: unknown = null;
   let mergedCanonical: ActorSchemaData | null = null;
 
   try {
-    workingDialog = showWorkingDialog(actor.name ?? canonical.name);
+    workingDialog = await showWorkingDialog(actor.name ?? canonical.name);
 
     const schema = buildSectionRemixSchema(request);
     const prompt = buildSectionRemixPrompt(actor.name ?? canonical.name, canonical, request);
@@ -1828,7 +1804,7 @@ export async function runNpcMainSheetRemixFlow(actor: Actor): Promise<void> {
     const summaryRows = buildSectionRemixSummaryRows(canonical, updatedCanonical, request);
     const selectedSections = getSelectedSections(request.sections).map((entry) => sectionLabel(entry));
 
-    workingDialog.close({ force: true });
+    await workingDialog.close();
     workingDialog = null;
 
     ui.notifications?.info(`${CONSTANTS.MODULE_NAME} | Remixed selected sections for ${actor.name}.`);
@@ -1857,6 +1833,7 @@ export async function runNpcMainSheetRemixFlow(actor: Actor): Promise<void> {
 
     console.error(`${CONSTANTS.MODULE_NAME} | NPC section remix failed`, error);
   } finally {
-    workingDialog?.close({ force: true });
+    await workingDialog?.close();
   }
 }
+

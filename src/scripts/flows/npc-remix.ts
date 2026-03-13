@@ -4,6 +4,7 @@ import { importActor } from "../mappers/import";
 import type { ActorGenerationResult, ActorSchemaData } from "../schemas";
 import { showGeneratedOutputRecoveryDialog } from "../ui/generated-output-recovery";
 import { showRemixSummaryDialog, type RemixSummaryRow } from "../ui/remix-summary";
+import { openDialog, type OpenDialogHandle } from "../foundry/dialog";
 
 export type RemixMode = "scale" | "features" | "remake" | "equipment" | "spells";
 
@@ -311,27 +312,17 @@ function getCoverageGap(
   return null;
 }
 
-function showWorkingDialog(actorName: string): Dialog {
+async function showWorkingDialog(actorName: string): Promise<OpenDialogHandle> {
   const safeName = escapeHtml(actorName);
-  const dialog = new Dialog(
-    {
-      title: `${CONSTANTS.MODULE_NAME} | Remixing`,
-      content: `
-        <div class="handy-dandy-remix-loading">
-          <p><i class="fas fa-spinner fa-spin"></i> Remixing ${safeName}...</p>
-          <p class="notes">Generating updated actor data and resolving official compendium references.</p>
-        </div>
-      `,
-      buttons: {},
-      close: () => {
-        /* no-op while loading */
-      },
-    },
-    { jQuery: true },
-  );
-
-  dialog.render(true);
-  return dialog;
+  return await openDialog({
+    title: `${CONSTANTS.MODULE_NAME} | Remixing`,
+    content: `
+      <div class="handy-dandy-remix-loading">
+        <p><i class="fas fa-spinner fa-spin"></i> Remixing ${safeName}...</p>
+        <p class="notes">Generating updated actor data and resolving official compendium references.</p>
+      </div>
+    `,
+  });
 }
 
 async function runNpcRemix(actor: Actor, request: NpcRemixRequest): Promise<void> {
@@ -345,10 +336,10 @@ async function runNpcRemix(actor: Actor, request: NpcRemixRequest): Promise<void
   const canonical = fromFoundryActor(actorObject as any);
   const normalizedRequest = normalizeRemixRequest(canonical, request);
 
-  let workingDialog: Dialog | null = null;
+  let workingDialog: OpenDialogHandle | null = null;
   let generated: ActorGenerationResult | null = null;
   try {
-    workingDialog = showWorkingDialog(actor.name ?? canonical.name);
+    workingDialog = await showWorkingDialog(actor.name ?? canonical.name);
 
     let referenceText = buildRemixReferenceText(actor.name ?? canonical.name, canonical, normalizedRequest);
 
@@ -402,7 +393,7 @@ async function runNpcRemix(actor: Actor, request: NpcRemixRequest): Promise<void
       highlights.push("Spellcasting-focused remix mode was used.");
     }
 
-    workingDialog.close({ force: true });
+    await workingDialog.close();
     workingDialog = null;
 
     ui.notifications?.info(`${CONSTANTS.MODULE_NAME} | Remixed ${imported.name}.`);
@@ -428,7 +419,7 @@ async function runNpcRemix(actor: Actor, request: NpcRemixRequest): Promise<void
 
     console.error(`${CONSTANTS.MODULE_NAME} | NPC remix failed`, error);
   } finally {
-    workingDialog?.close({ force: true });
+    await workingDialog?.close();
   }
 }
 
@@ -444,3 +435,4 @@ export async function runNpcRemixWithRequest(actor: Actor, request: NpcRemixRequ
 
   await runNpcRemix(actor, normalized);
 }
+

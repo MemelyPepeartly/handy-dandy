@@ -1,7 +1,8 @@
 import { CONSTANTS } from "../constants";
 import { fetchOpenRouterCreditsSummary, type OpenRouterCreditsSummary } from "../openrouter/credits";
 import { readConfiguredApiKey } from "../openrouter/runtime";
-import { renderTemplateCompat } from "../foundry/compat";
+import { waitForDialog } from "../foundry/dialog";
+import { renderApplicationTemplate } from "../foundry/templates";
 
 const OPENROUTER_CREDITS_TEMPLATE = `${CONSTANTS.TEMPLATE_PATH}/openrouter-credits.hbs`;
 
@@ -60,36 +61,33 @@ function toDialogData(summary: OpenRouterCreditsSummary): OpenRouterCreditsDialo
 }
 
 async function renderCreditsDialog(data: OpenRouterCreditsDialogData): Promise<void> {
-  const content = await renderTemplateCompat(OPENROUTER_CREDITS_TEMPLATE, data);
+  const content = await renderApplicationTemplate(OPENROUTER_CREDITS_TEMPLATE, data);
 
-  await new Promise<void>((resolve) => {
-    const dialog = new Dialog(
+  const action = await waitForDialog<"refresh" | "close">({
+    title: `${CONSTANTS.MODULE_NAME} | OpenRouter Credits`,
+    content,
+    width: 540,
+    closeResult: "close",
+    buttons: [
       {
-        title: `${CONSTANTS.MODULE_NAME} | OpenRouter Credits`,
-        content,
-        buttons: {
-          refresh: {
-            icon: '<i class="fas fa-rotate-right"></i>',
-            label: "Refresh",
-            callback: () => {
-              resolve();
-              void runOpenRouterCreditsFlow();
-            },
-          },
-          close: {
-            icon: '<i class="fas fa-times"></i>',
-            label: "Close",
-            callback: () => resolve(),
-          },
-        },
-        default: "refresh",
-        close: () => resolve(),
+        action: "refresh",
+        icon: '<i class="fas fa-rotate-right"></i>',
+        label: "Refresh",
+        default: true,
+        callback: () => "refresh",
       },
-      { jQuery: true, width: 540 },
-    );
-
-    dialog.render(true);
+      {
+        action: "close",
+        icon: '<i class="fas fa-times"></i>',
+        label: "Close",
+        callback: () => "close",
+      },
+    ],
   });
+
+  if (action === "refresh") {
+    void runOpenRouterCreditsFlow();
+  }
 }
 
 export async function runOpenRouterCreditsFlow(): Promise<void> {
@@ -110,3 +108,4 @@ export async function runOpenRouterCreditsFlow(): Promise<void> {
     console.error(`${CONSTANTS.MODULE_NAME} | Failed to fetch OpenRouter credits`, error);
   }
 }
+
