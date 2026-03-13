@@ -21,6 +21,73 @@ export interface OpenRouterUsageMetrics {
   totalTokens?: number;
 }
 
+function extractNestedErrorMessage(value: unknown, depth = 0): string | undefined {
+  if (depth > 4 || value == null) {
+    return undefined;
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed || undefined;
+  }
+
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      const nested = extractNestedErrorMessage(entry, depth + 1);
+      if (nested) {
+        return nested;
+      }
+    }
+    return undefined;
+  }
+
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  const directMessage = value.message;
+  if (typeof directMessage === "string" && directMessage.trim()) {
+    return directMessage.trim();
+  }
+
+  const nestedKeys = ["error", "cause", "detail", "details", "metadata", "raw", "provider_error", "errors"];
+  for (const key of nestedKeys) {
+    const nested = extractNestedErrorMessage(value[key], depth + 1);
+    if (nested) {
+      return nested;
+    }
+  }
+
+  return undefined;
+}
+
+export function formatOpenRouterError(error: unknown): string {
+  const fallback = error instanceof Error ? error.message : String(error);
+  if (!isRecord(error)) {
+    return fallback;
+  }
+
+  const status = typeof error.status === "number" ? String(error.status) : undefined;
+  const code = typeof error.code === "string" && error.code.trim() ? error.code.trim() : undefined;
+  const requestId = typeof error.requestID === "string" && error.requestID.trim() ? error.requestID.trim() : undefined;
+  const nestedMessage = extractNestedErrorMessage(error.error) ??
+    extractNestedErrorMessage(error.cause);
+
+  const primaryMessage = nestedMessage && nestedMessage !== fallback
+    ? nestedMessage
+    : fallback;
+
+  const parts = [status, primaryMessage].filter((value): value is string => Boolean(value));
+  if (code) {
+    parts.push(`code: ${code}`);
+  }
+  if (requestId) {
+    parts.push(`request: ${requestId}`);
+  }
+
+  return parts.join(" | ");
+}
+
 export function updateOpenRouterClientFromSettings(): void {
   const namespace = game.handyDandy;
   if (!namespace) {
@@ -680,7 +747,7 @@ export class OpenRouterClient {
     this.#applySchemaProviderPreferences(request as unknown as Record<string, unknown>);
     this.#applyOpenRouterPlugins(request as unknown as Record<string, unknown>);
 
-    const response = await this.#openai.responses.create(request);
+    const response = await this.#createResponseWithRoutingFallback(request);
 
     return {
       response,
@@ -717,7 +784,7 @@ export class OpenRouterClient {
     this.#applySchemaProviderPreferences(request as unknown as Record<string, unknown>);
     this.#applyOpenRouterPlugins(request as unknown as Record<string, unknown>);
 
-    const response = await this.#openai.responses.create(request);
+    const response = await this.#createResponseWithRoutingFallback(request);
 
     return {
       response,
@@ -766,11 +833,11 @@ export class OpenRouterClient {
     ];
     const combined = parts.join(" ").toLowerCase();
 
-    if (combined.includes("unable to parse json response")) {
-      return false;
-    }
-
     return (
+      combined.includes("unable to parse json response") ||
+      combined.includes("no endpoints found") ||
+      combined.includes("requested parameters") ||
+      combined.includes("provider returned error") ||
       combined.includes("response_format") ||
       combined.includes("structured output") ||
       combined.includes("structured-output") ||
@@ -779,6 +846,27 @@ export class OpenRouterClient {
       combined.includes("text.format") ||
       combined.includes("unsupported parameter")
     );
+  }
+
+  #shouldRetryWithoutPlugins(error: unknown): boolean {
+    if (!(error instanceof Error)) {
+      return false;
+    }
+
+    const candidate = error as Error & { status?: number; code?: string };
+    const parts = [
+      typeof candidate.code === "string" ? candidate.code : "",
+      typeof candidate.message === "string" ? candidate.message : "",
+    ];
+    const combined = parts.join(" ").toLowerCase();
+
+    return candidate.status === 404 &&
+      (
+        combined.includes("no endpoints found") ||
+        combined.includes("requested parameters") ||
+        combined.includes("provider-selection") ||
+        combined.includes("can handle the requested parameters")
+      );
   }
 
   async #runWithLogging<T>(
@@ -850,7 +938,9 @@ export class OpenRouterClient {
       request.temperature = this.#config.temperature;
     }
 
-    request.top_p = this.#config.top_p;
+    if (this.#supportsTopP()) {
+      request.top_p = this.#config.top_p;
+    }
   }
 
   #applySchemaProviderPreferences(target: Record<string, unknown>): void {
@@ -881,11 +971,45 @@ export class OpenRouterClient {
     target.plugins = plugins;
   }
 
+  async #createResponseWithRoutingFallback(request: ResponseCreateParams): Promise<unknown> {
+    try {
+      return await this.#openai.responses.create(request);
+    } catch (error) {
+      if (!this.#shouldRetryWithoutPlugins(error)) {
+        throw error;
+      }
+
+      const requestRecord = request as unknown as Record<string, unknown>;
+      const plugins = requestRecord.plugins;
+      if (!Array.isArray(plugins) || plugins.length === 0) {
+        throw error;
+      }
+
+      const retryRequest = { ...requestRecord };
+      delete retryRequest.plugins;
+
+      console.warn(
+        `${CONSTANTS.MODULE_NAME} | OpenRouter routing could not satisfy web-enabled parameters for ` +
+          `"${this.#config.model}". Retrying without web plugin.`,
+      );
+
+      return await this.#openai.responses.create(retryRequest as unknown as ResponseCreateParams);
+    }
+  }
+
   #supportsTemperature(): boolean {
+    if (!this.#supportsModelParameter("temperature")) {
+      return false;
+    }
+
     const normalized = this.#config.model.includes("/")
       ? this.#config.model.split("/").pop() ?? this.#config.model
       : this.#config.model;
     return !normalized.startsWith("gpt-5");
+  }
+
+  #supportsTopP(): boolean {
+    return this.#supportsModelParameter("top_p");
   }
 
   #createMetadata(seedOverride: number | undefined): Record<string, string> | undefined {
@@ -930,6 +1054,11 @@ export class OpenRouterClient {
   #extractJson<T>(response: unknown, schema: JsonSchemaDefinition): T {
     // Structured response format
     if (response && typeof response === "object") {
+      const topLevelParsed = (response as { output_parsed?: unknown }).output_parsed;
+      if (topLevelParsed && typeof topLevelParsed === "object") {
+        return topLevelParsed as T;
+      }
+
       const structured = this.#extractFromOutput<T>(response as Record<string, unknown>);
       if (structured !== undefined) return structured;
 
@@ -960,14 +1089,30 @@ export class OpenRouterClient {
         }
       }
 
+      const directParsed = (block as { parsed?: unknown }).parsed;
+      if (directParsed && typeof directParsed === "object") {
+        return directParsed as T;
+      }
+
+      const directJson = (block as { json?: unknown }).json;
+      if (directJson && typeof directJson === "object") {
+        return directJson as T;
+      }
+
       const content = (block as { content?: unknown }).content;
       if (!Array.isArray(content)) continue;
       for (const item of content) {
         if (!item || typeof item !== "object") continue;
         const type = (item as { type?: unknown }).type;
+        const parsedValue = (item as { parsed?: unknown }).parsed;
+        if (parsedValue && typeof parsedValue === "object") {
+          return parsedValue as T;
+        }
         if (type === "output_json") {
           const json = (item as { json?: unknown }).json;
           if (json && typeof json === "object") return json as T;
+          const parsedJson = this.#tryParseText<T>(json);
+          if (parsedJson !== undefined) return parsedJson;
         }
         if (type === "output_text") {
           const text = (item as { text?: unknown }).text;
@@ -1003,6 +1148,11 @@ export class OpenRouterClient {
       const message = (choice as { message?: unknown }).message;
       if (!message || typeof message !== "object") continue;
 
+      const parsedMessage = (message as { parsed?: unknown }).parsed;
+      if (parsedMessage && typeof parsedMessage === "object") {
+        return parsedMessage as T;
+      }
+
       const toolCalls = (message as { tool_calls?: unknown }).tool_calls;
       if (Array.isArray(toolCalls)) {
         for (const call of toolCalls) {
@@ -1016,6 +1166,25 @@ export class OpenRouterClient {
       }
 
       const content = (message as { content?: unknown }).content;
+      if (Array.isArray(content)) {
+        for (const block of content) {
+          if (!block || typeof block !== "object") {
+            continue;
+          }
+
+          const parsedBlock = (block as { parsed?: unknown }).parsed;
+          if (parsedBlock && typeof parsedBlock === "object") {
+            return parsedBlock as T;
+          }
+
+          const blockText = (block as { text?: unknown }).text;
+          const parsedBlockText = this.#tryParseText<T>(blockText);
+          if (parsedBlockText !== undefined) {
+            return parsedBlockText;
+          }
+        }
+      }
+
       const parsed = this.#tryParseText<T>(content);
       if (parsed !== undefined) return parsed;
     }
@@ -1024,11 +1193,88 @@ export class OpenRouterClient {
 
   #tryParseText<T>(value: unknown): T | undefined {
     if (typeof value !== "string") return undefined;
+    const trimmed = value.trim();
+    if (!trimmed) return undefined;
+
     try {
-      return JSON.parse(value) as T;
+      return JSON.parse(trimmed) as T;
     } catch {
+      const fenced = this.#extractJsonFence(trimmed);
+      if (fenced) {
+        try {
+          return JSON.parse(fenced) as T;
+        } catch {
+          // fall through
+        }
+      }
+
+      const inline = this.#extractJsonSubstring(trimmed);
+      if (!inline) {
+        return undefined;
+      }
+
+      try {
+        return JSON.parse(inline) as T;
+      } catch {
+        return undefined;
+      }
+    }
+  }
+
+  #extractJsonFence(value: string): string | undefined {
+    const match = /```(?:json)?\s*([\s\S]*?)```/i.exec(value);
+    const inner = match?.[1]?.trim();
+    return inner || undefined;
+  }
+
+  #extractJsonSubstring(value: string): string | undefined {
+    const start = [...value].findIndex((character) => character === "{" || character === "[");
+    if (start === -1) {
       return undefined;
     }
+
+    const opening = value[start];
+    const closing = opening === "{" ? "}" : "]";
+    let depth = 0;
+    let inString = false;
+    let escaping = false;
+
+    for (let index = start; index < value.length; index += 1) {
+      const character = value[index];
+      if (typeof character !== "string") {
+        continue;
+      }
+
+      if (escaping) {
+        escaping = false;
+        continue;
+      }
+
+      if (character === "\\") {
+        escaping = true;
+        continue;
+      }
+
+      if (character === "\"") {
+        inString = !inString;
+        continue;
+      }
+
+      if (inString) {
+        continue;
+      }
+
+      if (character === opening) {
+        depth += 1;
+      } else if (character === closing) {
+        depth -= 1;
+        if (depth === 0) {
+          return value.slice(start, index + 1).trim();
+        }
+      }
+    }
+
+    return undefined;
   }
 
   #assertTextModelSupported(): void {
@@ -1071,6 +1317,15 @@ export class OpenRouterClient {
     }
 
     return catalog.capabilitiesById[this.#config.model];
+  }
+
+  #supportsModelParameter(parameter: string): boolean {
+    const capabilities = this.#getCurrentModelCapabilities();
+    if (!capabilities) {
+      return true;
+    }
+
+    return capabilities.supportedParameters.includes(parameter);
   }
 
   #modelSupportsToolCalling(): boolean {
