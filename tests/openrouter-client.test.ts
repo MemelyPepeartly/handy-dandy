@@ -157,6 +157,40 @@ test("generateWithSchema returns parsed JSON from structured outputs", async () 
   assert.deepEqual(call.plugins, [{ id: "web", max_results: 4 }]);
 });
 
+test("generateWithSchema parses JSON fenced in output_text blocks", async () => {
+  const stub = new StubOpenAI();
+  stub.responses.enqueue({
+    output: [
+      {
+        type: "message",
+        content: [
+          {
+            type: "output_text",
+            text: '```json\n{"value":42}\n```',
+          },
+        ],
+      },
+    ],
+  });
+
+  const client = OpenRouterClient.fromSettings(stub as unknown as OpenAI);
+  const result = await client.generateWithSchema<{ value: number }>("Say hello", schema);
+
+  assert.deepEqual(result, { value: 42 });
+});
+
+test("generateWithSchema reads top-level output_parsed when available", async () => {
+  const stub = new StubOpenAI();
+  stub.responses.enqueue({
+    output_parsed: { value: 42 },
+  });
+
+  const client = OpenRouterClient.fromSettings(stub as unknown as OpenAI);
+  const result = await client.generateWithSchema<{ value: number }>("Say hello", schema);
+
+  assert.deepEqual(result, { value: 42 });
+});
+
 test("generateWithSchema normalizes schema required properties for strict mode", async () => {
   const stub = new StubOpenAI();
   stub.responses.enqueue({
@@ -283,6 +317,69 @@ test("generateWithSchema does not fall back on unrelated client errors", async (
   assert.equal(stub.responses.calls.length, 1);
 });
 
+test("generateWithSchema falls back to tool mode when structured output is unparsable", async () => {
+  const stub = new StubOpenAI();
+  stub.responses.enqueue({
+    output: [
+      {
+        type: "message",
+        content: [
+          {
+            type: "output_text",
+            text: "not valid json",
+          },
+        ],
+      },
+    ],
+  });
+  stub.responses.enqueue({
+    output: [
+      {
+        type: "function_call",
+        name: schema.name,
+        arguments: JSON.stringify({ value: 99 }),
+      },
+    ],
+  });
+
+  const client = OpenRouterClient.fromSettings(stub as unknown as OpenAI);
+  const result = await client.generateWithSchema<{ value: number }>("Say hello", schema);
+
+  assert.deepEqual(result, { value: 99 });
+  assert.equal(stub.responses.calls.length, 2);
+  assert.equal(Array.isArray(stub.responses.calls[1]?.tools), true);
+});
+
+test("generateWithSchema retries without web plugins when provider routing rejects the parameter bundle", async () => {
+  const stub = new StubOpenAI();
+  const error = new Error(
+    "No endpoints found that can handle the requested parameters. To learn more about provider routing, visit: https://openrouter.ai/docs/guides/routing/provider-selection",
+  );
+  (error as Error & { status?: number }).status = 404;
+  stub.responses.enqueue(error);
+  stub.responses.enqueue({
+    output: [
+      {
+        type: "message",
+        content: [
+          {
+            type: "output_json",
+            json: { value: 42 },
+          },
+        ],
+      },
+    ],
+  });
+
+  const client = OpenRouterClient.fromSettings(stub as unknown as OpenAI);
+  const result = await client.generateWithSchema<{ value: number }>("Say hello", schema);
+
+  assert.deepEqual(result, { value: 42 });
+  assert.equal(stub.responses.calls.length, 2);
+  assert.deepEqual(stub.responses.calls[0]?.plugins, [{ id: "web", max_results: 4 }]);
+  assert.equal(stub.responses.calls[1]?.plugins, undefined);
+});
+
 test("generateWithSchema uses tool mode directly when schema has additionalProperties true", async () => {
   const stub = new StubOpenAI();
   const looseSchema = {
@@ -327,6 +424,57 @@ test("generateWithSchema uses tool mode directly when schema has additionalPrope
   assert.equal(stub.responses.calls.length, 1);
   assert.equal(stub.responses.calls[0]?.text, undefined);
   assert.equal(Array.isArray(stub.responses.calls[0]?.tools), true);
+});
+
+test("tool-mode schema generation retries without web plugins when provider routing rejects the parameter bundle", async () => {
+  const stub = new StubOpenAI();
+  const looseSchema = {
+    name: "LooseObject",
+    schema: {
+      type: "object",
+      required: ["rules"],
+      properties: {
+        rules: {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: true,
+            required: ["key"],
+            properties: {
+              key: { type: "string" },
+            },
+          },
+        },
+      },
+      additionalProperties: false,
+    },
+  } as const satisfies JsonSchemaDefinition;
+
+  const error = new Error(
+    "No endpoints found that can handle the requested parameters. To learn more about provider routing, visit: https://openrouter.ai/docs/guides/routing/provider-selection",
+  );
+  (error as Error & { status?: number }).status = 404;
+  stub.responses.enqueue(error);
+  stub.responses.enqueue({
+    output: [
+      {
+        type: "function_call",
+        name: looseSchema.name,
+        arguments: JSON.stringify({ rules: [{ key: "FlatModifier", value: 6 }] }),
+      },
+    ],
+  });
+
+  const client = OpenRouterClient.fromSettings(stub as unknown as OpenAI);
+  const result = await client.generateWithSchema<{ rules: Array<{ key: string; value: number }> }>(
+    "Generate rules",
+    looseSchema,
+  );
+
+  assert.deepEqual(result, { rules: [{ key: "FlatModifier", value: 6 }] });
+  assert.equal(stub.responses.calls.length, 2);
+  assert.deepEqual(stub.responses.calls[0]?.plugins, [{ id: "web", max_results: 4 }]);
+  assert.equal(stub.responses.calls[1]?.plugins, undefined);
 });
 
 test("generateImage uses chat completions image modalities and parses data URLs", async () => {
