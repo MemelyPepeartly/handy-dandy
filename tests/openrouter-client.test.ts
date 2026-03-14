@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { beforeEach, test } from "node:test";
 import type { OpenAI } from "openai";
-import { OpenRouterClient, readOpenRouterSettings, type JsonSchemaDefinition } from "../src/scripts/openrouter/client";
+import {
+  OpenRouterClient,
+  readOpenRouterSettings,
+  type JsonSchemaDefinition,
+  type OpenRouterRoutingRetryEvent,
+} from "../src/scripts/openrouter/client";
 
 type ResponsesCall = Record<string, any>;
 
@@ -380,6 +385,123 @@ test("generateWithSchema retries without web plugins when provider routing rejec
   assert.equal(stub.responses.calls[1]?.plugins, undefined);
 });
 
+test("generateWithSchema emits routing retry callback metadata on fallback attempts", async () => {
+  const stub = new StubOpenAI();
+  const error = new Error(
+    "No endpoints found that can handle the requested parameters. To learn more about provider routing, visit: https://openrouter.ai/docs/guides/routing/provider-selection",
+  );
+  (error as Error & { status?: number }).status = 404;
+  stub.responses.enqueue(error);
+  stub.responses.enqueue({
+    output: [
+      {
+        type: "message",
+        content: [
+          {
+            type: "output_json",
+            json: { value: 42 },
+          },
+        ],
+      },
+    ],
+  });
+
+  const retries: OpenRouterRoutingRetryEvent[] = [];
+  const client = OpenRouterClient.fromSettings(stub as unknown as OpenAI);
+  const result = await client.generateWithSchema<{ value: number }>("Say hello", schema, {
+    onRoutingRetry: (event) => retries.push(event),
+  });
+
+  assert.deepEqual(result, { value: 42 });
+  assert.equal(retries.length, 1);
+  assert.equal(retries[0]?.label, "without-web-plugin");
+  assert.equal(retries[0]?.attemptNumber, 2);
+  assert.equal(retries[0]?.totalAttempts, 5);
+  assert.equal(retries[0]?.model, "openai/gpt-5-mini");
+});
+
+test("generateWithSchema retries with relaxed provider parameters when routing still fails after plugin removal", async () => {
+  const stub = new StubOpenAI();
+  const error = new Error(
+    "No endpoints found that can handle the requested parameters. To learn more about provider routing, visit: https://openrouter.ai/docs/guides/routing/provider-selection",
+  );
+  (error as Error & { status?: number }).status = 404;
+  stub.responses.enqueue(error);
+  stub.responses.enqueue(error);
+  stub.responses.enqueue({
+    output: [
+      {
+        type: "message",
+        content: [
+          {
+            type: "output_json",
+            json: { value: 17 },
+          },
+        ],
+      },
+    ],
+  });
+
+  const client = OpenRouterClient.fromSettings(stub as unknown as OpenAI);
+  const result = await client.generateWithSchema<{ value: number }>("Say hello", schema);
+
+  assert.deepEqual(result, { value: 17 });
+  assert.equal(stub.responses.calls.length, 3);
+  assert.deepEqual(stub.responses.calls[0]?.plugins, [{ id: "web", max_results: 4 }]);
+  assert.equal(stub.responses.calls[1]?.plugins, undefined);
+  assert.equal(stub.responses.calls[2]?.provider?.require_parameters, false);
+});
+
+test("generateWithSchema reuses learned routing profile for subsequent requests on the same model", async () => {
+  const stub = new StubOpenAI();
+  const routingError = new Error(
+    "No endpoints found that can handle the requested parameters. To learn more about provider routing, visit: https://openrouter.ai/docs/guides/routing/provider-selection",
+  );
+  (routingError as Error & { status?: number }).status = 404;
+
+  // First request: base fails, retry without plugin succeeds.
+  stub.responses.enqueue(routingError);
+  stub.responses.enqueue({
+    output: [
+      {
+        type: "message",
+        content: [
+          {
+            type: "output_json",
+            json: { value: 31 },
+          },
+        ],
+      },
+    ],
+  });
+
+  // Second request should use learned profile first and succeed in one call.
+  stub.responses.enqueue({
+    output: [
+      {
+        type: "message",
+        content: [
+          {
+            type: "output_json",
+            json: { value: 32 },
+          },
+        ],
+      },
+    ],
+  });
+
+  const client = OpenRouterClient.fromSettings(stub as unknown as OpenAI);
+  const first = await client.generateWithSchema<{ value: number }>("first", schema);
+  const second = await client.generateWithSchema<{ value: number }>("second", schema);
+
+  assert.deepEqual(first, { value: 31 });
+  assert.deepEqual(second, { value: 32 });
+  assert.equal(stub.responses.calls.length, 3);
+  assert.deepEqual(stub.responses.calls[0]?.plugins, [{ id: "web", max_results: 4 }]);
+  assert.equal(stub.responses.calls[1]?.plugins, undefined);
+  assert.equal(stub.responses.calls[2]?.plugins, undefined);
+});
+
 test("generateWithSchema uses tool mode directly when schema has additionalProperties true", async () => {
   const stub = new StubOpenAI();
   const looseSchema = {
@@ -475,6 +597,59 @@ test("tool-mode schema generation retries without web plugins when provider rout
   assert.equal(stub.responses.calls.length, 2);
   assert.deepEqual(stub.responses.calls[0]?.plugins, [{ id: "web", max_results: 4 }]);
   assert.equal(stub.responses.calls[1]?.plugins, undefined);
+});
+
+test("tool-mode schema generation retries with relaxed provider parameters when routing still fails after plugin removal", async () => {
+  const stub = new StubOpenAI();
+  const looseSchema = {
+    name: "LooseObject",
+    schema: {
+      type: "object",
+      required: ["rules"],
+      properties: {
+        rules: {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: true,
+            required: ["key"],
+            properties: {
+              key: { type: "string" },
+            },
+          },
+        },
+      },
+      additionalProperties: false,
+    },
+  } as const satisfies JsonSchemaDefinition;
+
+  const error = new Error(
+    "No endpoints found that can handle the requested parameters. To learn more about provider routing, visit: https://openrouter.ai/docs/guides/routing/provider-selection",
+  );
+  (error as Error & { status?: number }).status = 404;
+  stub.responses.enqueue(error);
+  stub.responses.enqueue(error);
+  stub.responses.enqueue({
+    output: [
+      {
+        type: "function_call",
+        name: looseSchema.name,
+        arguments: JSON.stringify({ rules: [{ key: "FlatModifier", value: 8 }] }),
+      },
+    ],
+  });
+
+  const client = OpenRouterClient.fromSettings(stub as unknown as OpenAI);
+  const result = await client.generateWithSchema<{ rules: Array<{ key: string; value: number }> }>(
+    "Generate rules",
+    looseSchema,
+  );
+
+  assert.deepEqual(result, { rules: [{ key: "FlatModifier", value: 8 }] });
+  assert.equal(stub.responses.calls.length, 3);
+  assert.deepEqual(stub.responses.calls[0]?.plugins, [{ id: "web", max_results: 4 }]);
+  assert.equal(stub.responses.calls[1]?.plugins, undefined);
+  assert.equal(stub.responses.calls[2]?.provider?.require_parameters, false);
 });
 
 test("generateImage uses chat completions image modalities and parses data URLs", async () => {
