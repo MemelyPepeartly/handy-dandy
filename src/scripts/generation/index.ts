@@ -10,12 +10,19 @@ import { getDefaultItemImage } from "../data/item-images";
 import { generateItemImage, generateTransparentTokenImage } from "./token-image";
 import {
   type ActionSchemaData,
+  type ActorSchemaData,
   type ActorGenerationResult,
   type ItemSchemaData,
 } from "../schemas";
-import { generateCanonicalEntity, mapCanonicalActor } from "./pipeline";
+import {
+  generateStructuredOutput,
+  getSchemaDefinition,
+  mapCanonicalActor,
+  normalizeGeneratedEntity,
+} from "./pipeline";
 import type {
   GenerateWithSchemaOptions,
+  OpenRouterRoutingRetryEvent,
   OpenRouterClient,
 } from "../openrouter/client";
 
@@ -40,6 +47,8 @@ export const DEFAULT_GENERATION_SEED = 1337;
 export type GenerationProgressStep =
   | "prompt"
   | "model"
+  | "routing"
+  | "generation"
   | "validation"
   | "image"
   | "mapping"
@@ -62,6 +71,54 @@ function reportProgress(
   }
 }
 
+function formatRoutingRetryLabel(label: string): string {
+  switch (label) {
+    case "profiled-base":
+      return "trying saved provider profile";
+    case "base":
+      return "retrying with default provider bundle";
+    case "without-web-plugin":
+      return "retrying without web-search plugin";
+    case "relaxed-provider-parameters":
+      return "retrying with relaxed provider parameters";
+    case "relaxed-provider-parameters-without-web-plugin":
+      return "retrying with relaxed provider parameters and no web plugin";
+    case "minimal-parameters":
+      return "retrying with minimal optional parameters";
+    default:
+      return label.replace(/[-_]+/g, " ");
+  }
+}
+
+function createRoutingRetryReporter(
+  options: Pick<GenerateOptions, "onProgress">,
+  percent: number,
+): NonNullable<GenerateWithSchemaOptions["onRoutingRetry"]> {
+  return (event: OpenRouterRoutingRetryEvent): void => {
+    const details = formatRoutingRetryLabel(event.label);
+    reportProgress(options, {
+      step: "routing",
+      message:
+        `Finding compatible provider route (${event.attemptNumber}/${event.totalAttempts}: ${details})...`,
+      percent,
+    });
+  };
+}
+
+function createRoutingResolvedReporter(
+  options: Pick<GenerateOptions, "onProgress">,
+  message: string,
+  percent: number,
+): NonNullable<GenerateWithSchemaOptions["onRoutingResolved"]> {
+  return (): void => {
+    reportProgress(options, {
+      step: "generation",
+      message,
+      percent,
+    });
+  };
+}
+
 export async function generateAction(
   input: ActionPromptInput,
   options: GenerateOptions,
@@ -75,16 +132,34 @@ export async function generateAction(
   const prompt = buildActionPrompt(input);
   reportProgress(options, {
     step: "model",
-    message: "Generating action JSON with OpenRouter...",
+    message: "Starting generation request...",
     percent: 35,
   });
-
+  reportProgress(options, {
+    step: "generation",
+    message: "Generating action JSON with OpenRouter...",
+    percent: 48,
+  });
+  const draft = await generateStructuredOutput<ActionSchemaData>(
+    openRouterClient,
+    prompt,
+    getSchemaDefinition("action"),
+    {
+      seed,
+      onRoutingRetry: createRoutingRetryReporter(options, 55),
+      onRoutingResolved: createRoutingResolvedReporter(
+        options,
+        "Provider route found. Generating action JSON...",
+        62,
+      ),
+    },
+  );
   reportProgress(options, {
     step: "validation",
     message: "Normalizing and validating action structure...",
     percent: 75,
   });
-  const validated = await generateCanonicalEntity(openRouterClient, "action", prompt, { seed });
+  const validated = await normalizeGeneratedEntity("action", draft);
   reportProgress(options, {
     step: "done",
     message: "Action generation complete.",
@@ -106,16 +181,34 @@ export async function generateItem(
   const prompt = buildItemPrompt(input);
   reportProgress(options, {
     step: "model",
-    message: "Generating item JSON with OpenRouter...",
+    message: "Starting generation request...",
     percent: 35,
   });
-
+  reportProgress(options, {
+    step: "generation",
+    message: "Generating item JSON with OpenRouter...",
+    percent: 46,
+  });
+  const draft = await generateStructuredOutput<ItemSchemaData>(
+    openRouterClient,
+    prompt,
+    getSchemaDefinition("item"),
+    {
+      seed,
+      onRoutingRetry: createRoutingRetryReporter(options, 52),
+      onRoutingResolved: createRoutingResolvedReporter(
+        options,
+        "Provider route found. Generating item JSON...",
+        58,
+      ),
+    },
+  );
   reportProgress(options, {
     step: "validation",
     message: "Normalizing and validating item structure...",
     percent: 70,
   });
-  const canonical = await generateCanonicalEntity(openRouterClient, "item", prompt, { seed });
+  const canonical = await normalizeGeneratedEntity("item", draft);
 
   if (input.generateItemImage && canGenerateImages(openRouterClient)) {
     reportProgress(options, {
@@ -165,16 +258,34 @@ export async function generateActor(
   const prompt = buildActorPrompt(input);
   reportProgress(options, {
     step: "model",
-    message: "Generating actor JSON with OpenRouter...",
+    message: "Starting generation request...",
     percent: 25,
   });
-
+  reportProgress(options, {
+    step: "generation",
+    message: "Generating actor JSON with OpenRouter...",
+    percent: 34,
+  });
+  const draft = await generateStructuredOutput<ActorSchemaData>(
+    openRouterClient,
+    prompt,
+    getSchemaDefinition("actor"),
+    {
+      seed,
+      onRoutingRetry: createRoutingRetryReporter(options, 42),
+      onRoutingResolved: createRoutingResolvedReporter(
+        options,
+        "Provider route found. Generating actor JSON...",
+        48,
+      ),
+    },
+  );
   reportProgress(options, {
     step: "validation",
     message: "Normalizing and validating actor structure...",
     percent: 55,
   });
-  const canonical = await generateCanonicalEntity(openRouterClient, "actor", prompt, { seed });
+  const canonical = await normalizeGeneratedEntity("actor", draft);
 
   if (input.actorType) {
     canonical.actorType = input.actorType;
