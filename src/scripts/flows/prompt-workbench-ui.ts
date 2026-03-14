@@ -543,6 +543,12 @@ type LoadingStep = {
   label: string;
 };
 
+type LoadingLogEntry = {
+  step: GenerationProgressUpdate["step"];
+  message: string;
+  at: number;
+};
+
 interface WorkbenchLoadingController {
   update: (update: GenerationProgressUpdate) => void;
   close: () => Promise<void>;
@@ -551,7 +557,9 @@ interface WorkbenchLoadingController {
 function buildLoadingSteps(request: PromptWorkbenchRequest<EntityType>): LoadingStep[] {
   const steps: LoadingStep[] = [
     { key: "prompt", label: "Preparing prompt" },
-    { key: "model", label: "Generating JSON draft" },
+    { key: "model", label: "Starting generation request" },
+    { key: "generation", label: "Generating core sheet data" },
+    { key: "routing", label: "Finding compatible provider route (if needed)" },
     { key: "validation", label: "Normalizing and validating data" },
   ];
 
@@ -590,6 +598,27 @@ function applyLoadingProgress(
   }
 }
 
+function formatLoadingLogElapsed(startTime: number, timestamp: number): string {
+  const elapsedSeconds = Math.max(0, Math.floor((timestamp - startTime) / 1000));
+  const minutes = Math.floor(elapsedSeconds / 60)
+    .toString()
+    .padStart(2, "0");
+  const seconds = (elapsedSeconds % 60).toString().padStart(2, "0");
+  return `${minutes}:${seconds}`;
+}
+
+function renderLoadingLog(root: HTMLElement, startTime: number, entries: readonly LoadingLogEntry[]): void {
+  const logNode = root.querySelector<HTMLElement>("[data-loading-stream]");
+  if (!logNode) {
+    return;
+  }
+
+  logNode.textContent = entries
+    .map((entry) => `[${formatLoadingLogElapsed(startTime, entry.at)}] [${entry.step}] ${entry.message}`)
+    .join("\n");
+  logNode.scrollTop = logNode.scrollHeight;
+}
+
 async function showGeneratingDialog(request: PromptWorkbenchRequest<EntityType>): Promise<WorkbenchLoadingController> {
   const entryName = request.entryName.trim() || "entry";
   const loadingSteps = buildLoadingSteps(request);
@@ -610,6 +639,13 @@ async function showGeneratingDialog(request: PromptWorkbenchRequest<EntityType>)
     percent: 0,
   };
   const startTime = Date.now();
+  const progressLog: LoadingLogEntry[] = [
+    {
+      step: latestProgress.step,
+      message: latestProgress.message,
+      at: startTime,
+    },
+  ];
 
   const refreshElapsed = (): void => {
     if (!root) return;
@@ -621,8 +657,17 @@ async function showGeneratingDialog(request: PromptWorkbenchRequest<EntityType>)
 
   const update = (progress: GenerationProgressUpdate): void => {
     latestProgress = progress;
+    progressLog.push({
+      step: progress.step,
+      message: progress.message,
+      at: Date.now(),
+    });
+    if (progressLog.length > 400) {
+      progressLog.shift();
+    }
     if (!root) return;
     applyLoadingProgress(root, loadingSteps, latestProgress);
+    renderLoadingLog(root, startTime, progressLog);
   };
 
   const dialog = await openDialog({
@@ -635,6 +680,7 @@ async function showGeneratingDialog(request: PromptWorkbenchRequest<EntityType>)
       }
 
       applyLoadingProgress(root, loadingSteps, latestProgress);
+      renderLoadingLog(root, startTime, progressLog);
       refreshElapsed();
       intervalId = window.setInterval(refreshElapsed, 1000);
     },
