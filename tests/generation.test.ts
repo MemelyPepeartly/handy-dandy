@@ -7,7 +7,12 @@ import {
   generateItem,
 } from "../src/scripts/generation";
 import { toFoundryActorData } from "../src/scripts/mappers/import";
-import type { GeneratedImageResult, JsonSchemaDefinition } from "../src/scripts/openrouter/client";
+import type {
+  GenerateWithSchemaOptions,
+  GeneratedImageResult,
+  JsonSchemaDefinition,
+  OpenRouterRoutingRetryEvent,
+} from "../src/scripts/openrouter/client";
 import type {
   ActionSchemaData,
   ActorSchemaData,
@@ -66,7 +71,7 @@ class FixtureOpenRouterClient {
   async generateWithSchema<T>(
     prompt: string,
     schema: JsonSchemaDefinition,
-    options?: { seed?: number },
+    options?: GenerateWithSchemaOptions,
   ): Promise<T> {
     const seed = options?.seed;
     this.calls.push({ prompt, schema, seed });
@@ -97,6 +102,22 @@ class FixtureImageOpenRouterClient extends FixtureOpenRouterClient {
       base64: "iVBORw0KGgo=",
       mimeType: "image/png",
     };
+  }
+}
+
+class FixtureRetryOpenRouterClient extends FixtureOpenRouterClient {
+  async generateWithSchema<T>(
+    prompt: string,
+    schema: JsonSchemaDefinition,
+    options?: GenerateWithSchemaOptions,
+  ): Promise<T> {
+    options?.onRoutingRetry?.({
+      label: "without-web-plugin",
+      attemptNumber: 2,
+      totalAttempts: 5,
+      model: "openai/gpt-5-mini",
+    } satisfies OpenRouterRoutingRetryEvent);
+    return super.generateWithSchema(prompt, schema, options);
   }
 }
 
@@ -227,4 +248,23 @@ test("generateItem can generate transparent icon art when enabled", async () => 
   } finally {
     (globalThis as { FilePicker?: unknown }).FilePicker = priorFilePicker;
   }
+});
+
+test("generateActor progress reports routing retry before validation", async () => {
+  const client = new FixtureRetryOpenRouterClient({ Action: actionFixture, Item: itemFixture, Actor: actorFixture });
+  const steps: string[] = [];
+
+  await generateActor(baseActorInput, {
+    openRouterClient: client,
+    seed: 7,
+    onProgress: (update) => steps.push(update.step),
+  });
+
+  const modelIndex = steps.indexOf("model");
+  const routingIndex = steps.indexOf("routing");
+  const validationIndex = steps.indexOf("validation");
+
+  assert.ok(modelIndex >= 0, "expected model progress step");
+  assert.ok(routingIndex > modelIndex, "expected routing retry progress after model");
+  assert.ok(validationIndex > routingIndex, "expected validation progress after routing retry");
 });
