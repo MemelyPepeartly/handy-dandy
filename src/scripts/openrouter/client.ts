@@ -250,6 +250,15 @@ export const readOpenRouterSettings = (): OpenRouterClientConfig => {
 
 export interface GenerateWithSchemaOptions {
   seed?: number;
+  onRoutingRetry?: (event: OpenRouterRoutingRetryEvent) => void;
+  onRoutingResolved?: (event: OpenRouterRoutingRetryEvent) => void;
+}
+
+export interface OpenRouterRoutingRetryEvent {
+  label: string;
+  attemptNumber: number;
+  totalAttempts: number;
+  model: string;
 }
 
 export interface GenerateImageOptions {
@@ -560,9 +569,16 @@ interface OpenRouterGenerationAttempt<T> {
   response: unknown;
 }
 
+interface RoutingProfile {
+  disableWebPlugin?: boolean;
+  relaxProviderParameters?: boolean;
+  minimalParameters?: boolean;
+}
+
 export class OpenRouterClient {
   #openai: OpenAI;
   #config: OpenRouterClientConfig;
+  #routingProfilesByModel = new Map<string, RoutingProfile>();
 
   constructor(openai: OpenAI, config: OpenRouterClientConfig) {
     this.#openai = openai;
@@ -747,7 +763,7 @@ export class OpenRouterClient {
     this.#applySchemaProviderPreferences(request as unknown as Record<string, unknown>);
     this.#applyOpenRouterPlugins(request as unknown as Record<string, unknown>);
 
-    const response = await this.#createResponseWithRoutingFallback(request);
+    const response = await this.#createResponseWithRoutingFallback(request, options);
 
     return {
       response,
@@ -784,7 +800,7 @@ export class OpenRouterClient {
     this.#applySchemaProviderPreferences(request as unknown as Record<string, unknown>);
     this.#applyOpenRouterPlugins(request as unknown as Record<string, unknown>);
 
-    const response = await this.#createResponseWithRoutingFallback(request);
+    const response = await this.#createResponseWithRoutingFallback(request, options);
 
     return {
       response,
@@ -860,7 +876,8 @@ export class OpenRouterClient {
     ];
     const combined = parts.join(" ").toLowerCase();
 
-    return candidate.status === 404 &&
+    const isRoutingStatus = candidate.status === 404 || candidate.status === 400;
+    return isRoutingStatus &&
       (
         combined.includes("no endpoints found") ||
         combined.includes("requested parameters") ||
@@ -933,6 +950,11 @@ export class OpenRouterClient {
     });
   }
 
+  #isDebugHooksEnabled(): boolean {
+    return Boolean((globalThis as { CONFIG?: { debug?: { hooks?: boolean } } })
+      .CONFIG?.debug?.hooks);
+  }
+
   #applySamplingParameters(request: ResponseCreateParams): void {
     if (this.#supportsTemperature()) {
       request.temperature = this.#config.temperature;
@@ -971,30 +993,230 @@ export class OpenRouterClient {
     target.plugins = plugins;
   }
 
-  async #createResponseWithRoutingFallback(request: ResponseCreateParams): Promise<unknown> {
-    try {
-      return await this.#openai.responses.create(request);
-    } catch (error) {
-      if (!this.#shouldRetryWithoutPlugins(error)) {
-        throw error;
-      }
+  #cloneRequest(request: Record<string, unknown>): Record<string, unknown> {
+    const cloned: Record<string, unknown> = { ...request };
 
-      const requestRecord = request as unknown as Record<string, unknown>;
-      const plugins = requestRecord.plugins;
-      if (!Array.isArray(plugins) || plugins.length === 0) {
-        throw error;
-      }
-
-      const retryRequest = { ...requestRecord };
-      delete retryRequest.plugins;
-
-      console.warn(
-        `${CONSTANTS.MODULE_NAME} | OpenRouter routing could not satisfy web-enabled parameters for ` +
-          `"${this.#config.model}". Retrying without web plugin.`,
-      );
-
-      return await this.#openai.responses.create(retryRequest as unknown as ResponseCreateParams);
+    if (isRecord(request.provider)) {
+      cloned.provider = { ...request.provider };
     }
+
+    if (Array.isArray(request.plugins)) {
+      cloned.plugins = [...request.plugins];
+    }
+
+    if (isRecord(request.text)) {
+      cloned.text = { ...request.text };
+    }
+
+    if (Array.isArray(request.tools)) {
+      cloned.tools = [...request.tools];
+    }
+
+    return cloned;
+  }
+
+  #readRoutingProfile(model: string): RoutingProfile | undefined {
+    const existing = this.#routingProfilesByModel.get(model);
+    if (!existing) {
+      return undefined;
+    }
+    return { ...existing };
+  }
+
+  #writeRoutingProfile(model: string, profile: RoutingProfile | null): void {
+    if (!profile) {
+      this.#routingProfilesByModel.delete(model);
+      return;
+    }
+
+    const normalized: RoutingProfile = {};
+    if (profile.disableWebPlugin) {
+      normalized.disableWebPlugin = true;
+    }
+    if (profile.relaxProviderParameters) {
+      normalized.relaxProviderParameters = true;
+    }
+    if (profile.minimalParameters) {
+      normalized.minimalParameters = true;
+    }
+
+    if (!normalized.disableWebPlugin && !normalized.relaxProviderParameters && !normalized.minimalParameters) {
+      this.#routingProfilesByModel.delete(model);
+      return;
+    }
+
+    this.#routingProfilesByModel.set(model, normalized);
+  }
+
+  #applyRoutingProfile(
+    request: Record<string, unknown>,
+    profile: RoutingProfile | undefined,
+  ): Record<string, unknown> {
+    const profiled = this.#cloneRequest(request);
+    if (!profile) {
+      return profiled;
+    }
+
+    if (profile.disableWebPlugin) {
+      delete profiled.plugins;
+    }
+
+    if (profile.relaxProviderParameters) {
+      const provider = isRecord(profiled.provider) ? { ...profiled.provider } : {};
+      provider.require_parameters = false;
+      profiled.provider = provider;
+    }
+
+    if (profile.minimalParameters) {
+      delete profiled.top_p;
+      delete profiled.temperature;
+      delete profiled.metadata;
+    }
+
+    return profiled;
+  }
+
+  #deriveRoutingProfileFromSuccess(
+    baseRequest: Record<string, unknown>,
+    successfulRequest: Record<string, unknown>,
+  ): RoutingProfile | null {
+    const profile: RoutingProfile = {};
+
+    const basePlugins = Array.isArray(baseRequest.plugins) && baseRequest.plugins.length > 0;
+    const successPlugins = Array.isArray(successfulRequest.plugins) && successfulRequest.plugins.length > 0;
+    if (basePlugins && !successPlugins) {
+      profile.disableWebPlugin = true;
+    }
+
+    const baseProvider = isRecord(baseRequest.provider) ? baseRequest.provider : null;
+    const successProvider = isRecord(successfulRequest.provider) ? successfulRequest.provider : null;
+    if (baseProvider?.require_parameters === true && successProvider?.require_parameters === false) {
+      profile.relaxProviderParameters = true;
+    }
+
+    const hadOptionalSampling = "top_p" in baseRequest || "temperature" in baseRequest || "metadata" in baseRequest;
+    const keptOptionalSampling = "top_p" in successfulRequest ||
+      "temperature" in successfulRequest ||
+      "metadata" in successfulRequest;
+    if (hadOptionalSampling && !keptOptionalSampling) {
+      profile.minimalParameters = true;
+    }
+
+    if (!profile.disableWebPlugin && !profile.relaxProviderParameters && !profile.minimalParameters) {
+      return null;
+    }
+
+    return profile;
+  }
+
+  async #createResponseWithRoutingFallback(
+    request: ResponseCreateParams,
+    options?: GenerateWithSchemaOptions,
+  ): Promise<unknown> {
+    const baseRequest = request as unknown as Record<string, unknown>;
+    const attempts: Array<{ label: string; request: Record<string, unknown> }> = [];
+    const seenKeys = new Set<string>();
+
+    const pushAttempt = (label: string, payload: Record<string, unknown>): void => {
+      const key = JSON.stringify(payload);
+      if (seenKeys.has(key)) {
+        return;
+      }
+      seenKeys.add(key);
+      attempts.push({ label, request: payload });
+    };
+
+    const savedProfile = this.#readRoutingProfile(this.#config.model);
+    if (savedProfile) {
+      pushAttempt("profiled-base", this.#applyRoutingProfile(baseRequest, savedProfile));
+    }
+
+    pushAttempt("base", this.#cloneRequest(baseRequest));
+
+    if (Array.isArray(baseRequest.plugins) && baseRequest.plugins.length > 0) {
+      const withoutPlugins = this.#cloneRequest(baseRequest);
+      delete withoutPlugins.plugins;
+      pushAttempt("without-web-plugin", withoutPlugins);
+    }
+
+    const providerConfig = isRecord(baseRequest.provider) ? baseRequest.provider : null;
+    if (providerConfig?.require_parameters === true) {
+      const relaxedProvider = this.#cloneRequest(baseRequest);
+      const provider = isRecord(relaxedProvider.provider) ? { ...relaxedProvider.provider } : {};
+      provider.require_parameters = false;
+      relaxedProvider.provider = provider;
+      pushAttempt("relaxed-provider-parameters", relaxedProvider);
+
+      if (Array.isArray(baseRequest.plugins) && baseRequest.plugins.length > 0) {
+        const relaxedWithoutPlugins = this.#cloneRequest(relaxedProvider);
+        delete relaxedWithoutPlugins.plugins;
+        pushAttempt("relaxed-provider-parameters-without-web-plugin", relaxedWithoutPlugins);
+      }
+    }
+
+    if ("top_p" in baseRequest || "temperature" in baseRequest || "metadata" in baseRequest) {
+      const minimal = this.#cloneRequest(baseRequest);
+      delete minimal.top_p;
+      delete minimal.temperature;
+      delete minimal.metadata;
+      pushAttempt("minimal-parameters", minimal);
+    }
+
+    let lastRoutingError: unknown = null;
+    for (let index = 0; index < attempts.length; index += 1) {
+      const attempt = attempts[index];
+      try {
+        if (index > 0) {
+          try {
+            options?.onRoutingRetry?.({
+              label: attempt.label,
+              attemptNumber: index + 1,
+              totalAttempts: attempts.length,
+              model: this.#config.model,
+            });
+          } catch (callbackError) {
+            if (this.#isDebugHooksEnabled()) {
+              console.debug(`${CONSTANTS.MODULE_NAME} | Routing retry callback failed.`, callbackError);
+            }
+          }
+        }
+
+        if (index > 0 && this.#isDebugHooksEnabled()) {
+          console.debug(
+            `${CONSTANTS.MODULE_NAME} | OpenRouter routing retry "${attempt.label}" for "${this.#config.model}".`,
+          );
+        }
+        const response = await this.#openai.responses.create(attempt.request as unknown as ResponseCreateParams);
+        if (index > 0) {
+          try {
+            options?.onRoutingResolved?.({
+              label: attempt.label,
+              attemptNumber: index + 1,
+              totalAttempts: attempts.length,
+              model: this.#config.model,
+            });
+          } catch (callbackError) {
+            if (this.#isDebugHooksEnabled()) {
+              console.debug(`${CONSTANTS.MODULE_NAME} | Routing resolved callback failed.`, callbackError);
+            }
+          }
+        }
+        const learned = this.#deriveRoutingProfileFromSuccess(baseRequest, attempt.request);
+        this.#writeRoutingProfile(this.#config.model, learned);
+        return response;
+      } catch (error) {
+        if (!this.#shouldRetryWithoutPlugins(error)) {
+          throw error;
+        }
+        lastRoutingError = error;
+      }
+    }
+
+    if (lastRoutingError) {
+      throw lastRoutingError;
+    }
+
+    throw new Error("OpenRouter request failed without a recoverable routing fallback.");
   }
 
   #supportsTemperature(): boolean {
