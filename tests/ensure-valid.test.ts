@@ -65,6 +65,116 @@ test("ensureValid normalises PF2e payloads before validation", async () => {
   assert.equal(Object.hasOwn(result as Record<string, unknown>, "extra"), false);
 });
 
+test("ensureValid preserves structured system payloads for item and actor sub-documents", async () => {
+  const itemResult = await ensureValid({
+    type: "item",
+    payload: {
+      schema_version: 3,
+      systemId: "pf2e",
+      type: "item",
+      slug: "custom-bulwark",
+      name: "Custom Bulwark",
+      itemType: "shield",
+      rarity: "common",
+      level: 5,
+      system: {
+        acBonus: 3,
+        hardness: 10,
+        hp: { value: 40, max: 40, brokenThreshold: 20 },
+      },
+    },
+  });
+
+  assert.equal(itemResult.itemType, "shield");
+  assert.deepEqual(itemResult.system, {
+    acBonus: 3,
+    hardness: 10,
+    hp: { value: 40, max: 40, brokenThreshold: 20 },
+  });
+
+  const actorResult = await ensureValid({
+    type: "actor",
+    payload: {
+      schema_version: 3,
+      systemId: "pf2e",
+      type: "actor",
+      slug: "system-rich-actor",
+      name: "System Rich Actor",
+      actorType: "npc",
+      rarity: "common",
+      level: 5,
+      size: "med",
+      traits: [],
+      languages: [],
+      attributes: {
+        hp: { value: 60, max: 60 },
+        ac: { value: 22 },
+        perception: { value: 12 },
+        speed: { value: 25 },
+        saves: {
+          fortitude: { value: 12 },
+          reflex: { value: 10 },
+          will: { value: 8 },
+        },
+      },
+      abilities: { str: 4, dex: 2, con: 3, int: 1, wis: 1, cha: 0 },
+      skills: [],
+      strikes: [],
+      actions: [],
+      spellcasting: [
+        {
+          name: "Arcane Matrix",
+          tradition: "arcane",
+          castingType: "innate",
+          spells: [
+            {
+              level: 3,
+              name: "Ion Spear",
+              system: { time: { value: "2" }, range: { value: "60 feet" } },
+            },
+          ],
+        },
+      ],
+      inventory: [
+        {
+          name: "Storm Halberd",
+          itemType: "weapon",
+          system: { category: "martial", group: "polearm" },
+        },
+      ],
+      img: null,
+      source: "",
+    },
+  });
+
+  assert.deepEqual(actorResult.spellcasting?.[0]?.spells?.[0]?.system, {
+    time: { value: "2" },
+    range: { value: "60 feet" },
+  });
+  assert.deepEqual(actorResult.inventory?.[0]?.system, {
+    category: "martial",
+    group: "polearm",
+  });
+});
+
+test("ensureValid coerces ammunition aliases to canonical ammo itemType", async () => {
+  const result = await ensureValid({
+    type: "item",
+    payload: {
+      schema_version: 3,
+      systemId: "pf2e",
+      type: "item",
+      slug: "iron-arrows",
+      name: "Iron Arrows",
+      itemType: "ammunition",
+      rarity: "common",
+      level: 1,
+    },
+  });
+
+  assert.equal(result.itemType, "ammo");
+});
+
 test("ensureValid filters traits to the PF2e dictionary", async () => {
   const payload = {
     schema_version: 3,

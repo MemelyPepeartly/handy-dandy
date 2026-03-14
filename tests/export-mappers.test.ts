@@ -105,6 +105,30 @@ test("fromFoundryItem normalises PF2e specific fields", () => {
   assert.deepEqual(validation, { ok: true });
 });
 
+test("fromFoundryItem preserves wand and staff aliases from PF2E system payloads", () => {
+  const wandItem = fromFoundryItem({
+    name: "Wand of Sparks",
+    type: "consumable",
+    system: {
+      category: "wand",
+      level: { value: 3 },
+      traits: { value: [], rarity: "common" },
+    },
+  });
+  assert.equal(wandItem.itemType, "wand");
+
+  const staffItem = fromFoundryItem({
+    name: "Staff of Ice",
+    type: "weapon",
+    system: {
+      baseItem: "staff",
+      level: { value: 5 },
+      traits: { value: [], rarity: "common" },
+    },
+  });
+  assert.equal(staffItem.itemType, "staff");
+});
+
 test("fromFoundryActor converts actor documents", () => {
   const mockActor = {
     name: "Goblin Warrior",

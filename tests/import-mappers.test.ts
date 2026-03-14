@@ -296,6 +296,60 @@ test("toFoundryItemData always includes normalized quantity, usage, bulk, size, 
   assert.deepEqual(source.system.price.value, { pp: 1, gp: 2, sp: 3, cp: 4 });
 });
 
+test("toFoundryItemData supports shield item type with PF2E-specific system overrides", () => {
+  const item = createItem();
+  item.itemType = "shield";
+  item.name = "Aegis Bulwark";
+  item.system = {
+    acBonus: 3,
+    hardness: 12,
+    hp: { value: 48, max: 48, brokenThreshold: 24 },
+    speedPenalty: 5,
+    runes: { reinforcing: 2 },
+  };
+
+  const source = toFoundryItemData(item);
+
+  assert.equal(source.type, "shield");
+  assert.equal(source.system.acBonus, 3);
+  assert.equal(source.system.hardness, 12);
+  assert.deepEqual(source.system.hp, { value: 48, max: 48, brokenThreshold: 24 });
+  assert.deepEqual(source.system.runes, { reinforcing: 2 });
+});
+
+test("toFoundryItemData supports ammo, backpack, book, and treasure item types", () => {
+  const ammo = createItem();
+  ammo.itemType = "ammo";
+  ammo.system = { uses: { value: 2, max: 2, autoDestroy: true } };
+
+  const backpack = createItem();
+  backpack.itemType = "backpack";
+  backpack.system = { capacity: 8, stowing: true };
+
+  const book = createItem();
+  book.itemType = "book";
+  book.system = { category: "spell", capacity: 12 };
+
+  const treasure = createItem();
+  treasure.itemType = "treasure";
+  treasure.system = { category: "gem" };
+
+  const ammoSource = toFoundryItemData(ammo);
+  const backpackSource = toFoundryItemData(backpack);
+  const bookSource = toFoundryItemData(book);
+  const treasureSource = toFoundryItemData(treasure);
+
+  assert.equal(ammoSource.type, "ammo");
+  assert.deepEqual((ammoSource.system as Record<string, unknown>).uses, { value: 2, max: 2, autoDestroy: true });
+  assert.equal(backpackSource.type, "backpack");
+  assert.equal((backpackSource.system as Record<string, unknown>).usage?.value, "wornbackpack");
+  assert.equal((backpackSource.system as Record<string, unknown>).capacity, 8);
+  assert.equal(bookSource.type, "book");
+  assert.equal((bookSource.system as Record<string, unknown>).category, "spell");
+  assert.equal(treasureSource.type, "treasure");
+  assert.equal((treasureSource.system as Record<string, unknown>).category, "gem");
+});
+
 test("importItem can target and update a specific world item by itemId", async () => {
   const existing = new MockItem({
     name: "Old Item",
@@ -806,7 +860,7 @@ test("toFoundryActorData maps wand inventory entries to consumable item document
 
   assert.ok(wand, "expected custom wand inventory item");
   assert.equal(wand!.type, "consumable");
-  assert.equal(wand!.img, "systems/pf2e/icons/default-icons/wand.svg");
+  assert.equal(wand!.img, "systems/pf2e/icons/default-icons/consumable.svg");
   assert.equal((wand!.system as Record<string, unknown>).category, "wand");
 });
 
@@ -828,7 +882,115 @@ test("toFoundryActorData maps staff inventory entries to weapon item documents",
 
   assert.ok(staff, "expected custom staff inventory item");
   assert.equal(staff!.type, "weapon");
-  assert.equal(staff!.img, "systems/pf2e/icons/default-icons/staff.svg");
+  assert.equal(staff!.img, "systems/pf2e/icons/default-icons/weapon.svg");
+});
+
+test("toFoundryActorData maps backpack and treasure inventory entries to PF2E item document types", () => {
+  const actor = createActor();
+  actor.inventory = [
+    {
+      name: "Emergency Satchel",
+      itemType: "backpack",
+      quantity: 1,
+      level: 4,
+      description: "Contains emergency tools.",
+      img: null,
+      system: { capacity: 12, stowing: true },
+    },
+    {
+      name: "Bag of Gems",
+      itemType: "treasure",
+      quantity: 4,
+      level: 2,
+      description: "Assorted polished gems.",
+      img: null,
+      system: { category: "gem" },
+    },
+  ];
+
+  const result = toFoundryActorData(actor);
+  const backpack = result.items.find((item) => item.name === "Emergency Satchel");
+  const treasure = result.items.find((item) => item.name === "Bag of Gems");
+
+  assert.ok(backpack, "expected backpack inventory item");
+  assert.equal(backpack!.type, "backpack");
+  assert.equal((backpack!.system as Record<string, unknown>).capacity, 12);
+  assert.ok(treasure, "expected treasure inventory item");
+  assert.equal(treasure!.type, "treasure");
+  assert.equal((treasure!.system as Record<string, unknown>).category, "gem");
+});
+
+test("toFoundryActorData applies custom inventory system fields for generated weapons", () => {
+  const actor = createActor();
+  actor.inventory = [
+    {
+      name: "Stormpiercer",
+      itemType: "weapon",
+      quantity: 1,
+      level: 11,
+      description: "A charged spear that calls lightning.",
+      img: null,
+      system: {
+        category: "martial",
+        group: "spear",
+        damage: { dice: 2, die: "d10", damageType: "electricity", modifier: 0, persistent: null },
+        range: 60,
+        reload: { value: "1" },
+        runes: { potency: 2, striking: 1, property: ["flaming"] },
+      },
+    },
+  ];
+
+  const result = toFoundryActorData(actor);
+  const weapon = result.items.find((item) => item.name === "Stormpiercer");
+
+  assert.ok(weapon, "expected generated custom weapon");
+  assert.equal(weapon!.type, "weapon");
+  assert.equal((weapon!.system as Record<string, unknown>).category, "martial");
+  assert.deepEqual(
+    (weapon!.system as Record<string, unknown>).damage,
+    { dice: 2, die: "d10", damageType: "electricity", modifier: 0, persistent: null },
+  );
+  assert.deepEqual((weapon!.system as Record<string, unknown>).reload, { value: "1" });
+});
+
+test("toFoundryActorData applies custom spell system fields for generated spells", () => {
+  const actor = createActor();
+  actor.spellcasting = [
+    {
+      name: "Arcane Matrix",
+      tradition: "arcane",
+      castingType: "innate",
+      attackBonus: 21,
+      saveDC: 31,
+      notes: "High-voltage spell package",
+      spells: [
+        {
+          level: 6,
+          name: "Voltic Collapse",
+          description: "Crackling implosion of arcane force.",
+          tradition: "arcane",
+          system: {
+            time: { value: "2" },
+            range: { value: "120 feet" },
+            target: { value: "1 creature" },
+            duration: { value: "1 round", sustained: false },
+            defense: { save: { statistic: "fortitude", basic: true }, passive: null },
+          },
+        },
+      ],
+    },
+  ];
+
+  const result = toFoundryActorData(actor);
+  const spell = result.items.find((item) => item.type === "spell" && item.name === "Voltic Collapse");
+
+  assert.ok(spell, "expected generated spell item");
+  assert.deepEqual(spell!.system.time, { value: "2" });
+  assert.deepEqual(spell!.system.range, { value: "120 feet" });
+  assert.deepEqual(spell!.system.target, { value: "1 creature" });
+  assert.deepEqual(spell!.system.duration, { value: "1 round", sustained: false });
+  assert.deepEqual(spell!.system.defense, { save: { statistic: "fortitude", basic: true }, passive: null });
 });
 
 test("toFoundryActorData emits label-safe skill entries for standard and lore-like slugs", () => {
