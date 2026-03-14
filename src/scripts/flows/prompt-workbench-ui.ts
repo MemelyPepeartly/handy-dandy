@@ -558,8 +558,8 @@ function buildLoadingSteps(request: PromptWorkbenchRequest<EntityType>): Loading
   const steps: LoadingStep[] = [
     { key: "prompt", label: "Preparing prompt" },
     { key: "model", label: "Starting generation request" },
-    { key: "generation", label: "Generating core sheet data" },
     { key: "routing", label: "Finding compatible provider route (if needed)" },
+    { key: "generation", label: "Generating core sheet data" },
     { key: "validation", label: "Normalizing and validating data" },
   ];
 

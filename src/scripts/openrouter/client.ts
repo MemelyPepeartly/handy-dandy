@@ -1186,21 +1186,20 @@ export class OpenRouterClient {
             `${CONSTANTS.MODULE_NAME} | OpenRouter routing retry "${attempt.label}" for "${this.#config.model}".`,
           );
         }
-        const response = await this.#openai.responses.create(attempt.request as unknown as ResponseCreateParams);
-        if (index > 0) {
-          try {
-            options?.onRoutingResolved?.({
-              label: attempt.label,
-              attemptNumber: index + 1,
-              totalAttempts: attempts.length,
-              model: this.#config.model,
-            });
-          } catch (callbackError) {
-            if (this.#isDebugHooksEnabled()) {
-              console.debug(`${CONSTANTS.MODULE_NAME} | Routing resolved callback failed.`, callbackError);
-            }
+        try {
+          options?.onRoutingResolved?.({
+            label: attempt.label,
+            attemptNumber: index + 1,
+            totalAttempts: attempts.length,
+            model: this.#config.model,
+          });
+        } catch (callbackError) {
+          if (this.#isDebugHooksEnabled()) {
+            console.debug(`${CONSTANTS.MODULE_NAME} | Routing resolved callback failed.`, callbackError);
           }
         }
+
+        const response = await this.#openai.responses.create(attempt.request as unknown as ResponseCreateParams);
         const learned = this.#deriveRoutingProfileFromSuccess(baseRequest, attempt.request);
         this.#writeRoutingProfile(this.#config.model, learned);
         return response;

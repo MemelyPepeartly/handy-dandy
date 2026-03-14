@@ -107,13 +107,13 @@ function createRoutingRetryReporter(
 
 function createRoutingResolvedReporter(
   options: Pick<GenerateOptions, "onProgress">,
-  message: string,
+  messageFactory: (event: OpenRouterRoutingRetryEvent) => string,
   percent: number,
 ): NonNullable<GenerateWithSchemaOptions["onRoutingResolved"]> {
-  return (): void => {
+  return (event: OpenRouterRoutingRetryEvent): void => {
     reportProgress(options, {
       step: "generation",
-      message,
+      message: messageFactory(event),
       percent,
     });
   };
@@ -136,9 +136,9 @@ export async function generateAction(
     percent: 35,
   });
   reportProgress(options, {
-    step: "generation",
-    message: "Generating action JSON with OpenRouter...",
-    percent: 48,
+    step: "routing",
+    message: "Finding compatible provider route...",
+    percent: 45,
   });
   const draft = await generateStructuredOutput<ActionSchemaData>(
     openRouterClient,
@@ -149,7 +149,7 @@ export async function generateAction(
       onRoutingRetry: createRoutingRetryReporter(options, 55),
       onRoutingResolved: createRoutingResolvedReporter(
         options,
-        "Provider route found. Generating action JSON...",
+        (event) => `Provider route selected (${formatRoutingRetryLabel(event.label)}). Generating action JSON...`,
         62,
       ),
     },
@@ -185,9 +185,9 @@ export async function generateItem(
     percent: 35,
   });
   reportProgress(options, {
-    step: "generation",
-    message: "Generating item JSON with OpenRouter...",
-    percent: 46,
+    step: "routing",
+    message: "Finding compatible provider route...",
+    percent: 43,
   });
   const draft = await generateStructuredOutput<ItemSchemaData>(
     openRouterClient,
@@ -198,7 +198,7 @@ export async function generateItem(
       onRoutingRetry: createRoutingRetryReporter(options, 52),
       onRoutingResolved: createRoutingResolvedReporter(
         options,
-        "Provider route found. Generating item JSON...",
+        (event) => `Provider route selected (${formatRoutingRetryLabel(event.label)}). Generating item JSON...`,
         58,
       ),
     },
@@ -262,9 +262,9 @@ export async function generateActor(
     percent: 25,
   });
   reportProgress(options, {
-    step: "generation",
-    message: "Generating actor JSON with OpenRouter...",
-    percent: 34,
+    step: "routing",
+    message: "Finding compatible provider route...",
+    percent: 32,
   });
   const draft = await generateStructuredOutput<ActorSchemaData>(
     openRouterClient,
@@ -275,7 +275,7 @@ export async function generateActor(
       onRoutingRetry: createRoutingRetryReporter(options, 42),
       onRoutingResolved: createRoutingResolvedReporter(
         options,
-        "Provider route found. Generating actor JSON...",
+        (event) => `Provider route selected (${formatRoutingRetryLabel(event.label)}). Generating actor JSON...`,
         48,
       ),
     },
