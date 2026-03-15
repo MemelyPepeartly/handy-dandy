@@ -76,9 +76,6 @@
 - If routing/retry semantics change in `src/scripts/openrouter/client.ts`, update progress messaging in:
 - `src/scripts/generation/index.ts`
 - `src/scripts/flows/prompt-workbench-ui.ts`
-- and tests in:
-- `tests/generation.test.ts`
-- `tests/openrouter-client.test.ts`
 
 ## Loading UI Stream Contract
 - Prompt Workbench loading UI must include both:
@@ -88,7 +85,7 @@
 - template: `src/templates/prompt-workbench-loading.hbs`
 - logic: `src/scripts/flows/prompt-workbench-ui.ts`
 - styles: `src/styles/prompt-workbench.css`
-- If adding/removing progress step keys, update all three layers plus affected tests in the same change.
+- If adding/removing progress step keys, update all three layers in the same change.
 
 ## Generation and Import Safety Rules
 - Always surface useful failure messages when generation or import fails.
@@ -146,15 +143,14 @@
 - `e:\repos\pf2e\packs\pf2e\`
 - Do not edit `e:\repos\pf2e` unless user explicitly requests cross-repo edits.
 
-## Build, Test, and Verification
+## Build and Verification
 - Install deps: `npm ci`
-- Validation tests: `npm run test:validation`
 - Type check: `npx tsc --noEmit`
 - If PowerShell blocks execution policy, use: `cmd /c npx tsc --noEmit`
 - Production build: `npm run build`
-- Deployment copy build: `npm run test` (build + copy to local Foundry modules dir)
+- Deployment copy build: `npm run deploy:local` (build + copy to local Foundry modules dir)
 - Minimum expectations:
-- `schemas`, `validation`, `mappers`, `flows`, `generation`, `openrouter`: run validation tests + type check.
+- `schemas`, `validation`, `mappers`, `flows`, `generation`, `openrouter`: run type check.
 - `module.ts`, `setup/*`, `ui/*`, `templates`, `styles`: run build and provide manual verification notes.
 
 ## Manual QA Expectations for Feature Work
@@ -170,7 +166,7 @@
 - Before adding a new generation/remix helper, check whether `src/scripts/generation/pipeline.ts`, `src/scripts/generation/index.ts`, or existing import/export utilities already cover the need.
 - Do not hand-edit generated files in `dist/`.
 - Treat `src/static/module.json` as template input; manifest metadata is derived from `package.json`.
-- If schema behavior changes, update migrations/validation/tests together.
+- If schema behavior changes, update migrations/validation together.
 
 ## Versioning and Releases
 - Bump module version only when explicitly requested.

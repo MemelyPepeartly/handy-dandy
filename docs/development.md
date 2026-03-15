@@ -21,4 +21,4 @@ The validation layer performs light coercion before running AJV. Update the look
 2. **Add migration steps.** Register forward-only migrations in [`src/scripts/migrations/index.ts`](../src/scripts/migrations/index.ts) for each validator key. Each entry maps the previous version to a function that mutates the payload into the next version before bumping the `schema_version`.【F:src/scripts/migrations/index.ts†L1-L63】
 3. **Keep pack indices current.** Remember to include `packEntry` migrations when the structure of stored compendium metadata changes so the batch importer/exporter can still round-trip entries.【F:src/scripts/migrations/index.ts†L8-L31】
 
-After these steps, regenerate TypeScript output if required and add tests or fixtures that cover the new entity type or migration behaviour.
+After these steps, regenerate TypeScript output if required and add fixtures that cover the new entity type or migration behaviour.
