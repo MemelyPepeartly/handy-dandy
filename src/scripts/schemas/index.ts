@@ -14,10 +14,15 @@ export const ACTION_EXECUTIONS = [
 export type ActionExecution = (typeof ACTION_EXECUTIONS)[number];
 
 export const ITEM_CATEGORIES = [
+  "ammo",
   "armor",
+  "shield",
   "weapon",
   "equipment",
+  "backpack",
+  "book",
   "consumable",
+  "treasure",
   "feat",
   "spell",
   "wand",
@@ -102,6 +107,7 @@ export interface ItemSchemaData extends BaseEntity<"item"> {
   description?: string | null;
   img?: string | null;
   source?: string | null;
+  system?: Record<string, unknown> | null;
   publication: PublicationData;
 }
 
@@ -228,6 +234,7 @@ export interface ActorSpellData {
   name: string;
   description?: string | null;
   tradition?: string | null;
+  system?: Record<string, unknown> | null;
 }
 
 export interface ActorSpellcastingEntryData {
@@ -248,6 +255,7 @@ export interface ActorInventoryEntryData {
   level?: number | null;
   description?: string | null;
   img?: string | null;
+  system?: Record<string, unknown> | null;
 }
 
 export interface ActorLootSheetData {
@@ -403,6 +411,14 @@ export const itemSchema = {
     description: { type: "string", nullable: true, default: "" },
     img: { type: "string", nullable: true, default: null },
     source: { type: "string", nullable: true, default: "" },
+    system: {
+      type: "object",
+      nullable: true,
+      default: null,
+      additionalProperties: true,
+      required: [],
+      properties: {},
+    },
     publication: publicationSchema
   }
 } satisfies JSONSchemaType<ItemSchemaData>;
@@ -740,7 +756,15 @@ export const actorSchema = {
                 level: { type: "integer", minimum: 0 },
                 name: { type: "string", minLength: 1 },
                 description: { type: "string", nullable: true, default: null },
-                tradition: { type: "string", nullable: true, default: null }
+                tradition: { type: "string", nullable: true, default: null },
+                system: {
+                  type: "object",
+                  nullable: true,
+                  default: null,
+                  additionalProperties: true,
+                  required: [],
+                  properties: {},
+                },
               }
             }
           }
@@ -763,6 +787,14 @@ export const actorSchema = {
           level: { type: "integer", minimum: 0, nullable: true, default: null },
           description: { type: "string", nullable: true, default: null },
           img: { type: "string", nullable: true, default: null },
+          system: {
+            type: "object",
+            nullable: true,
+            default: null,
+            additionalProperties: true,
+            required: [],
+            properties: {},
+          },
         },
       },
     },

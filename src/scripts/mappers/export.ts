@@ -36,8 +36,12 @@ const ACTION_TYPE_MAP: Record<string, ActionExecution> = {
 };
 
 const ITEM_TYPE_MAP: Record<string, ItemCategory> = {
+  ammo: "ammo",
   armor: "armor",
-  shield: "armor",
+  backpack: "backpack",
+  book: "book",
+  shield: "shield",
+  treasure: "treasure",
   weapon: "weapon",
   equipment: "equipment",
   consumable: "consumable",
@@ -748,7 +752,7 @@ function extractActorInventory(items: unknown): ActorInventoryList {
 
       const entry: ActorInventoryList[number] = {
         name: item.name ?? "Unnamed Item",
-        itemType: resolveItemType(item.type),
+        itemType: resolveItemTypeFromDocument(item.type, system),
       };
 
       if (slug) {
@@ -765,6 +769,20 @@ function extractActorInventory(items: unknown): ActorInventoryList {
       }
       if (typeof item.img === "string" && item.img.trim()) {
         entry.img = item.img.trim();
+      }
+
+      const systemOverride = extractSystemOverride(system, [
+        "slug",
+        "description",
+        "traits",
+        "level",
+        "quantity",
+        "price",
+        "source",
+        "publication",
+      ]);
+      if (systemOverride) {
+        entry.system = systemOverride;
       }
 
       return entry;
@@ -800,11 +818,17 @@ function extractSpellList(value: unknown): ActorSpellList {
         continue;
       }
       const description = normalizeHtml(record.spell?.system?.description?.value ?? "");
+      const systemOverride = extractSystemOverride(record.spell?.system ?? null, [
+        "description",
+        "level",
+        "location",
+      ]);
       result.push({
         level,
         name,
         description: description || null,
         tradition: null,
+        ...(systemOverride ? { system: systemOverride } : {}),
       });
     }
   }
@@ -817,6 +841,22 @@ function coerceOptionalString(value: unknown): string | null {
   }
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function extractSystemOverride(
+  source: unknown,
+  omittedKeys: readonly string[],
+): Record<string, unknown> | null {
+  if (!source || typeof source !== "object") {
+    return null;
+  }
+
+  const copy = JSON.parse(JSON.stringify(source)) as Record<string, unknown>;
+  for (const key of omittedKeys) {
+    delete copy[key];
+  }
+
+  return Object.keys(copy).length > 0 ? copy : null;
 }
 
 function coerceInteger(value: unknown, fallback: number): number {
@@ -962,6 +1002,34 @@ function resolveItemType(value: unknown): ItemCategory {
   }
 
   return "other";
+}
+
+function resolveItemTypeFromDocument(
+  typeValue: unknown,
+  system: Record<string, unknown> | undefined,
+): ItemCategory {
+  const baseType = resolveItemType(typeValue);
+  if (!system) {
+    return baseType;
+  }
+
+  if (baseType === "consumable") {
+    const categoryRaw = extractValueProperty<unknown>(system.category) ?? system.category;
+    const normalizedCategory = normalizeString(categoryRaw)?.toLowerCase();
+    if (normalizedCategory === "wand") {
+      return "wand";
+    }
+  }
+
+  if (baseType === "weapon") {
+    const baseItemRaw = extractValueProperty<unknown>(system.baseItem) ?? system.baseItem;
+    const normalizedBaseItem = normalizeString(baseItemRaw)?.toLowerCase();
+    if (normalizedBaseItem === "staff") {
+      return "staff";
+    }
+  }
+
+  return baseType;
 }
 
 function resolveActorType(value: unknown): ActorCategory {
@@ -1151,9 +1219,10 @@ export function fromFoundryItem(doc: FoundryItem): ItemSchemaData {
     type: "item",
     slug,
     name: doc.name,
-    itemType: resolveItemType(doc.type),
+    itemType: resolveItemTypeFromDocument(doc.type, doc.system),
     rarity: normalizeRarity(rarityValue),
     level: Number.isFinite(level) ? Number(level) : 0,
+    system: null,
     publication,
   };
 

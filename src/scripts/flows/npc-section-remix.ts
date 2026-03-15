@@ -133,7 +133,17 @@ type FoundryActorItemLike = Record<string, unknown> & {
 type SectionRemixClient = Pick<OpenRouterClient, "generateWithSchema"> &
   Partial<Pick<OpenRouterClient, "generateImage">>;
 
-const INVENTORY_ITEM_TYPES = new Set(["armor", "weapon", "equipment", "consumable"]);
+const INVENTORY_ITEM_TYPES = new Set([
+  "ammo",
+  "armor",
+  "backpack",
+  "book",
+  "shield",
+  "treasure",
+  "weapon",
+  "equipment",
+  "consumable",
+]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);

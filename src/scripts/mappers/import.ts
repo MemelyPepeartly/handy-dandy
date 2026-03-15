@@ -324,49 +324,7 @@ type FoundryItemSource = {
   name: string;
   type: string;
   img: string;
-  system: {
-    slug: string;
-    description: { value: string; gm: string };
-    rules: unknown[];
-    _migration: { version: number; lastMigration: number | null };
-    traits: { value: string[]; otherTags: string[]; rarity: string };
-    publication: { title: string; authors: string; license: string; remaster: boolean };
-    level: { value: number };
-    quantity: number;
-    baseItem: string | null;
-    bulk: { value: number | string | null };
-    hp: { value: number; max: number };
-    hardness: number;
-    price: { value: Record<string, number> };
-    source: { value: string };
-    equipped: { carryType: string; invested: boolean | null; handsHeld?: number | null };
-    containerId: string | null;
-    size: string;
-    material: { type: string | null; grade: string | null };
-    identification: {
-      status: string;
-      unidentified: { name: string; img: string; data: { description: { value: string } } };
-      misidentified: Record<string, unknown>;
-    };
-    usage: { value: string };
-    subitems: unknown[];
-    category?: string | null;
-    group?: string | null;
-    bonus?: { value: number };
-    damage?: {
-      dice: number;
-      die: string | null;
-      damageType: string | null;
-      persistent?: { number: number; faces: number; type: string | null } | null;
-    };
-    splashDamage?: { value: number };
-    range?: number | null;
-    expend?: number | null;
-    reload?: { value: string | null };
-    grade?: string | null;
-    runes?: { potency: number; striking: number; property: string[] };
-    specific?: unknown;
-  };
+  system: Record<string, unknown>;
   effects: unknown[];
   folder: string | null;
   flags: Record<string, unknown>;
@@ -874,7 +832,11 @@ function ensureCoreItemSystemFields(
   systemData.usage = { value: usageValue || resolveItemUsage(itemType) };
 
   const bulkValue = sanitizeNonNegativeInteger((systemData.bulk as { value?: unknown })?.value, 0);
-  systemData.bulk = { value: bulkValue };
+  if (isRecord(systemData.bulk)) {
+    systemData.bulk = { ...systemData.bulk, value: bulkValue };
+  } else {
+    systemData.bulk = { value: bulkValue };
+  }
 
   const size = typeof systemData.size === "string" ? systemData.size.trim().toLowerCase() : "";
   systemData.size = ITEM_SIZE_VALUES.has(size) ? size : "med";
@@ -886,10 +848,15 @@ function ensureCoreItemSystemFields(
 const ITEM_MIGRATION_VERSION = 0.946;
 
 const ITEM_IDENTIFICATION_DEFAULTS: Record<ItemSchemaData["itemType"], { name: string; img: string }> = {
+  ammo: { name: "Unusual Ammunition", img: "systems/pf2e/icons/unidentified_item_icons/ammunition.webp" },
   armor: { name: "Unusual Armor", img: "systems/pf2e/icons/unidentified_item_icons/armor.webp" },
+  shield: { name: "Unusual Shield", img: "systems/pf2e/icons/unidentified_item_icons/shields.webp" },
   weapon: { name: "Unusual Weapon", img: "systems/pf2e/icons/unidentified_item_icons/weapon.webp" },
   equipment: { name: "Unusual Object", img: "systems/pf2e/icons/unidentified_item_icons/adventuring_gear.webp" },
+  backpack: { name: "Unusual Backpack", img: "systems/pf2e/icons/unidentified_item_icons/adventuring_gear.webp" },
+  book: { name: "Unusual Book", img: "systems/pf2e/icons/unidentified_item_icons/adventuring_gear.webp" },
   consumable: { name: "Unusual Consumable", img: "systems/pf2e/icons/unidentified_item_icons/consumable.webp" },
+  treasure: { name: "Unusual Treasure", img: "systems/pf2e/icons/unidentified_item_icons/adventuring_gear.webp" },
   feat: { name: "Unusual Feat", img: "systems/pf2e/icons/unidentified_item_icons/feat.webp" },
   spell: { name: "Unusual Spell", img: "systems/pf2e/icons/unidentified_item_icons/spell.webp" },
   wand: { name: "Unusual Wand", img: "systems/pf2e/icons/unidentified_item_icons/wand.webp" },
@@ -898,19 +865,29 @@ const ITEM_IDENTIFICATION_DEFAULTS: Record<ItemSchemaData["itemType"], { name: s
 };
 
 const ITEM_USAGE_DEFAULTS: Partial<Record<ItemSchemaData["itemType"], string>> = {
+  ammo: "carried",
   armor: "worn",
+  shield: "held-in-one-hand",
   weapon: "held-in-one-hand",
   equipment: "held-in-one-hand",
+  backpack: "wornbackpack",
+  book: "held-in-one-hand",
   consumable: "held-in-one-hand",
+  treasure: "carried",
   wand: "held-in-one-hand",
   staff: "held-in-two-hands",
 };
 
 const ITEM_CARRY_TYPE_DEFAULTS: Partial<Record<ItemSchemaData["itemType"], string>> = {
+  ammo: "worn",
   armor: "worn",
+  shield: "held",
   weapon: "worn",
   equipment: "worn",
+  backpack: "worn",
+  book: "worn",
   consumable: "worn",
+  treasure: "worn",
   wand: "worn",
   staff: "worn",
 };
@@ -952,7 +929,18 @@ function resolveItemCarryType(itemType: ItemSchemaData["itemType"]): string {
   return carryType ?? "worn";
 }
 
-type FoundryCreatableItemType = "armor" | "weapon" | "equipment" | "consumable" | "feat" | "spell";
+type FoundryCreatableItemType =
+  | "ammo"
+  | "armor"
+  | "backpack"
+  | "book"
+  | "shield"
+  | "treasure"
+  | "weapon"
+  | "equipment"
+  | "consumable"
+  | "feat"
+  | "spell";
 
 function resolveFoundryItemType(itemType: ItemSchemaData["itemType"]): FoundryCreatableItemType {
   switch (itemType) {
@@ -1762,7 +1750,12 @@ function mergeCompendiumActorItem(
 
 function mapEmbeddedItemTypeToCategory(itemType: string): ItemSchemaData["itemType"] {
   switch (itemType) {
+    case "ammo":
     case "armor":
+    case "backpack":
+    case "book":
+    case "shield":
+    case "treasure":
     case "weapon":
     case "equipment":
     case "consumable":
@@ -1771,8 +1764,6 @@ function mapEmbeddedItemTypeToCategory(itemType: string): ItemSchemaData["itemTy
     case "wand":
     case "staff":
       return itemType;
-    case "shield":
-      return "armor";
     default:
       return "other";
   }
@@ -1904,64 +1895,27 @@ function prepareItemSource(item: ItemSchemaData): FoundryItemSource {
   const timestamp = Date.now();
   const userId = resolveCurrentUserId();
   const worldId = resolveWorldId();
-
-  const systemData: FoundryItemSource["system"] = {
-    slug: item.slug,
-    description: { value: description, gm: "" },
-    rules: [],
-    _migration: { version: ITEM_MIGRATION_VERSION, lastMigration: null },
-    traits: { value: traits, otherTags: [], rarity: item.rarity },
+  const systemData = createBaseItemSystemData(item, {
+    type,
+    traits,
+    description,
+    source,
     publication,
-    level: { value: item.level },
-    quantity: 1,
-    baseItem: null,
-    bulk: { value: 0 },
-    hp: { value: 0, max: 0 },
-    hardness: 0,
-    price: { value: coins },
-    source: { value: source },
-    equipped: { carryType, invested: null },
-    containerId: null,
-    size: "med",
-    material: { type: null, grade: null },
-    identification: {
-      status: "identified",
-      unidentified: {
-        name: identification.name,
-        img: identification.img,
-        data: { description: { value: "" } },
-      },
-      misidentified: {},
-    },
-    usage: { value: usage },
-    subitems: [],
-  };
+    usage,
+    carryType,
+    identification,
+    coins,
+  });
 
-  if (type === "weapon") {
-    systemData.category = "simple";
-    systemData.group = null;
-    systemData.bonus = { value: 0 };
-    systemData.damage = {
-      dice: 1,
-      die: "d4",
-      damageType: null,
-      persistent: null,
-    };
-    systemData.splashDamage = { value: 0 };
-    systemData.range = 0;
-    systemData.expend = null;
-    systemData.reload = { value: "0" };
-    systemData.grade = null;
-    systemData.runes = { potency: 0, striking: 0, property: [] };
-    systemData.specific = null;
-    systemData.equipped = { ...systemData.equipped, handsHeld: 0 };
-  }
-
-  if (item.itemType === "wand" && type === "consumable") {
-    systemData.category = "wand";
-  }
-
-  ensureCoreItemSystemFields(systemData, item.itemType);
+  mergeGeneratedItemSystemOverrides(systemData, item.system);
+  enforceCanonicalItemSystemIdentity(systemData, {
+    item,
+    traits,
+    description,
+    source,
+    publication,
+  });
+  applyItemTypeDefaults(systemData, item.itemType, type);
 
   const stats: FoundryItemSource["_stats"] = {
     compendiumSource: null,
@@ -1995,6 +1949,369 @@ function prepareItemSource(item: ItemSchemaData): FoundryItemSource {
     _stats: stats,
     ownership: { default: 0 },
   };
+}
+
+function createBaseItemSystemData(
+  item: ItemSchemaData,
+  context: {
+    type: FoundryCreatableItemType;
+    traits: string[];
+    description: string;
+    source: string;
+    publication: PublicationData;
+    usage: string;
+    carryType: string;
+    identification: { name: string; img: string };
+    coins: Record<string, number>;
+  },
+): FoundryItemSource["system"] {
+  const {
+    type,
+    traits,
+    description,
+    source,
+    publication,
+    usage,
+    carryType,
+    identification,
+    coins,
+  } = context;
+
+  if (type === "spell") {
+    return {
+      slug: item.slug,
+      description: { value: description, gm: "" },
+      rules: [],
+      _migration: { version: ITEM_MIGRATION_VERSION, lastMigration: null },
+      traits: {
+        otherTags: [],
+        value: traits,
+        rarity: item.rarity,
+        traditions: [],
+      },
+      publication,
+      level: { value: Math.max(1, item.level) },
+      requirements: "",
+      target: { value: "" },
+      range: { value: "" },
+      area: null,
+      time: { value: "" },
+      duration: { value: "", sustained: false },
+      damage: {},
+      defense: null,
+      cost: { value: "" },
+      location: { value: null },
+      counteraction: false,
+      heightening: { type: null, interval: null, damage: {}, area: null },
+      source: { value: source },
+    };
+  }
+
+  if (type === "feat") {
+    return {
+      slug: item.slug,
+      description: { value: description, gm: "" },
+      rules: [],
+      _migration: { version: ITEM_MIGRATION_VERSION, lastMigration: null },
+      traits: {
+        value: traits,
+        otherTags: [],
+        rarity: item.rarity,
+      },
+      publication,
+      level: { value: Math.max(1, item.level) },
+      category: "bonus",
+      onlyLevel1: false,
+      maxTakable: 1,
+      actionType: { value: "passive" },
+      actions: { value: null },
+      prerequisites: { value: [] },
+      frequency: null,
+      subfeatures: {},
+      selfEffect: null,
+      location: null,
+      source: { value: source },
+    };
+  }
+
+  const systemData: FoundryItemSource["system"] = {
+    slug: item.slug,
+    description: { value: description, gm: "" },
+    rules: [],
+    _migration: { version: ITEM_MIGRATION_VERSION, lastMigration: null },
+    traits: { value: traits, otherTags: [], rarity: item.rarity },
+    publication,
+    level: { value: item.level },
+    quantity: 1,
+    baseItem: null,
+    bulk: { value: 0 },
+    hp: { value: 0, max: 0 },
+    hardness: 0,
+    price: { value: coins },
+    source: { value: source },
+    equipped: { carryType, invested: null },
+    containerId: null,
+    size: "med",
+    material: { type: null, grade: null },
+    identification: {
+      status: "identified",
+      unidentified: {
+        name: identification.name,
+        img: identification.img,
+        data: { description: { value: "" } },
+      },
+      misidentified: {},
+    },
+    usage: { value: usage },
+    subitems: [],
+  };
+
+  return systemData;
+}
+
+function mergeGeneratedItemSystemOverrides(
+  systemData: FoundryItemSource["system"],
+  overrides: ItemSchemaData["system"],
+): void {
+  if (!isRecord(overrides)) {
+    return;
+  }
+
+  mergeIntoRecord(systemData as Record<string, unknown>, clone(overrides) as Record<string, unknown>);
+}
+
+function mergeIntoRecord(target: Record<string, unknown>, source: Record<string, unknown>): void {
+  for (const [key, value] of Object.entries(source)) {
+    if (Array.isArray(value)) {
+      target[key] = clone(value);
+      continue;
+    }
+
+    if (isRecord(value)) {
+      const existing = target[key];
+      if (isRecord(existing)) {
+        mergeIntoRecord(existing, clone(value) as Record<string, unknown>);
+      } else {
+        target[key] = clone(value);
+      }
+      continue;
+    }
+
+    target[key] = value;
+  }
+}
+
+function enforceCanonicalItemSystemIdentity(
+  systemData: FoundryItemSource["system"],
+  context: {
+    item: ItemSchemaData;
+    traits: string[];
+    description: string;
+    source: string;
+    publication: PublicationData;
+  },
+): void {
+  const { item, traits, description, source, publication } = context;
+  const levelValue = Math.max(0, Math.trunc(item.level));
+
+  systemData.slug = item.slug;
+  systemData.description = {
+    value: description,
+    gm: isRecord(systemData.description) && typeof systemData.description.gm === "string"
+      ? systemData.description.gm
+      : "",
+  };
+  systemData.source = { value: source };
+  systemData.publication = publication;
+  systemData.level = { value: levelValue };
+  systemData.rules = Array.isArray(systemData.rules) ? systemData.rules : [];
+
+  if (isRecord(systemData.traits)) {
+    const existingOtherTags = Array.isArray(systemData.traits.otherTags) ? systemData.traits.otherTags : [];
+    const existingTraditions = Array.isArray(systemData.traits.traditions) ? systemData.traits.traditions : undefined;
+    systemData.traits = {
+      ...systemData.traits,
+      value: traits,
+      rarity: item.rarity,
+      otherTags: existingOtherTags,
+      ...(existingTraditions ? { traditions: existingTraditions } : {}),
+    };
+  }
+}
+
+function applyItemTypeDefaults(
+  systemData: FoundryItemSource["system"],
+  itemType: ItemSchemaData["itemType"],
+  foundryType: FoundryCreatableItemType,
+): void {
+  if (foundryType === "ammo") {
+    systemData.baseItem = typeof systemData.baseItem === "string" ? systemData.baseItem : null;
+    if (!isRecord(systemData.uses)) {
+      systemData.uses = { value: 1, max: 1, autoDestroy: true };
+    } else {
+      const uses = systemData.uses as Record<string, unknown>;
+      systemData.uses = {
+        value: sanitizeNonNegativeInteger(uses.value, 1),
+        max: sanitizeNonNegativeInteger(uses.max, Math.max(1, sanitizeNonNegativeInteger(uses.value, 1))),
+        autoDestroy: typeof uses.autoDestroy === "boolean" ? uses.autoDestroy : true,
+      };
+    }
+    if (!Array.isArray(systemData.craftableAs) && systemData.craftableAs !== null) {
+      systemData.craftableAs = null;
+    }
+  }
+
+  if (foundryType === "backpack") {
+    systemData.stowing = typeof systemData.stowing === "boolean" ? systemData.stowing : false;
+    const bulk = isRecord(systemData.bulk) ? systemData.bulk : {};
+    systemData.bulk = {
+      value: sanitizeNonNegativeInteger((bulk as { value?: unknown }).value, 0),
+      heldOrStowed: sanitizeNonNegativeInteger((bulk as { heldOrStowed?: unknown }).heldOrStowed, 0),
+      capacity: sanitizeNonNegativeInteger((bulk as { capacity?: unknown }).capacity, 0),
+      ignored: sanitizeNonNegativeInteger((bulk as { ignored?: unknown }).ignored, 0),
+      per: sanitizeNonNegativeInteger((bulk as { per?: unknown }).per, 1),
+    };
+    systemData.collapsed = typeof systemData.collapsed === "boolean" ? systemData.collapsed : false;
+  }
+
+  if (foundryType === "book") {
+    systemData.category = typeof systemData.category === "string" ? systemData.category : "formula";
+    systemData.capacity = sanitizeNonNegativeInteger(systemData.capacity, 1);
+    systemData.contents = Array.isArray(systemData.contents) ? systemData.contents : [];
+  }
+
+  if (foundryType === "treasure") {
+    systemData.category = typeof systemData.category === "string" ? systemData.category : null;
+    systemData.equipped = {
+      carryType: typeof (systemData.equipped as { carryType?: unknown } | undefined)?.carryType === "string"
+        ? (systemData.equipped as { carryType: string }).carryType
+        : resolveItemCarryType(itemType),
+    };
+  }
+
+  if (foundryType === "weapon") {
+    systemData.category = typeof systemData.category === "string" ? systemData.category : "simple";
+    systemData.group = typeof systemData.group === "string" ? systemData.group : null;
+    systemData.bonus = isRecord(systemData.bonus) ? systemData.bonus : { value: 0 };
+    systemData.damage = isRecord(systemData.damage)
+      ? systemData.damage
+      : {
+        dice: 1,
+        die: "d4",
+        damageType: null,
+        modifier: 0,
+        persistent: null,
+      };
+    systemData.splashDamage = isRecord(systemData.splashDamage) ? systemData.splashDamage : { value: 0 };
+    systemData.range = typeof systemData.range === "number" ? systemData.range : 0;
+    systemData.expend = typeof systemData.expend === "number" ? systemData.expend : null;
+    systemData.reload = isRecord(systemData.reload) ? systemData.reload : { value: "0" };
+    systemData.grade = typeof systemData.grade === "string" ? systemData.grade : null;
+    systemData.runes = isRecord(systemData.runes) ? systemData.runes : { potency: 0, striking: 0, property: [] };
+    systemData.specific = systemData.specific ?? null;
+    systemData.equipped = {
+      ...(isRecord(systemData.equipped) ? systemData.equipped : {}),
+      carryType: resolveItemCarryType(itemType),
+      invested: null,
+      handsHeld: Number.isFinite((systemData.equipped as { handsHeld?: unknown } | undefined)?.handsHeld)
+        ? (systemData.equipped as { handsHeld: number }).handsHeld
+        : 0,
+    };
+  }
+
+  if (foundryType === "armor") {
+    systemData.category = typeof systemData.category === "string" ? systemData.category : "light";
+    systemData.group = typeof systemData.group === "string" ? systemData.group : null;
+    systemData.acBonus = Number.isFinite(systemData.acBonus as number) ? systemData.acBonus : 0;
+    systemData.strength = Number.isFinite(systemData.strength as number) ? systemData.strength : null;
+    systemData.dexCap = Number.isFinite(systemData.dexCap as number) ? systemData.dexCap : 5;
+    systemData.checkPenalty = Number.isFinite(systemData.checkPenalty as number) ? systemData.checkPenalty : 0;
+    systemData.speedPenalty = Number.isFinite(systemData.speedPenalty as number) ? systemData.speedPenalty : 0;
+    systemData.grade = typeof systemData.grade === "string" ? systemData.grade : null;
+    systemData.runes = isRecord(systemData.runes) ? systemData.runes : { potency: 0, resilient: 0, property: [] };
+    systemData.specific = systemData.specific ?? null;
+  }
+
+  if (foundryType === "shield") {
+    systemData.baseItem = typeof systemData.baseItem === "string" ? systemData.baseItem : null;
+    systemData.acBonus = Number.isFinite(systemData.acBonus as number) ? systemData.acBonus : 2;
+    systemData.speedPenalty = Number.isFinite(systemData.speedPenalty as number) ? systemData.speedPenalty : 0;
+    systemData.grade = typeof systemData.grade === "string" ? systemData.grade : null;
+    systemData.runes = isRecord(systemData.runes) ? systemData.runes : { reinforcing: 0 };
+    systemData.specific = systemData.specific ?? null;
+  }
+
+  if (foundryType === "consumable") {
+    if (itemType === "wand") {
+      systemData.category = "wand";
+    } else if (typeof systemData.category !== "string") {
+      systemData.category = "other";
+    }
+    systemData.uses = isRecord(systemData.uses) ? systemData.uses : { value: 1, max: 1, autoDestroy: true };
+    systemData.damage = isRecord(systemData.damage) ? systemData.damage : null;
+    systemData.spell = isRecord(systemData.spell) ? systemData.spell : null;
+  }
+
+  if (foundryType === "spell") {
+    const existingTraits = isRecord(systemData.traits) ? systemData.traits : {};
+    if (!Array.isArray(existingTraits.traditions)) {
+      existingTraits.traditions = [];
+    }
+    if (!Array.isArray(existingTraits.otherTags)) {
+      existingTraits.otherTags = [];
+    }
+    systemData.traits = existingTraits;
+    systemData.level = {
+      value: Math.max(
+        1,
+        Number.isFinite((systemData.level as { value?: unknown } | undefined)?.value as number)
+          ? Math.trunc((systemData.level as { value: number }).value)
+          : Math.max(1, Number(systemData.level ?? 1) || 1),
+      ),
+    };
+    systemData.requirements = typeof systemData.requirements === "string" ? systemData.requirements : "";
+    systemData.target = isRecord(systemData.target) ? systemData.target : { value: "" };
+    systemData.range = isRecord(systemData.range) ? systemData.range : { value: "" };
+    systemData.time = isRecord(systemData.time) ? systemData.time : { value: "" };
+    systemData.duration = isRecord(systemData.duration) ? systemData.duration : { value: "", sustained: false };
+    systemData.damage = isRecord(systemData.damage) ? systemData.damage : {};
+    systemData.defense = isRecord(systemData.defense) || systemData.defense === null ? systemData.defense : null;
+    systemData.cost = isRecord(systemData.cost) ? systemData.cost : { value: "" };
+    systemData.location = isRecord(systemData.location) ? systemData.location : { value: null };
+    systemData.counteraction = typeof systemData.counteraction === "boolean" ? systemData.counteraction : false;
+  }
+
+  if (foundryType === "feat") {
+    systemData.category = typeof systemData.category === "string" ? systemData.category : "bonus";
+    systemData.onlyLevel1 = typeof systemData.onlyLevel1 === "boolean" ? systemData.onlyLevel1 : false;
+    const maxTakable = Number(systemData.maxTakable);
+    systemData.maxTakable = Number.isFinite(maxTakable) && maxTakable > 0 ? Math.trunc(maxTakable) : 1;
+    systemData.actionType = isRecord(systemData.actionType) ? systemData.actionType : { value: "passive" };
+    systemData.actions = isRecord(systemData.actions) ? systemData.actions : { value: null };
+    systemData.prerequisites = isRecord(systemData.prerequisites) ? systemData.prerequisites : { value: [] };
+    systemData.frequency = isRecord(systemData.frequency) || systemData.frequency === null ? systemData.frequency : null;
+    systemData.subfeatures = isRecord(systemData.subfeatures) ? systemData.subfeatures : {};
+    systemData.selfEffect = isRecord(systemData.selfEffect) || systemData.selfEffect === null ? systemData.selfEffect : null;
+    systemData.location = typeof systemData.location === "string" || systemData.location === null
+      ? systemData.location
+      : null;
+  }
+
+  if (isPhysicalFoundryItemType(foundryType)) {
+    ensureCoreItemSystemFields(systemData, itemType);
+  }
+}
+
+function isPhysicalFoundryItemType(type: FoundryCreatableItemType): boolean {
+  return type === "ammo"
+    || type === "armor"
+    || type === "backpack"
+    || type === "book"
+    || type === "shield"
+    || type === "treasure"
+    || type === "weapon"
+    || type === "equipment"
+    || type === "consumable";
 }
 
 function prepareActorSource(actor: ActorSchemaData): FoundryActorSource {
@@ -3028,38 +3345,65 @@ function createSpellItem(
 ): FoundryActorSpellSource {
   const description = toRichText(spell.description ?? "");
   const tradition = (spell.tradition ?? defaultTradition).toLowerCase();
+  const system: FoundryActorSpellSource["system"] = {
+    description: { value: description, gm: "" },
+    rules: [],
+    slug: null,
+    _migration: { version: 0.946, lastMigration: null },
+    traits: {
+      otherTags: [],
+      value: [],
+      rarity: "common",
+      traditions: tradition ? [tradition] : [],
+    },
+    publication: { title: "", authors: "", license: "OGL", remaster: false },
+    level: { value: spell.level },
+    requirements: "",
+    target: { value: "" },
+    range: { value: "" },
+    area: { value: null, type: null },
+    time: { value: "" },
+    duration: { value: "", sustained: false },
+    damage: {},
+    defense: { passive: { statistic: "" }, save: { statistic: "", basic: false } },
+    cost: { value: "" },
+    location: { value: entryId },
+    counteraction: false,
+    heightening: { type: null, interval: null, damage: {}, area: null },
+  };
+
+  if (isRecord(spell.system)) {
+    mergeIntoRecord(system as Record<string, unknown>, clone(spell.system) as Record<string, unknown>);
+  }
+
+  system.description = {
+    value: description,
+    gm: isRecord(system.description) && typeof system.description.gm === "string" ? system.description.gm : "",
+  };
+  system.level = { value: Math.max(0, Math.trunc(spell.level)) };
+  system.location = { value: entryId };
+  system.traits = {
+    ...(isRecord(system.traits) ? system.traits : {}),
+    value: Array.isArray((system.traits as { value?: unknown } | undefined)?.value)
+      ? (system.traits as { value: string[] }).value
+      : [],
+    otherTags: Array.isArray((system.traits as { otherTags?: unknown } | undefined)?.otherTags)
+      ? (system.traits as { otherTags: string[] }).otherTags
+      : [],
+    rarity: typeof (system.traits as { rarity?: unknown } | undefined)?.rarity === "string"
+      ? (system.traits as { rarity: string }).rarity
+      : "common",
+    traditions: Array.isArray((system.traits as { traditions?: unknown } | undefined)?.traditions)
+      ? (system.traits as { traditions: string[] }).traditions
+      : (tradition ? [tradition] : []),
+  };
 
   return {
     _id: generateStableId(`spell:${actorKey}:${entryIndex}:${spellIndex}`),
     name: spell.name,
     type: "spell",
     img: DEFAULT_SPELL_IMAGE,
-    system: {
-      description: { value: description, gm: "" },
-      rules: [],
-      slug: null,
-      _migration: { version: 0.946, lastMigration: null },
-      traits: {
-        otherTags: [],
-        value: [],
-        rarity: "common",
-        traditions: tradition ? [tradition] : [],
-      },
-      publication: { title: "", authors: "", license: "OGL", remaster: false },
-      level: { value: spell.level },
-      requirements: "",
-      target: { value: "" },
-      range: { value: "" },
-      area: { value: null, type: null },
-      time: { value: "" },
-      duration: { value: "", sustained: false },
-      damage: {},
-      defense: { passive: { statistic: "" }, save: { statistic: "", basic: false } },
-      cost: { value: "" },
-      location: { value: entryId },
-      counteraction: false,
-      heightening: { type: null, interval: null, damage: {}, area: null },
-    },
+    system,
     effects: [],
     folder: null,
     sort: 0,
@@ -3085,8 +3429,13 @@ function inferInventoryItemTypeFromText(text: string): ItemSchemaData["itemType"
   }
 
   const normalized = text.toLowerCase();
+  if (/\b(ammo|ammunition|arrow|bolt|rounds|shot|cartridge)\b/.test(normalized)) return "ammo";
+  if (/\b(shield|buckler|tower shield)\b/.test(normalized)) return "shield";
   if (/\b(wand|magic wand)\b/.test(normalized)) return "wand";
   if (/\b(staff|stave|quarterstaff)\b/.test(normalized)) return "staff";
+  if (/\b(backpack|satchel|knapsack|pack)\b/.test(normalized)) return "backpack";
+  if (/\b(book|tome|grimoire|codex|journal)\b/.test(normalized)) return "book";
+  if (/\b(treasure|coin|coins|gem|gems|art object|material)\b/.test(normalized)) return "treasure";
   if (/\b(potion|elixir|bomb|poison|talisman|scroll|mutagen|consumable|ammunition|ammo)\b/.test(normalized)) {
     return "consumable";
   }
@@ -3110,10 +3459,15 @@ function mapInventoryItemType(
   if (typeof value === "string") {
     const normalized = value.trim().toLowerCase();
     switch (normalized) {
+      case "ammo":
       case "armor":
+      case "shield":
       case "weapon":
       case "equipment":
+      case "backpack":
+      case "book":
       case "consumable":
+      case "treasure":
       case "feat":
       case "spell":
       case "wand":
@@ -3201,6 +3555,7 @@ function createInventoryItem(
     description: entry.description ?? "",
     img: normalizedImg,
     source: actor.source,
+    system: isRecord(entry.system) ? (clone(entry.system) as Record<string, unknown>) : null,
     publication: actor.publication,
   });
 

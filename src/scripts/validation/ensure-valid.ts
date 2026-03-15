@@ -81,7 +81,11 @@ const ACTION_TYPE_LOOKUP = createEnumLookup(ACTION_EXECUTIONS, {
 });
 
 const ITEM_TYPE_LOOKUP = createEnumLookup(ITEM_CATEGORIES, {
-  shield: "armor",
+  armour: "armor",
+  ammunition: "ammo",
+  backpacks: "backpack",
+  books: "book",
+  treasures: "treasure",
 });
 
 const ACTOR_TYPE_LOOKUP = createEnumLookup(ACTOR_CATEGORIES);
@@ -293,6 +297,7 @@ function coerceItem(value: Record<string, unknown>): void {
   assignOptionalString(value, "description");
   assignOptionalString(value, "img", { allowEmpty: true });
   assignOptionalString(value, "source", { allowEmpty: true });
+  assignOptionalObject(value, "system");
 }
 
 function coerceActor(value: Record<string, unknown>): void {
@@ -719,6 +724,7 @@ function normalizeSpellList(raw: unknown): ActorSpellList {
       name,
       description: normalizeNullableString(source.description ?? source.details),
       tradition: normalizeNullableString(source.tradition),
+      system: normalizeLooseObject(source.system),
     });
   }
   return result;
@@ -769,6 +775,11 @@ function normalizeActorInventory(raw: unknown): NonNullable<ActorSchemaData["inv
     const img = normalizeNullableString(source.img ?? source.image);
     if (img) {
       normalizedEntry.img = img;
+    }
+
+    const system = normalizeLooseObject(source.system);
+    if (system) {
+      normalizedEntry.system = system;
     }
 
     result.push(normalizedEntry);
@@ -1086,6 +1097,24 @@ function assignNumber(target: Record<string, unknown>, key: string): void {
   if (coerced !== undefined) {
     target[key] = coerced;
   }
+}
+
+function assignOptionalObject(target: Record<string, unknown>, key: string): void {
+  if (!Object.hasOwn(target, key)) return;
+  const value = normalizeLooseObject(target[key]);
+  if (value) {
+    target[key] = value;
+  } else {
+    delete target[key];
+  }
+}
+
+function normalizeLooseObject(value: unknown): Record<string, unknown> | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  return clone(value) as Record<string, unknown>;
 }
 
 function coerceString(value: unknown): string | undefined {
