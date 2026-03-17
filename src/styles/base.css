@@ -77,3 +77,15 @@
 .handy-dandy-npc-rule-elements-form select {
   width: 100%;
 }
+
+.handy-dandy-map-marker-window {
+  max-height: 92vh;
+}
+
+.handy-dandy-map-marker-window .window-content,
+.handy-dandy-map-marker-window [data-application-part="content"],
+.handy-dandy-map-marker-window-content {
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}

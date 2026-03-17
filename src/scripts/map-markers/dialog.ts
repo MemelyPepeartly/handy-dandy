@@ -89,8 +89,8 @@ function buildDialogContent(marker: MapMarkerData): string {
         flex-direction: column;
         gap: 0.85rem;
         min-width: min(980px, 96vw);
-        max-height: 78vh;
-        overflow-y: auto;
+        max-width: 100%;
+        min-height: 0;
         padding: 0.1rem 0.2rem 0.2rem;
       }
 
@@ -523,13 +523,55 @@ function attachExpandedEditors(root: HTMLElement): void {
   }
 }
 
+function decorateMapMarkerDialogShell(root: HTMLElement): HTMLElement {
+  const shell = root.matches(".window-app, dialog")
+    ? root
+    : (root.closest<HTMLElement>(".window-app, dialog") ?? root);
+  shell.classList.add("handy-dandy-map-marker-window");
+
+  const content = shell.querySelector<HTMLElement>(".window-content, [data-application-part='content']");
+  content?.classList.add("handy-dandy-map-marker-window-content");
+  return content ?? shell;
+}
+
+function attachTextareaWheelPassthrough(root: HTMLElement, scrollContainer: HTMLElement): void {
+  const textareas = Array.from(root.querySelectorAll<HTMLTextAreaElement>(".handy-dandy-map-marker-form textarea"));
+  for (const textarea of textareas) {
+    textarea.addEventListener("wheel", (event) => {
+      const deltaY = event.deltaY;
+      if (!Number.isFinite(deltaY) || deltaY === 0) {
+        return;
+      }
+
+      const epsilon = 1;
+      const canScrollUp = textarea.scrollTop > epsilon;
+      const canScrollDown = textarea.scrollTop + textarea.clientHeight < textarea.scrollHeight - epsilon;
+      const wantsUp = deltaY < 0;
+      const wantsDown = deltaY > 0;
+
+      if ((wantsUp && canScrollUp) || (wantsDown && canScrollDown)) {
+        return;
+      }
+
+      if (scrollContainer.scrollHeight <= scrollContainer.clientHeight) {
+        return;
+      }
+
+      scrollContainer.scrollTop += deltaY;
+      event.preventDefault();
+    }, { passive: false });
+  }
+}
+
 function setupDialogInteractions(root: HTMLElement, marker: MapMarkerData): void {
+  const scrollContainer = decorateMapMarkerDialogShell(root);
   const form = root.querySelector<HTMLFormElement>(".handy-dandy-map-marker-form");
   if (!form) {
     return;
   }
 
   attachExpandedEditors(root);
+  attachTextareaWheelPassthrough(root, scrollContainer);
 
   const displayField = root.querySelector<HTMLSelectElement>("select[name=\"displayMode\"]");
   const groupedFields = Array.from(root.querySelectorAll<HTMLElement>("[data-display-group]"));
