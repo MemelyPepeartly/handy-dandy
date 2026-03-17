@@ -119,6 +119,7 @@ Hooks.once("init", async () => {
     "openrouter-account": `${CONSTANTS.TEMPLATE_PATH}/openrouter-account.hbs`,
     "openrouter-credits": `${CONSTANTS.TEMPLATE_PATH}/openrouter-credits.hbs`,
     "openrouter-model-manager": `${CONSTANTS.TEMPLATE_PATH}/openrouter-model-manager.hbs`,
+    "map-marker-dialog": `${CONSTANTS.TEMPLATE_PATH}/map-marker-dialog.hbs`,
     "npc-rule-elements-editor": `${CONSTANTS.TEMPLATE_PATH}/npc-rule-elements-editor.hbs`,
     "prompt-workbench-loading": `${CONSTANTS.TEMPLATE_PATH}/prompt-workbench-loading.hbs`,
     "prompt-workbench-generation-setup": `${CONSTANTS.TEMPLATE_PATH}/prompt-workbench-generation-setup.hbs`,

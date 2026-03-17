@@ -1,0 +1,150 @@
+.handy-dandy-map-marker-window {
+  max-height: 92vh;
+}
+
+.handy-dandy-map-marker-window .window-content,
+.handy-dandy-map-marker-window [data-application-part="content"],
+.handy-dandy-map-marker-window-content {
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0.55rem 0.65rem 0.75rem;
+}
+
+.handy-dandy-map-marker-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.handy-dandy-map-marker-card {
+  margin: 0;
+  border: 1px solid var(--color-border-dark, #333);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.16);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.75rem;
+}
+
+.handy-dandy-map-marker-card > legend {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.035em;
+  padding: 0 0.3rem;
+  text-transform: uppercase;
+}
+
+.handy-dandy-map-marker-grid {
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+
+.handy-dandy-map-marker-context-grid {
+  display: grid;
+  gap: 0.7rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.handy-dandy-map-marker-field {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.handy-dandy-map-marker-field > label {
+  color: var(--color-text-light-3, #d2d2d2);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.handy-dandy-map-marker-form input,
+.handy-dandy-map-marker-form select,
+.handy-dandy-map-marker-form textarea {
+  width: 100%;
+  min-width: 0;
+}
+
+.handy-dandy-map-marker-form textarea {
+  line-height: 1.35;
+  min-height: 5.25rem;
+  max-height: 22rem;
+  overflow-y: auto;
+  resize: vertical;
+}
+
+.handy-dandy-map-marker-form textarea[name="boxText"] {
+  min-height: 12rem;
+}
+
+.handy-dandy-map-marker-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.handy-dandy-map-marker-actions {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.4rem;
+}
+
+.handy-dandy-map-marker-actions button {
+  min-height: 2rem;
+  min-width: 6.2rem;
+  white-space: nowrap;
+}
+
+.handy-dandy-map-marker-expand-row {
+  display: flex;
+  justify-content: flex-end;
+  margin: -0.1rem 0 0.05rem;
+}
+
+.handy-dandy-map-marker-expand-button {
+  font-size: 0.79rem;
+  line-height: 1;
+  padding: 0.22rem 0.5rem;
+}
+
+.handy-dandy-map-marker-checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-weight: 600;
+}
+
+.handy-dandy-map-marker-checkbox input[type="checkbox"] {
+  margin-top: 0.2rem;
+}
+
+.handy-dandy-map-marker-checkbox span {
+  line-height: 1.3;
+}
+
+.handy-dandy-map-marker-form .notes {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.3;
+  color: var(--color-text-light-6, #b9b9b9);
+}
+
+.handy-dandy-map-marker-gm-notes[data-active="false"] textarea {
+  opacity: 0.72;
+}
+
+@media (max-width: 980px) {
+  .handy-dandy-map-marker-context-grid {
+    grid-template-columns: 1fr;
+  }
+}

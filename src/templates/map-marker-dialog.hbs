@@ -1,0 +1,180 @@
+<form class="handy-dandy-map-marker-form">
+  <fieldset class="handy-dandy-map-marker-card">
+    <legend>Marker Setup</legend>
+    <div class="handy-dandy-map-marker-grid">
+      <div class="handy-dandy-map-marker-field">
+        <label for="handy-dandy-marker-kind">Marker Type</label>
+        <select id="handy-dandy-marker-kind" name="kind">
+          <option value="specific-room"{{#unless isMapNote}} selected{{/unless}}>Specific Room</option>
+          <option value="map-note"{{#if isMapNote}} selected{{/if}}>Map Note</option>
+        </select>
+      </div>
+
+      <div class="handy-dandy-map-marker-field">
+        <label for="handy-dandy-marker-title">Room/Area Name</label>
+        <input
+          id="handy-dandy-marker-title"
+          name="title"
+          type="text"
+          value="{{marker.title}}"
+          placeholder="The Caved-In Observatory"
+        />
+      </div>
+
+      <div class="handy-dandy-map-marker-field">
+        <label for="handy-dandy-marker-display-mode">Marker Display</label>
+        <select id="handy-dandy-marker-display-mode" name="displayMode">
+          <option value="number"{{#unless isIconMode}} selected{{/unless}}>Number</option>
+          <option value="icon"{{#if isIconMode}} selected{{/if}}>Icon</option>
+        </select>
+      </div>
+
+      <div class="handy-dandy-map-marker-field" data-display-group="number">
+        <label for="handy-dandy-marker-number">Number Label</label>
+        <input id="handy-dandy-marker-number" name="numberLabel" type="text" value="{{marker.numberLabel}}" />
+      </div>
+
+      <div class="handy-dandy-map-marker-field" data-display-group="icon">
+        <label for="handy-dandy-marker-icon">Icon</label>
+        <select id="handy-dandy-marker-icon" name="iconSymbol">
+          {{#each iconOptions}}
+            <option value="{{value}}"{{#if selected}} selected{{/if}}>{{label}}</option>
+          {{/each}}
+        </select>
+      </div>
+
+      <div class="handy-dandy-map-marker-field">
+        <label for="handy-dandy-marker-tone">Tone</label>
+        <select id="handy-dandy-marker-tone" name="tone">
+          {{#each toneOptions}}
+            <option value="{{value}}"{{#if selected}} selected{{/if}}>{{label}}</option>
+          {{/each}}
+        </select>
+      </div>
+
+      <div class="handy-dandy-map-marker-field">
+        <label for="handy-dandy-marker-length">Boxtext Length</label>
+        <select id="handy-dandy-marker-length" name="boxTextLength">
+          {{#each lengthOptions}}
+            <option value="{{value}}"{{#if selected}} selected{{/if}}>{{label}}</option>
+          {{/each}}
+        </select>
+      </div>
+    </div>
+  </fieldset>
+
+  <fieldset class="handy-dandy-map-marker-card">
+    <legend>Scene Prep Context</legend>
+    <div class="handy-dandy-map-marker-toolbar">
+      <button type="button" data-action="insert-template">Insert Prep Template</button>
+    </div>
+    <p class="notes">These fields are stored on the marker and used to generate stronger read-aloud text.</p>
+
+    <div class="handy-dandy-map-marker-context-grid">
+      <div class="handy-dandy-map-marker-field">
+        <label for="handy-dandy-marker-prompt">Prompt Objective</label>
+        <textarea
+          id="handy-dandy-marker-prompt"
+          name="prompt"
+          rows="4"
+          placeholder="What should the boxed text accomplish?"
+        >{{marker.prompt}}</textarea>
+      </div>
+
+      <div class="handy-dandy-map-marker-field">
+        <label for="handy-dandy-marker-theme">Area Specifics and Theme</label>
+        <textarea
+          id="handy-dandy-marker-theme"
+          name="areaTheme"
+          rows="4"
+          placeholder="Architecture, history, vibe, and environmental flavor."
+        >{{marker.areaTheme}}</textarea>
+      </div>
+
+      <div class="handy-dandy-map-marker-field">
+        <label for="handy-dandy-marker-sensory">First Sensory Impression</label>
+        <textarea
+          id="handy-dandy-marker-sensory"
+          name="sensoryDetails"
+          rows="4"
+          placeholder="What do players see, hear, smell, or feel first?"
+        >{{marker.sensoryDetails}}</textarea>
+      </div>
+
+      <div class="handy-dandy-map-marker-field">
+        <label for="handy-dandy-marker-features">Notable Features and Interactables</label>
+        <textarea
+          id="handy-dandy-marker-features"
+          name="notableFeatures"
+          rows="4"
+          placeholder="Landmarks, objects, clues, and interactable set pieces."
+        >{{marker.notableFeatures}}</textarea>
+      </div>
+
+      <div class="handy-dandy-map-marker-field">
+        <label for="handy-dandy-marker-occupants">Occupants and Activity</label>
+        <textarea
+          id="handy-dandy-marker-occupants"
+          name="occupants"
+          rows="4"
+          placeholder="Creatures, NPCs, movement, or signs of recent presence."
+        >{{marker.occupants}}</textarea>
+      </div>
+
+      <div class="handy-dandy-map-marker-field">
+        <label for="handy-dandy-marker-hazards">Hazards and Tension</label>
+        <textarea
+          id="handy-dandy-marker-hazards"
+          name="hazards"
+          rows="4"
+          placeholder="Danger cues, unstable elements, and pressure in the scene."
+        >{{marker.hazards}}</textarea>
+      </div>
+    </div>
+  </fieldset>
+
+  <fieldset class="handy-dandy-map-marker-card handy-dandy-map-marker-gm-notes" data-active="{{#if marker.includeGmNotes}}true{{else}}false{{/if}}">
+    <legend>GM Notes</legend>
+    <label class="handy-dandy-map-marker-checkbox" for="handy-dandy-marker-include-gm-notes">
+      <input
+        id="handy-dandy-marker-include-gm-notes"
+        type="checkbox"
+        name="includeGmNotes"
+        {{#if marker.includeGmNotes}}checked{{/if}}
+      />
+      <span>Allow generation to lightly weave these notes into read-aloud text</span>
+    </label>
+
+    <div class="handy-dandy-map-marker-field">
+      <textarea
+        id="handy-dandy-marker-gm-notes"
+        name="gmNotes"
+        rows="4"
+        placeholder="Secret context, pacing notes, and what this area is doing in your adventure."
+      >{{marker.gmNotes}}</textarea>
+    </div>
+
+    <p class="notes">Keep secrets here. Disable the checkbox above if you want boxtext to avoid revealing them.</p>
+  </fieldset>
+
+  <fieldset class="handy-dandy-map-marker-card">
+    <legend>Boxtext Output</legend>
+    <div class="handy-dandy-map-marker-toolbar">
+      <div class="handy-dandy-map-marker-actions">
+        <button type="button" data-action="copy-boxtext">Copy</button>
+        <button type="button" data-action="generate-boxtext">Generate Boxtext</button>
+      </div>
+    </div>
+
+    <div class="handy-dandy-map-marker-field">
+      <textarea
+        id="handy-dandy-marker-boxtext"
+        name="boxText"
+        rows="8"
+        placeholder="Generated read-aloud text appears here."
+      >{{marker.boxText}}</textarea>
+    </div>
+
+    <p class="notes">Generated text is editable. Save when it reads the way you want.</p>
+  </fieldset>
+</form>

@@ -11,6 +11,7 @@ import {
 } from "./types";
 import { generateMapMarkerBoxText } from "./generation";
 import { waitForDialog } from "../foundry/dialog";
+import { renderApplicationTemplate } from "../foundry/templates";
 
 type MapMarkerDialogAction = "save" | "delete" | "cancel";
 
@@ -35,6 +36,8 @@ const BOXTEXT_LENGTH_OPTIONS: ReadonlyArray<{ value: MapMarkerBoxTextLength; lab
   { value: "long", label: "Long (5-7)" },
 ];
 
+const MAP_MARKER_DIALOG_TEMPLATE = `${CONSTANTS.TEMPLATE_PATH}/map-marker-dialog.hbs`;
+
 const PREP_TEMPLATE_VALUES = {
   prompt: "Introduce the room's core purpose and immediate player focus.",
   areaTheme: "Architecture, era, atmosphere, and the emotional tone of this space.",
@@ -56,276 +59,69 @@ function escapeHtml(value: string): string {
   return div.innerHTML;
 }
 
-function buildIconOptions(selected: string): string {
-  return MAP_MARKER_ICON_OPTIONS.map((value) => {
-    const active = value === selected ? " selected" : "";
-    return `<option value="${escapeHtml(value)}"${active}>${escapeHtml(value)}</option>`;
-  }).join("");
+interface MapMarkerDialogSelectOption {
+  readonly value: string;
+  readonly label: string;
+  readonly selected: boolean;
 }
 
-function buildSelectOptions<TValue extends string>(
+interface MapMarkerDialogTemplateData {
+  readonly isMapNote: boolean;
+  readonly isIconMode: boolean;
+  readonly marker: MapMarkerData;
+  readonly iconOptions: ReadonlyArray<MapMarkerDialogSelectOption>;
+  readonly toneOptions: ReadonlyArray<MapMarkerDialogSelectOption>;
+  readonly lengthOptions: ReadonlyArray<MapMarkerDialogSelectOption>;
+}
+
+function buildTemplateSelectOptions<TValue extends string>(
   options: ReadonlyArray<{ value: TValue; label: string }>,
   selected: string,
-): string {
-  return options
-    .map((option) => {
-      const active = option.value === selected ? " selected" : "";
-      return `<option value="${escapeHtml(option.value)}"${active}>${escapeHtml(option.label)}</option>`;
-    })
-    .join("");
+): ReadonlyArray<MapMarkerDialogSelectOption> {
+  return options.map((option) => ({
+    value: option.value,
+    label: option.label,
+    selected: option.value === selected,
+  }));
 }
 
-function buildDialogContent(marker: MapMarkerData): string {
-  const isMapNote = marker.kind === "map-note";
-  const isIconMode = marker.displayMode === "icon";
-  const iconOptions = buildIconOptions(marker.iconSymbol || DEFAULT_MAP_MARKER_ICON);
-  const toneOptions = buildSelectOptions(TONE_OPTIONS, marker.tone);
-  const lengthOptions = buildSelectOptions(BOXTEXT_LENGTH_OPTIONS, marker.boxTextLength);
+async function buildDialogContent(marker: MapMarkerData): Promise<string> {
+  const iconSymbol = marker.iconSymbol || DEFAULT_MAP_MARKER_ICON;
+  const tone = normalizeTone(marker.tone, DEFAULT_MAP_MARKER_TONE);
+  const boxTextLength = normalizeBoxTextLength(
+    marker.boxTextLength,
+    DEFAULT_MAP_MARKER_BOXTEXT_LENGTH,
+  );
 
-  return `
-    <style>
-      .handy-dandy-map-marker-form {
-        display: flex;
-        flex-direction: column;
-        gap: 0.85rem;
-        min-width: min(980px, 96vw);
-        max-width: 100%;
-        min-height: 0;
-        padding: 0.1rem 0.2rem 0.2rem;
-      }
+  const templateData: MapMarkerDialogTemplateData = {
+    isMapNote: marker.kind === "map-note",
+    isIconMode: marker.displayMode === "icon",
+    marker: {
+      ...marker,
+      iconSymbol,
+      tone,
+      boxTextLength,
+      title: marker.title ?? "",
+      numberLabel: marker.numberLabel ?? "",
+      prompt: marker.prompt ?? "",
+      areaTheme: marker.areaTheme ?? "",
+      sensoryDetails: marker.sensoryDetails ?? "",
+      notableFeatures: marker.notableFeatures ?? "",
+      occupants: marker.occupants ?? "",
+      hazards: marker.hazards ?? "",
+      gmNotes: marker.gmNotes ?? "",
+      boxText: marker.boxText ?? "",
+    },
+    iconOptions: MAP_MARKER_ICON_OPTIONS.map((value) => ({
+      value,
+      label: value,
+      selected: value === iconSymbol,
+    })),
+    toneOptions: buildTemplateSelectOptions(TONE_OPTIONS, tone),
+    lengthOptions: buildTemplateSelectOptions(BOXTEXT_LENGTH_OPTIONS, boxTextLength),
+  };
 
-      .handy-dandy-map-marker-card {
-        margin: 0;
-        border: 1px solid var(--color-border-dark, #333);
-        border-radius: 8px;
-        display: flex;
-        flex-direction: column;
-        gap: 0.65rem;
-        padding: 0.7rem;
-      }
-
-      .handy-dandy-map-marker-card > legend {
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.03em;
-        font-size: 0.78rem;
-        padding: 0 0.25rem;
-      }
-
-      .handy-dandy-map-marker-form .form-group {
-        display: flex;
-        flex-direction: column;
-        gap: 0.35rem;
-      }
-
-      .handy-dandy-map-marker-form .form-group > label {
-        font-weight: 600;
-      }
-
-      .handy-dandy-map-marker-form input,
-      .handy-dandy-map-marker-form select,
-      .handy-dandy-map-marker-form textarea {
-        width: 100%;
-      }
-
-      .handy-dandy-map-marker-grid {
-        display: grid;
-        gap: 0.6rem;
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      }
-
-      .handy-dandy-map-marker-context-grid {
-        display: grid;
-        gap: 0.65rem;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
-
-      .handy-dandy-map-marker-form textarea {
-        line-height: 1.35;
-        min-height: 5.8rem;
-        max-height: 20rem;
-        overflow-y: auto;
-        resize: vertical;
-        width: 100%;
-      }
-
-      .handy-dandy-map-marker-form textarea[name="boxText"] {
-        min-height: 13rem;
-      }
-
-      .handy-dandy-map-marker-expand-row {
-        display: flex;
-        justify-content: flex-end;
-        margin: -0.15rem 0 0.15rem;
-      }
-
-      .handy-dandy-map-marker-expand-button {
-        font-size: 0.82rem;
-        line-height: 1;
-        padding: 0.2rem 0.45rem;
-      }
-
-      .handy-dandy-map-marker-toolbar {
-        display: flex;
-        justify-content: flex-end;
-      }
-
-      .handy-dandy-map-marker-row {
-        align-items: center;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.45rem;
-        justify-content: space-between;
-      }
-
-      .handy-dandy-map-marker-row button {
-        flex: none;
-        white-space: nowrap;
-      }
-
-      .handy-dandy-map-marker-actions {
-        align-items: center;
-        display: inline-flex;
-        flex-wrap: nowrap;
-        gap: 0.4rem;
-        justify-content: flex-end;
-      }
-
-      .handy-dandy-map-marker-actions button {
-        align-items: center;
-        display: inline-flex;
-        justify-content: center;
-        line-height: 1.15;
-        min-height: 2.35rem;
-        min-width: 7.2rem;
-        padding: 0.35rem 0.75rem;
-        white-space: nowrap;
-        width: auto;
-      }
-
-      .handy-dandy-map-marker-form .notes {
-        margin: 0;
-        font-size: 0.86rem;
-        line-height: 1.3;
-        color: var(--color-text-light-6, #bbb);
-      }
-
-      .handy-dandy-map-marker-checkbox {
-        align-items: center;
-        display: inline-flex;
-        gap: 0.45rem;
-        font-weight: 600;
-        margin-bottom: 0.2rem;
-      }
-
-      .handy-dandy-map-marker-gm-notes[data-active="false"] textarea {
-        opacity: 0.72;
-      }
-
-      @media (max-width: 880px) {
-        .handy-dandy-map-marker-context-grid {
-          grid-template-columns: 1fr;
-        }
-      }
-    </style>
-    <form class="handy-dandy-map-marker-form">
-      <fieldset class="handy-dandy-map-marker-card">
-        <legend>Marker Setup</legend>
-        <div class="handy-dandy-map-marker-grid">
-          <div class="form-group">
-            <label for="handy-dandy-marker-kind">Marker Type</label>
-            <select id="handy-dandy-marker-kind" name="kind">
-              <option value="specific-room"${isMapNote ? "" : " selected"}>Specific Room</option>
-              <option value="map-note"${isMapNote ? " selected" : ""}>Map Note</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label for="handy-dandy-marker-title">Room/Area Name</label>
-            <input id="handy-dandy-marker-title" name="title" type="text" value="${escapeHtml(marker.title)}" placeholder="The Caved-In Observatory" />
-          </div>
-          <div class="form-group">
-            <label for="handy-dandy-marker-display-mode">Marker Display</label>
-            <select id="handy-dandy-marker-display-mode" name="displayMode">
-              <option value="number"${isIconMode ? "" : " selected"}>Number</option>
-              <option value="icon"${isIconMode ? " selected" : ""}>Icon</option>
-            </select>
-          </div>
-          <div class="form-group" data-display-group="number">
-            <label for="handy-dandy-marker-number">Number Label</label>
-            <input id="handy-dandy-marker-number" name="numberLabel" type="text" value="${escapeHtml(marker.numberLabel)}" />
-          </div>
-          <div class="form-group" data-display-group="icon">
-            <label for="handy-dandy-marker-icon">Icon</label>
-            <select id="handy-dandy-marker-icon" name="iconSymbol">${iconOptions}</select>
-          </div>
-          <div class="form-group">
-            <label for="handy-dandy-marker-tone">Tone</label>
-            <select id="handy-dandy-marker-tone" name="tone">${toneOptions}</select>
-          </div>
-          <div class="form-group">
-            <label for="handy-dandy-marker-length">Boxtext Length</label>
-            <select id="handy-dandy-marker-length" name="boxTextLength">${lengthOptions}</select>
-          </div>
-        </div>
-      </fieldset>
-
-      <fieldset class="handy-dandy-map-marker-card">
-        <legend>Scene Prep Context</legend>
-        <div class="handy-dandy-map-marker-toolbar">
-          <button type="button" data-action="insert-template">Insert Prep Template</button>
-        </div>
-        <p class="notes">These fields are stored on the marker and used to generate stronger read-aloud text.</p>
-        <div class="handy-dandy-map-marker-context-grid">
-          <div class="form-group">
-            <label for="handy-dandy-marker-prompt">Prompt Objective</label>
-            <textarea id="handy-dandy-marker-prompt" name="prompt" rows="5" placeholder="What should the boxed text accomplish?">${escapeHtml(marker.prompt)}</textarea>
-          </div>
-          <div class="form-group">
-            <label for="handy-dandy-marker-theme">Area Specifics and Theme</label>
-            <textarea id="handy-dandy-marker-theme" name="areaTheme" rows="5" placeholder="Architecture, history, vibe, and environmental flavor.">${escapeHtml(marker.areaTheme)}</textarea>
-          </div>
-          <div class="form-group">
-            <label for="handy-dandy-marker-sensory">First Sensory Impression</label>
-            <textarea id="handy-dandy-marker-sensory" name="sensoryDetails" rows="5" placeholder="What do players see, hear, smell, or feel first?">${escapeHtml(marker.sensoryDetails)}</textarea>
-          </div>
-          <div class="form-group">
-            <label for="handy-dandy-marker-features">Notable Features and Interactables</label>
-            <textarea id="handy-dandy-marker-features" name="notableFeatures" rows="5" placeholder="Landmarks, objects, clues, and interactable set pieces.">${escapeHtml(marker.notableFeatures)}</textarea>
-          </div>
-          <div class="form-group">
-            <label for="handy-dandy-marker-occupants">Occupants and Activity</label>
-            <textarea id="handy-dandy-marker-occupants" name="occupants" rows="5" placeholder="Creatures, NPCs, movement, or signs of recent presence.">${escapeHtml(marker.occupants)}</textarea>
-          </div>
-          <div class="form-group">
-            <label for="handy-dandy-marker-hazards">Hazards and Tension</label>
-            <textarea id="handy-dandy-marker-hazards" name="hazards" rows="5" placeholder="Danger cues, unstable elements, and pressure in the scene.">${escapeHtml(marker.hazards)}</textarea>
-          </div>
-        </div>
-      </fieldset>
-
-      <fieldset class="handy-dandy-map-marker-card handy-dandy-map-marker-gm-notes" data-active="${marker.includeGmNotes ? "true" : "false"}">
-        <legend>GM Notes</legend>
-        <label class="handy-dandy-map-marker-checkbox">
-          <input type="checkbox" name="includeGmNotes"${marker.includeGmNotes ? " checked" : ""} />
-          Allow generation to lightly weave these notes into read-aloud text
-        </label>
-        <textarea name="gmNotes" rows="5" placeholder="Secret context, pacing notes, and what this area is doing in your adventure.">${escapeHtml(marker.gmNotes)}</textarea>
-        <p class="notes">Keep secrets here. Disable the checkbox above if you want boxtext to avoid revealing them.</p>
-      </fieldset>
-
-      <fieldset class="handy-dandy-map-marker-card">
-        <legend>Boxtext Output</legend>
-        <div class="handy-dandy-map-marker-toolbar">
-          <div class="handy-dandy-map-marker-actions">
-            <button type="button" data-action="copy-boxtext">Copy</button>
-            <button type="button" data-action="generate-boxtext">Generate Boxtext</button>
-          </div>
-        </div>
-        <textarea id="handy-dandy-marker-boxtext" name="boxText" rows="10" placeholder="Generated read-aloud text appears here.">${escapeHtml(marker.boxText)}</textarea>
-        <p class="notes">Generated text is editable. Save when it reads the way you want.</p>
-      </fieldset>
-    </form>
-  `;
+  return await renderApplicationTemplate(MAP_MARKER_DIALOG_TEMPLATE, templateData);
 }
 
 function normalizeTone(value: unknown, fallback: MapMarkerTone): MapMarkerTone {
@@ -394,7 +190,7 @@ function resolveTextareaLabel(root: HTMLElement, textarea: HTMLTextAreaElement):
     }
   }
 
-  const inGroup = textarea.closest(".form-group")?.querySelector<HTMLLabelElement>("label");
+  const inGroup = textarea.closest(".handy-dandy-map-marker-field")?.querySelector<HTMLLabelElement>("label");
   const inGroupText = inGroup?.textContent?.trim();
   if (inGroupText) {
     return inGroupText;
@@ -486,7 +282,8 @@ async function promptExpandedTextEditor(label: string, value: string): Promise<s
 function attachExpandedEditors(root: HTMLElement): void {
   const textareas = Array.from(root.querySelectorAll<HTMLTextAreaElement>(".handy-dandy-map-marker-form textarea[name]"));
   for (const textarea of textareas) {
-    const container = textarea.closest<HTMLElement>(".form-group") ?? textarea.closest<HTMLElement>("fieldset");
+    const container = textarea.closest<HTMLElement>(".handy-dandy-map-marker-field")
+      ?? textarea.closest<HTMLElement>("fieldset");
     if (!container) {
       continue;
     }
@@ -727,9 +524,10 @@ function readDialogForm(root: HTMLElement, marker: MapMarkerData): { marker: Map
 }
 
 export async function promptMapMarkerDialog(marker: MapMarkerData): Promise<MapMarkerDialogResult> {
+  const content = await buildDialogContent(marker);
   return (await waitForDialog<MapMarkerDialogResult>({
     title: `${CONSTANTS.MODULE_NAME} | Map Note / Room Prep`,
-    content: buildDialogContent(marker),
+    content,
     width: 980,
     resizable: true,
     closeResult: { action: "cancel" },
