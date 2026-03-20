@@ -423,20 +423,6 @@ export const itemSchema = {
   }
 } satisfies JSONSchemaType<ItemSchemaData>;
 
-const INVENTORY_GENERIC_ITEM_CATEGORIES = [
-  "ammo",
-  "equipment",
-  "backpack",
-  "book",
-  "consumable",
-  "treasure",
-  "feat",
-  "spell",
-  "wand",
-  "staff",
-  "other",
-] as const;
-
 const genericStringValueSchema = {
   type: "object",
   additionalProperties: false,
@@ -598,165 +584,6 @@ const genericPhysicalSystemSchema = {
   },
 } as const;
 
-const weaponInventorySystemSchema = {
-  ...genericPhysicalSystemSchema,
-  properties: {
-    ...genericPhysicalSystemSchema.properties,
-    category: { type: "string", default: "simple" },
-    group: { type: "string", nullable: true, default: null },
-    bonus: {
-      type: "object",
-      additionalProperties: false,
-      required: [],
-      properties: {
-        value: { type: "integer", default: 0 },
-      },
-    },
-    damage: {
-      type: "object",
-      additionalProperties: false,
-      required: [],
-      properties: {
-        dice: { type: "integer", minimum: 0, default: 1 },
-        die: { type: "string", enum: ["d4", "d6", "d8", "d10", "d12"] as const, nullable: true, default: "d4" as const },
-        damageType: { type: "string", nullable: true, default: "bludgeoning" },
-        modifier: { type: "integer", default: 0 },
-        persistent: {
-          type: "object",
-          nullable: true,
-          default: null,
-          additionalProperties: false,
-          required: [],
-          properties: {
-            number: { type: "integer", minimum: 0, default: 0 },
-            faces: { type: "integer", enum: [4, 6, 8, 10, 12] as const, nullable: true, default: null },
-            type: { type: "string", nullable: true, default: null },
-          },
-        },
-      },
-    },
-    splashDamage: {
-      type: "object",
-      additionalProperties: false,
-      required: [],
-      properties: {
-        value: { type: "integer", minimum: 0, default: 0 },
-      },
-    },
-    range: { type: "integer", minimum: 0, nullable: true, default: null },
-    maxRange: { type: "integer", minimum: 0, nullable: true, default: null },
-    expend: { type: "integer", minimum: 0, nullable: true, default: null },
-    reload: {
-      type: "object",
-      additionalProperties: false,
-      required: [],
-      properties: {
-        value: { type: "string", nullable: true, default: "0" },
-      },
-    },
-    ammo: {
-      type: "object",
-      nullable: true,
-      default: null,
-      additionalProperties: false,
-      required: [],
-      properties: {
-        builtIn: { type: "boolean", default: false },
-        baseType: { type: "string", nullable: true, default: null },
-        capacity: { type: "integer", minimum: 0, nullable: true, default: null },
-      },
-    },
-    selectedAmmoId: { type: "string", nullable: true, default: null },
-    grade: { type: "string", nullable: true, default: null },
-    runes: {
-      type: "object",
-      additionalProperties: false,
-      required: [],
-      properties: {
-        potency: { type: "integer", minimum: 0, maximum: 4, default: 0 },
-        striking: { type: "integer", minimum: 0, maximum: 4, default: 0 },
-        property: {
-          type: "array",
-          default: [] as const,
-          items: { type: "string", minLength: 1 },
-        },
-      },
-    },
-    specific: {
-      type: "object",
-      nullable: true,
-      default: null,
-      additionalProperties: false,
-      required: [],
-      properties: {},
-    },
-  },
-} as const;
-
-const armorInventorySystemSchema = {
-  ...genericPhysicalSystemSchema,
-  properties: {
-    ...genericPhysicalSystemSchema.properties,
-    category: { type: "string", default: "light" },
-    group: { type: "string", nullable: true, default: null },
-    acBonus: { type: "integer", minimum: 0, default: 0 },
-    strength: { type: "integer", nullable: true, default: null },
-    dexCap: { type: "integer", minimum: 0, default: 5 },
-    checkPenalty: { type: "integer", default: 0 },
-    speedPenalty: { type: "integer", default: 0 },
-    grade: { type: "string", nullable: true, default: null },
-    runes: {
-      type: "object",
-      additionalProperties: false,
-      required: [],
-      properties: {
-        potency: { type: "integer", minimum: 0, maximum: 4, default: 0 },
-        resilient: { type: "integer", minimum: 0, maximum: 4, default: 0 },
-        property: {
-          type: "array",
-          default: [] as const,
-          items: { type: "string", minLength: 1 },
-        },
-      },
-    },
-    specific: {
-      type: "object",
-      nullable: true,
-      default: null,
-      additionalProperties: false,
-      required: [],
-      properties: {},
-    },
-  },
-} as const;
-
-const shieldInventorySystemSchema = {
-  ...genericPhysicalSystemSchema,
-  properties: {
-    ...genericPhysicalSystemSchema.properties,
-    baseItem: { type: "string", nullable: true, default: null },
-    acBonus: { type: "integer", minimum: 0, default: 2 },
-    speedPenalty: { type: "integer", default: 0 },
-    grade: { type: "string", nullable: true, default: null },
-    runes: {
-      type: "object",
-      additionalProperties: false,
-      required: [],
-      properties: {
-        reinforcing: { type: "integer", minimum: 0, maximum: 4, default: 0 },
-      },
-    },
-    specific: {
-      type: "object",
-      nullable: true,
-      default: null,
-      additionalProperties: false,
-      required: [],
-      properties: {},
-    },
-  },
-} as const;
-
 const actorInventoryBaseProperties = {
   name: { type: "string", minLength: 1 },
   slug: { type: "string", nullable: true, default: null },
@@ -765,62 +592,6 @@ const actorInventoryBaseProperties = {
   description: { type: "string", nullable: true, default: null },
   img: { type: "string", nullable: true, default: null },
 } as const;
-
-const actorInventoryEntryVariantSchemas = [
-  {
-    type: "object",
-    additionalProperties: false,
-    required: ["name", "itemType", "system"],
-    properties: {
-      ...actorInventoryBaseProperties,
-      itemType: { type: "string", enum: ["weapon"] as const, default: "weapon" as const },
-      system: {
-        ...weaponInventorySystemSchema,
-        default: {},
-      },
-    },
-  },
-  {
-    type: "object",
-    additionalProperties: false,
-    required: ["name", "itemType", "system"],
-    properties: {
-      ...actorInventoryBaseProperties,
-      itemType: { type: "string", enum: ["armor"] as const, default: "armor" as const },
-      system: {
-        ...armorInventorySystemSchema,
-        default: {},
-      },
-    },
-  },
-  {
-    type: "object",
-    additionalProperties: false,
-    required: ["name", "itemType", "system"],
-    properties: {
-      ...actorInventoryBaseProperties,
-      itemType: { type: "string", enum: ["shield"] as const, default: "shield" as const },
-      system: {
-        ...shieldInventorySystemSchema,
-        default: {},
-      },
-    },
-  },
-  {
-    type: "object",
-    additionalProperties: false,
-    required: ["name"],
-    properties: {
-      ...actorInventoryBaseProperties,
-      itemType: { type: "string", enum: INVENTORY_GENERIC_ITEM_CATEGORIES, nullable: true, default: null },
-      system: {
-        ...genericPhysicalSystemSchema,
-        nullable: true,
-        default: null,
-      },
-    },
-  },
-] as const;
 
 const actorSpellSystemSchema = {
   type: "object",
@@ -1256,7 +1027,136 @@ export const actorSchema = {
       nullable: true,
       default: [] as const,
       items: {
-        anyOf: actorInventoryEntryVariantSchemas,
+        type: "object",
+        additionalProperties: false,
+        required: ["name"],
+        properties: {
+          ...actorInventoryBaseProperties,
+          itemType: { type: "string", enum: ITEM_CATEGORIES, nullable: true, default: null },
+          system: {
+            ...genericPhysicalSystemSchema,
+            nullable: true,
+            default: null,
+          },
+        },
+        allOf: [
+          {
+            if: {
+              type: "object",
+              properties: {
+                itemType: { const: "weapon" },
+              },
+              required: ["itemType"],
+            },
+            then: {
+              type: "object",
+              required: ["system"],
+              properties: {
+                system: {
+                  type: "object",
+                  additionalProperties: false,
+                  required: ["damage", "runes"],
+                  properties: {
+                    damage: {
+                      type: "object",
+                      additionalProperties: false,
+                      required: ["dice", "die", "damageType", "modifier"],
+                      properties: {
+                        dice: { type: "integer", minimum: 0 },
+                        die: { type: "string", enum: ["d4", "d6", "d8", "d10", "d12"] as const, nullable: true },
+                        damageType: { type: "string", nullable: true },
+                        modifier: { type: "integer" },
+                      },
+                    },
+                    runes: {
+                      type: "object",
+                      additionalProperties: false,
+                      required: ["potency", "striking", "property"],
+                      properties: {
+                        potency: { type: "integer", minimum: 0, maximum: 4 },
+                        striking: { type: "integer", minimum: 0, maximum: 4 },
+                        property: {
+                          type: "array",
+                          items: { type: "string", minLength: 1 },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          {
+            if: {
+              type: "object",
+              properties: {
+                itemType: { const: "armor" },
+              },
+              required: ["itemType"],
+            },
+            then: {
+              type: "object",
+              required: ["system"],
+              properties: {
+                system: {
+                  type: "object",
+                  additionalProperties: false,
+                  required: ["acBonus", "dexCap", "checkPenalty", "speedPenalty", "runes"],
+                  properties: {
+                    acBonus: { type: "integer", minimum: 0 },
+                    dexCap: { type: "integer", minimum: 0 },
+                    checkPenalty: { type: "integer" },
+                    speedPenalty: { type: "integer" },
+                    runes: {
+                      type: "object",
+                      additionalProperties: false,
+                      required: ["potency", "resilient", "property"],
+                      properties: {
+                        potency: { type: "integer", minimum: 0, maximum: 4 },
+                        resilient: { type: "integer", minimum: 0, maximum: 4 },
+                        property: {
+                          type: "array",
+                          items: { type: "string", minLength: 1 },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          {
+            if: {
+              type: "object",
+              properties: {
+                itemType: { const: "shield" },
+              },
+              required: ["itemType"],
+            },
+            then: {
+              type: "object",
+              required: ["system"],
+              properties: {
+                system: {
+                  type: "object",
+                  additionalProperties: false,
+                  required: ["acBonus", "runes"],
+                  properties: {
+                    acBonus: { type: "integer", minimum: 0 },
+                    runes: {
+                      type: "object",
+                      additionalProperties: false,
+                      required: ["reinforcing"],
+                      properties: {
+                        reinforcing: { type: "integer", minimum: 0, maximum: 4 },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        ],
       },
     },
     loot: {
