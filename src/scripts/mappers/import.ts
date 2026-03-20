@@ -807,6 +807,51 @@ function sanitizeNonNegativeInteger(value: unknown, fallback: number): number {
   return Math.max(0, Math.trunc(candidate));
 }
 
+function sanitizeInteger(value: unknown, fallback: number): number {
+  const candidate = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(candidate)) {
+    return fallback;
+  }
+  return Math.trunc(candidate);
+}
+
+function sanitizeNonNegativeNumber(value: unknown, fallback: number): number {
+  const candidate = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(candidate)) {
+    return fallback;
+  }
+  return Math.max(0, candidate);
+}
+
+function sanitizeOptionalInteger(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+  const candidate = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(candidate)) {
+    return null;
+  }
+  return Math.trunc(candidate);
+}
+
+function sanitizeStringOrNull(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function sanitizeStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
+    .filter((entry) => entry.length > 0);
+}
+
 function sanitizePriceCoins(value: unknown): Record<string, number> {
   if (!isRecord(value)) {
     return { pp: 0, gp: 0, sp: 0, cp: 0 };
@@ -827,22 +872,120 @@ function ensureCoreItemSystemFields(
   const quantityValue = sanitizeNonNegativeInteger((systemData.quantity as { value?: unknown })?.value ?? systemData.quantity, 1);
   systemData.quantity = Math.max(1, quantityValue);
 
-  const usageCandidate = (systemData.usage as { value?: unknown })?.value;
-  const usageValue = typeof usageCandidate === "string" ? usageCandidate.trim() : "";
+  const usageSource = isRecord(systemData.usage)
+    ? (systemData.usage as { value?: unknown }).value
+    : systemData.usage;
+  const usageValue = typeof usageSource === "string" ? usageSource.trim() : "";
   systemData.usage = { value: usageValue || resolveItemUsage(itemType) };
 
-  const bulkValue = sanitizeNonNegativeInteger((systemData.bulk as { value?: unknown })?.value, 0);
-  if (isRecord(systemData.bulk)) {
-    systemData.bulk = { ...systemData.bulk, value: bulkValue };
-  } else {
-    systemData.bulk = { value: bulkValue };
-  }
+  const bulk = isRecord(systemData.bulk) ? systemData.bulk : {};
+  const bulkValue = sanitizeNonNegativeNumber((bulk as { value?: unknown }).value, 0);
+  systemData.bulk = {
+    ...bulk,
+    value: bulkValue,
+    heldOrStowed: sanitizeNonNegativeNumber((bulk as { heldOrStowed?: unknown }).heldOrStowed, bulkValue),
+    capacity: sanitizeNonNegativeInteger((bulk as { capacity?: unknown }).capacity, 0),
+    ignored: sanitizeNonNegativeInteger((bulk as { ignored?: unknown }).ignored, 0),
+    per: Math.max(1, sanitizeNonNegativeInteger((bulk as { per?: unknown }).per, 1)),
+  };
 
   const size = typeof systemData.size === "string" ? systemData.size.trim().toLowerCase() : "";
   systemData.size = ITEM_SIZE_VALUES.has(size) ? size : "med";
 
-  const coinRecord = sanitizePriceCoins((systemData.price as { value?: unknown } | undefined)?.value);
-  systemData.price = { value: coinRecord };
+  const price = isRecord(systemData.price) ? systemData.price : {};
+  const coinRecord = sanitizePriceCoins((price as { value?: unknown }).value);
+  const per = sanitizeNonNegativeInteger((price as { per?: unknown }).per, 1);
+  systemData.price = {
+    ...price,
+    value: coinRecord,
+    per: Math.max(1, per),
+    sizeSensitive: typeof (price as { sizeSensitive?: unknown }).sizeSensitive === "boolean"
+      ? (price as { sizeSensitive: boolean }).sizeSensitive
+      : false,
+  };
+
+  const hp = isRecord(systemData.hp) ? systemData.hp : {};
+  const hpValue = sanitizeNonNegativeInteger((hp as { value?: unknown }).value, 0);
+  const hpMax = sanitizeNonNegativeInteger((hp as { max?: unknown }).max, hpValue);
+  systemData.hp = {
+    value: hpValue,
+    max: Math.max(hpValue, hpMax),
+  };
+
+  systemData.hardness = sanitizeNonNegativeInteger(systemData.hardness, 0);
+  systemData.baseItem = sanitizeStringOrNull(systemData.baseItem);
+  systemData.containerId = sanitizeStringOrNull(systemData.containerId);
+
+  const equipped = isRecord(systemData.equipped) ? systemData.equipped : {};
+  const handsHeld = sanitizeOptionalInteger((equipped as { handsHeld?: unknown }).handsHeld);
+  systemData.equipped = {
+    carryType: sanitizeStringOrNull((equipped as { carryType?: unknown }).carryType) ?? resolveItemCarryType(itemType),
+    invested: typeof (equipped as { invested?: unknown }).invested === "boolean"
+      ? (equipped as { invested: boolean }).invested
+      : null,
+    ...(handsHeld !== null ? { handsHeld: Math.max(0, Math.min(2, handsHeld)) } : {}),
+    ...(typeof (equipped as { inSlot?: unknown }).inSlot === "boolean"
+      ? { inSlot: (equipped as { inSlot: boolean }).inSlot }
+      : {}),
+  };
+
+  const material = isRecord(systemData.material) ? systemData.material : {};
+  systemData.material = {
+    type: sanitizeStringOrNull((material as { type?: unknown }).type),
+    grade: sanitizeStringOrNull((material as { grade?: unknown }).grade),
+  };
+
+  const traits = isRecord(systemData.traits) ? systemData.traits : {};
+  const traitValues = sanitizeStringArray(
+    Array.isArray((traits as { value?: unknown }).value) ? (traits as { value: unknown[] }).value : [],
+  );
+  const otherTags = sanitizeStringArray(
+    Array.isArray((traits as { otherTags?: unknown }).otherTags) ? (traits as { otherTags: unknown[] }).otherTags : [],
+  );
+  const traditions = sanitizeStringArray(
+    Array.isArray((traits as { traditions?: unknown }).traditions) ? (traits as { traditions: unknown[] }).traditions : [],
+  );
+  const rarity = sanitizeStringOrNull((traits as { rarity?: unknown }).rarity) ?? "common";
+  systemData.traits = {
+    ...traits,
+    value: traitValues,
+    otherTags,
+    rarity,
+    ...(traditions.length > 0 ? { traditions } : {}),
+  };
+
+  const identificationDefaults = resolveItemIdentification(itemType);
+  const identification = isRecord(systemData.identification) ? systemData.identification : {};
+  const unidentified = isRecord((identification as { unidentified?: unknown }).unidentified)
+    ? ((identification as { unidentified: Record<string, unknown> }).unidentified)
+    : {};
+  const unidentifiedData = isRecord((unidentified as { data?: unknown }).data)
+    ? ((unidentified as { data: Record<string, unknown> }).data)
+    : {};
+  const unidentifiedDescription = isRecord((unidentifiedData as { description?: unknown }).description)
+    ? ((unidentifiedData as { description: Record<string, unknown> }).description)
+    : {};
+  const status = String((identification as { status?: unknown }).status ?? "identified").trim().toLowerCase() === "unidentified"
+    ? "unidentified"
+    : "identified";
+  systemData.identification = {
+    ...identification,
+    status,
+    unidentified: {
+      ...unidentified,
+      name: sanitizeStringOrNull((unidentified as { name?: unknown }).name) ?? identificationDefaults.name,
+      img: sanitizeStringOrNull((unidentified as { img?: unknown }).img) ?? identificationDefaults.img,
+      data: {
+        ...unidentifiedData,
+        description: {
+          ...unidentifiedDescription,
+          value: typeof unidentifiedDescription.value === "string" ? unidentifiedDescription.value : "",
+        },
+      },
+    },
+  };
+
+  systemData.subitems = Array.isArray(systemData.subitems) ? systemData.subitems : [];
 }
 
 const ITEM_MIGRATION_VERSION = 0.946;
@@ -866,7 +1009,7 @@ const ITEM_IDENTIFICATION_DEFAULTS: Record<ItemSchemaData["itemType"], { name: s
 
 const ITEM_USAGE_DEFAULTS: Partial<Record<ItemSchemaData["itemType"], string>> = {
   ammo: "carried",
-  armor: "worn",
+  armor: "wornarmor",
   shield: "held-in-one-hand",
   weapon: "held-in-one-hand",
   equipment: "held-in-one-hand",
@@ -892,23 +1035,33 @@ const ITEM_CARRY_TYPE_DEFAULTS: Partial<Record<ItemSchemaData["itemType"], strin
   staff: "worn",
 };
 
-function sanitizeItemTraits(traits: ItemSchemaData["traits"]): string[] {
-  const values = trimArray(traits ?? []);
-  if (!values.length) {
+const ITEM_RARITY_VALUES = new Set(["common", "uncommon", "rare", "unique"]);
+const WEAPON_DIE_VALUES = new Set(["d4", "d6", "d8", "d10", "d12"]);
+
+function normalizeItemTraitValues(value: unknown): string[] {
+  if (!Array.isArray(value)) {
     return [];
   }
 
   const seen = new Set<string>();
   const normalized: string[] = [];
-  for (const trait of values) {
-    const key = trait.toLowerCase();
-    if (seen.has(key)) {
+  for (const entry of value) {
+    if (typeof entry !== "string") {
+      continue;
+    }
+    const key = normalizeTraitKey(entry);
+    if (!key || seen.has(key)) {
       continue;
     }
     seen.add(key);
     normalized.push(key);
   }
+
   return normalized;
+}
+
+function sanitizeItemTraits(traits: ItemSchemaData["traits"]): string[] {
+  return normalizeItemTraitValues(traits ?? []);
 }
 
 function resolveItemIdentification(itemType: ItemSchemaData["itemType"]): {
@@ -927,6 +1080,66 @@ function resolveItemUsage(itemType: ItemSchemaData["itemType"]): string {
 function resolveItemCarryType(itemType: ItemSchemaData["itemType"]): string {
   const carryType = ITEM_CARRY_TYPE_DEFAULTS[itemType];
   return carryType ?? "worn";
+}
+
+function sanitizeItemRarity(value: unknown, fallback: ItemSchemaData["rarity"] = "common"): ItemSchemaData["rarity"] {
+  if (typeof value !== "string") {
+    return fallback;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  return ITEM_RARITY_VALUES.has(normalized)
+    ? normalized as ItemSchemaData["rarity"]
+    : fallback;
+}
+
+function sanitizeWeaponDamageType(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const normalized = normalizeStrikeDamageTypeAlias(normalizeTraitKey(value));
+  if (!normalized) {
+    return null;
+  }
+
+  const known = getPf2eDamageTypes();
+  return known.size === 0 || known.has(normalized) ? normalized : null;
+}
+
+function sanitizeWeaponDie(value: unknown, fallback: "d4" | null = "d4"): string | null {
+  if (value === null || value === undefined || value === "") {
+    return fallback;
+  }
+
+  if (typeof value !== "string") {
+    return fallback;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  return WEAPON_DIE_VALUES.has(normalized) ? normalized : fallback;
+}
+
+function sanitizeWeaponPersistentDamage(
+  value: unknown,
+  fallbackType: string | null,
+): { number: number; faces: 4 | 6 | 8 | 10 | 12 | null; type: string | null } | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const number = sanitizeNonNegativeInteger(value.number, 0);
+  const facesCandidate = sanitizeOptionalInteger(value.faces);
+  const faces = facesCandidate !== null && [4, 6, 8, 10, 12].includes(facesCandidate)
+    ? facesCandidate as 4 | 6 | 8 | 10 | 12
+    : null;
+  const type = sanitizeWeaponDamageType(value.type) ?? fallbackType;
+
+  if (number <= 0 && faces === null && type === null) {
+    return null;
+  }
+
+  return { number, faces, type };
 }
 
 type FoundryCreatableItemType =
@@ -2127,12 +2340,16 @@ function enforceCanonicalItemSystemIdentity(
   systemData.rules = Array.isArray(systemData.rules) ? systemData.rules : [];
 
   if (isRecord(systemData.traits)) {
+    const existingValue = normalizeItemTraitValues(
+      Array.isArray(systemData.traits.value) ? systemData.traits.value : [],
+    );
+    const canonicalTraits = traits.length > 0 ? traits : existingValue;
     const existingOtherTags = Array.isArray(systemData.traits.otherTags) ? systemData.traits.otherTags : [];
     const existingTraditions = Array.isArray(systemData.traits.traditions) ? systemData.traits.traditions : undefined;
     systemData.traits = {
       ...systemData.traits,
-      value: traits,
-      rarity: item.rarity,
+      value: canonicalTraits,
+      rarity: sanitizeItemRarity(systemData.traits.rarity, item.rarity),
       otherTags: existingOtherTags,
       ...(existingTraditions ? { traditions: existingTraditions } : {}),
     };
@@ -2165,11 +2382,11 @@ function applyItemTypeDefaults(
     systemData.stowing = typeof systemData.stowing === "boolean" ? systemData.stowing : false;
     const bulk = isRecord(systemData.bulk) ? systemData.bulk : {};
     systemData.bulk = {
-      value: sanitizeNonNegativeInteger((bulk as { value?: unknown }).value, 0),
-      heldOrStowed: sanitizeNonNegativeInteger((bulk as { heldOrStowed?: unknown }).heldOrStowed, 0),
+      value: sanitizeNonNegativeNumber((bulk as { value?: unknown }).value, 0),
+      heldOrStowed: sanitizeNonNegativeNumber((bulk as { heldOrStowed?: unknown }).heldOrStowed, 0),
       capacity: sanitizeNonNegativeInteger((bulk as { capacity?: unknown }).capacity, 0),
       ignored: sanitizeNonNegativeInteger((bulk as { ignored?: unknown }).ignored, 0),
-      per: sanitizeNonNegativeInteger((bulk as { per?: unknown }).per, 1),
+      per: Math.max(1, sanitizeNonNegativeInteger((bulk as { per?: unknown }).per, 1)),
     };
     systemData.collapsed = typeof systemData.collapsed === "boolean" ? systemData.collapsed : false;
   }
@@ -2182,62 +2399,122 @@ function applyItemTypeDefaults(
 
   if (foundryType === "treasure") {
     systemData.category = typeof systemData.category === "string" ? systemData.category : null;
+    const equipped = isRecord(systemData.equipped) ? systemData.equipped : {};
     systemData.equipped = {
-      carryType: typeof (systemData.equipped as { carryType?: unknown } | undefined)?.carryType === "string"
-        ? (systemData.equipped as { carryType: string }).carryType
-        : resolveItemCarryType(itemType),
+      ...equipped,
+      carryType: sanitizeStringOrNull((equipped as { carryType?: unknown }).carryType) ?? resolveItemCarryType(itemType),
+      invested: typeof (equipped as { invested?: unknown }).invested === "boolean"
+        ? (equipped as { invested: boolean }).invested
+        : null,
     };
   }
 
   if (foundryType === "weapon") {
     systemData.category = typeof systemData.category === "string" ? systemData.category : "simple";
     systemData.group = typeof systemData.group === "string" ? systemData.group : null;
-    systemData.bonus = isRecord(systemData.bonus) ? systemData.bonus : { value: 0 };
-    systemData.damage = isRecord(systemData.damage)
-      ? systemData.damage
-      : {
-        dice: 1,
-        die: "d4",
-        damageType: null,
-        modifier: 0,
-        persistent: null,
-      };
-    systemData.splashDamage = isRecord(systemData.splashDamage) ? systemData.splashDamage : { value: 0 };
-    systemData.range = typeof systemData.range === "number" ? systemData.range : 0;
-    systemData.expend = typeof systemData.expend === "number" ? systemData.expend : null;
-    systemData.reload = isRecord(systemData.reload) ? systemData.reload : { value: "0" };
+    const bonus = isRecord(systemData.bonus) ? systemData.bonus : {};
+    systemData.bonus = {
+      ...bonus,
+      value: sanitizeInteger((bonus as { value?: unknown }).value, 0),
+    };
+
+    const damage = isRecord(systemData.damage) ? systemData.damage : {};
+    const damageType = sanitizeWeaponDamageType((damage as { damageType?: unknown }).damageType) ?? "bludgeoning";
+    systemData.damage = {
+      ...damage,
+      dice: Math.max(0, sanitizeNonNegativeInteger((damage as { dice?: unknown }).dice, 1)),
+      die: sanitizeWeaponDie((damage as { die?: unknown }).die, "d4"),
+      damageType,
+      modifier: sanitizeInteger((damage as { modifier?: unknown }).modifier, 0),
+      persistent: sanitizeWeaponPersistentDamage((damage as { persistent?: unknown }).persistent, damageType),
+    };
+
+    const splashDamage = isRecord(systemData.splashDamage) ? systemData.splashDamage : {};
+    systemData.splashDamage = {
+      ...splashDamage,
+      value: sanitizeNonNegativeInteger((splashDamage as { value?: unknown }).value, 0),
+    };
+
+    const rangeCandidate = sanitizeOptionalInteger(systemData.range);
+    systemData.range = rangeCandidate !== null && rangeCandidate > 0 ? rangeCandidate : null;
+
+    const maxRangeCandidate = sanitizeOptionalInteger(systemData.maxRange);
+    systemData.maxRange = maxRangeCandidate !== null && maxRangeCandidate > 0 ? maxRangeCandidate : null;
+
+    const expendCandidate = sanitizeOptionalInteger(systemData.expend);
+    systemData.expend = expendCandidate !== null && expendCandidate >= 0 ? expendCandidate : null;
+
+    const reload = isRecord(systemData.reload) ? systemData.reload : {};
+    const reloadValueRaw = (reload as { value?: unknown }).value;
+    const reloadValue = typeof reloadValueRaw === "string"
+      ? reloadValueRaw.trim()
+      : (typeof reloadValueRaw === "number" && Number.isFinite(reloadValueRaw) ? String(Math.trunc(reloadValueRaw)) : "0");
+    systemData.reload = {
+      ...reload,
+      value: reloadValue || "0",
+    };
+
+    systemData.ammo = isRecord(systemData.ammo) || systemData.ammo === null ? systemData.ammo : null;
     systemData.grade = typeof systemData.grade === "string" ? systemData.grade : null;
-    systemData.runes = isRecord(systemData.runes) ? systemData.runes : { potency: 0, striking: 0, property: [] };
+    const runes = isRecord(systemData.runes) ? systemData.runes : {};
+    systemData.runes = {
+      ...runes,
+      potency: Math.max(0, Math.min(4, sanitizeNonNegativeInteger((runes as { potency?: unknown }).potency, 0))),
+      striking: Math.max(0, Math.min(4, sanitizeNonNegativeInteger((runes as { striking?: unknown }).striking, 0))),
+      property: sanitizeStringArray((runes as { property?: unknown }).property),
+    };
     systemData.specific = systemData.specific ?? null;
+    systemData.selectedAmmoId = sanitizeStringOrNull(systemData.selectedAmmoId);
+    systemData.subitems = Array.isArray(systemData.subitems) ? systemData.subitems : [];
     systemData.equipped = {
       ...(isRecord(systemData.equipped) ? systemData.equipped : {}),
       carryType: resolveItemCarryType(itemType),
-      invested: null,
-      handsHeld: Number.isFinite((systemData.equipped as { handsHeld?: unknown } | undefined)?.handsHeld)
-        ? (systemData.equipped as { handsHeld: number }).handsHeld
-        : 0,
+      invested: typeof (systemData.equipped as { invested?: unknown } | undefined)?.invested === "boolean"
+        ? (systemData.equipped as { invested: boolean }).invested
+        : null,
+      handsHeld: (() => {
+        const handsHeld = sanitizeOptionalInteger((systemData.equipped as { handsHeld?: unknown } | undefined)?.handsHeld);
+        return handsHeld !== null ? Math.max(0, Math.min(2, handsHeld)) : 0;
+      })(),
     };
   }
 
   if (foundryType === "armor") {
     systemData.category = typeof systemData.category === "string" ? systemData.category : "light";
     systemData.group = typeof systemData.group === "string" ? systemData.group : null;
-    systemData.acBonus = Number.isFinite(systemData.acBonus as number) ? systemData.acBonus : 0;
-    systemData.strength = Number.isFinite(systemData.strength as number) ? systemData.strength : null;
-    systemData.dexCap = Number.isFinite(systemData.dexCap as number) ? systemData.dexCap : 5;
-    systemData.checkPenalty = Number.isFinite(systemData.checkPenalty as number) ? systemData.checkPenalty : 0;
-    systemData.speedPenalty = Number.isFinite(systemData.speedPenalty as number) ? systemData.speedPenalty : 0;
+    systemData.acBonus = Math.max(0, sanitizeInteger(systemData.acBonus, 0));
+    const strength = sanitizeOptionalInteger(systemData.strength);
+    systemData.strength = strength !== null ? strength : null;
+    systemData.dexCap = Math.max(0, sanitizeInteger(systemData.dexCap, 5));
+    systemData.checkPenalty = Math.min(0, sanitizeInteger(systemData.checkPenalty, 0));
+    systemData.speedPenalty = Math.min(0, sanitizeInteger(systemData.speedPenalty, 0));
     systemData.grade = typeof systemData.grade === "string" ? systemData.grade : null;
-    systemData.runes = isRecord(systemData.runes) ? systemData.runes : { potency: 0, resilient: 0, property: [] };
+    const runes = isRecord(systemData.runes) ? systemData.runes : {};
+    systemData.runes = {
+      ...runes,
+      potency: Math.max(0, Math.min(4, sanitizeNonNegativeInteger((runes as { potency?: unknown }).potency, 0))),
+      resilient: Math.max(0, Math.min(4, sanitizeNonNegativeInteger((runes as { resilient?: unknown }).resilient, 0))),
+      property: sanitizeStringArray((runes as { property?: unknown }).property),
+    };
     systemData.specific = systemData.specific ?? null;
+    const usage = isRecord(systemData.usage) ? systemData.usage : {};
+    const usageValue = sanitizeStringOrNull((usage as { value?: unknown }).value) ?? resolveItemUsage(itemType);
+    systemData.usage = {
+      ...usage,
+      value: usageValue === "worn" ? "wornarmor" : usageValue,
+    };
   }
 
   if (foundryType === "shield") {
     systemData.baseItem = typeof systemData.baseItem === "string" ? systemData.baseItem : null;
-    systemData.acBonus = Number.isFinite(systemData.acBonus as number) ? systemData.acBonus : 2;
-    systemData.speedPenalty = Number.isFinite(systemData.speedPenalty as number) ? systemData.speedPenalty : 0;
+    systemData.acBonus = Math.max(0, sanitizeInteger(systemData.acBonus, 2));
+    systemData.speedPenalty = Math.min(0, sanitizeInteger(systemData.speedPenalty, 0));
     systemData.grade = typeof systemData.grade === "string" ? systemData.grade : null;
-    systemData.runes = isRecord(systemData.runes) ? systemData.runes : { reinforcing: 0 };
+    const runes = isRecord(systemData.runes) ? systemData.runes : {};
+    systemData.runes = {
+      ...runes,
+      reinforcing: Math.max(0, Math.min(4, sanitizeNonNegativeInteger((runes as { reinforcing?: unknown }).reinforcing, 0))),
+    };
     systemData.specific = systemData.specific ?? null;
   }
 
@@ -2247,7 +2524,17 @@ function applyItemTypeDefaults(
     } else if (typeof systemData.category !== "string") {
       systemData.category = "other";
     }
-    systemData.uses = isRecord(systemData.uses) ? systemData.uses : { value: 1, max: 1, autoDestroy: true };
+    const uses = isRecord(systemData.uses) ? systemData.uses : {};
+    const usesValue = sanitizeNonNegativeInteger((uses as { value?: unknown }).value, 1);
+    const usesMax = sanitizeNonNegativeInteger((uses as { max?: unknown }).max, Math.max(1, usesValue));
+    systemData.uses = {
+      ...uses,
+      value: usesValue,
+      max: Math.max(usesValue, usesMax),
+      autoDestroy: typeof (uses as { autoDestroy?: unknown }).autoDestroy === "boolean"
+        ? (uses as { autoDestroy: boolean }).autoDestroy
+        : true,
+    };
     systemData.damage = isRecord(systemData.damage) ? systemData.damage : null;
     systemData.spell = isRecord(systemData.spell) ? systemData.spell : null;
   }
@@ -2840,6 +3127,39 @@ function remapGeneratedFeatureItemForImport(
   };
 }
 
+function isFoundryCreatableItemType(value: string): value is FoundryCreatableItemType {
+  return value === "ammo"
+    || value === "armor"
+    || value === "backpack"
+    || value === "book"
+    || value === "shield"
+    || value === "treasure"
+    || value === "weapon"
+    || value === "equipment"
+    || value === "consumable"
+    || value === "feat"
+    || value === "spell";
+}
+
+function sanitizeGeneratedPhysicalItemForImport(item: FoundryActorItemSource): FoundryActorItemSource {
+  const type = typeof item.type === "string" ? item.type.trim().toLowerCase() : "";
+  if (!isFoundryCreatableItemType(type) || !isPhysicalFoundryItemType(type)) {
+    return item;
+  }
+
+  if (!isRecord(item.system)) {
+    return item;
+  }
+
+  const system = clone(item.system) as FoundryItemSource["system"];
+  const itemType = mapEmbeddedItemTypeToCategory(type);
+  applyItemTypeDefaults(system, itemType, type);
+  return {
+    ...item,
+    system: system as FoundryActorItemSource["system"],
+  };
+}
+
 function sanitizeGeneratedActorItemsForImport(items: unknown): FoundryActorItemSource[] {
   if (!Array.isArray(items)) {
     return [];
@@ -2849,7 +3169,8 @@ function sanitizeGeneratedActorItemsForImport(items: unknown): FoundryActorItemS
   return clonedItems.map((item) => {
     const normalized = remapGeneratedFeatureItemForImport(item);
     const sanitizedAction = sanitizeGeneratedActionItemForImport(normalized);
-    return sanitizeGeneratedMeleeItemForImport(sanitizedAction);
+    const sanitizedMelee = sanitizeGeneratedMeleeItemForImport(sanitizedAction);
+    return sanitizeGeneratedPhysicalItemForImport(sanitizedMelee);
   });
 }
 
@@ -3531,6 +3852,24 @@ function coerceCreatureInventoryItemType(itemType: ItemSchemaData["itemType"]): 
   }
 }
 
+function extractInventoryTraits(value: unknown): string[] {
+  if (!isRecord(value)) {
+    return [];
+  }
+
+  const traits = isRecord(value.traits) ? value.traits : {};
+  return normalizeItemTraitValues(Array.isArray(traits.value) ? traits.value : []);
+}
+
+function extractInventoryRarity(value: unknown): ItemSchemaData["rarity"] {
+  if (!isRecord(value)) {
+    return "common";
+  }
+
+  const traits = isRecord(value.traits) ? value.traits : {};
+  return sanitizeItemRarity(traits.rarity, "common");
+}
+
 function createInventoryItem(
   actor: ActorSchemaData,
   entry: ActorInventoryEntry,
@@ -3541,6 +3880,9 @@ function createInventoryItem(
   const itemType = options.lootOnly ? coerceLootInventoryItemType(mappedType) : coerceCreatureInventoryItemType(mappedType);
   const slug = entry.slug?.trim() || toSlug(entry.name) || toSlug(generateId());
   const normalizedImg = normalizeInventoryEntryImage(entry.img ?? null, itemType);
+  const systemOverrides = isRecord(entry.system) ? (clone(entry.system) as Record<string, unknown>) : null;
+  const inventoryTraits = extractInventoryTraits(systemOverrides);
+  const inventoryRarity = extractInventoryRarity(systemOverrides);
   const source = prepareItemSource({
     schema_version: actor.schema_version,
     systemId: actor.systemId,
@@ -3548,14 +3890,14 @@ function createInventoryItem(
     slug,
     name: entry.name,
     itemType,
-    rarity: "common",
+    rarity: inventoryRarity,
     level: entry.level ?? 0,
     price: null,
-    traits: [],
+    traits: inventoryTraits,
     description: entry.description ?? "",
     img: normalizedImg,
     source: actor.source,
-    system: isRecord(entry.system) ? (clone(entry.system) as Record<string, unknown>) : null,
+    system: systemOverrides,
     publication: actor.publication,
   });
 

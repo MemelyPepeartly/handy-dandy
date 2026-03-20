@@ -76,6 +76,7 @@ function buildActorSchemaSection(): string {
     "- actions: array of special abilities { name, actionCost (one-action|two-actions|three-actions|free|reaction|passive), traits, requirements, trigger, frequency, description } with traits limited to valid PF2e slugs.",
     "- spellcasting: optional array of entries { name, tradition, castingType (prepared|spontaneous|innate|focus|ritual), attackBonus, saveDC, notes, spells[] } where spells are { level, name, description, tradition, system }. Use spell.system for PF2E spell item fields (time/range/target/area/duration/defense/damage/heightening/etc.) on custom spells.",
     "- inventory: optional array of carried items { name, itemType, slug, quantity, level, description, img, system } used for gear import. Use inventory[].system for PF2E item-type fields (ammo/armor/shield/weapon/consumable/equipment/backpack/book/treasure/feat/spell data) when the item is custom instead of compendium-linked.",
+    "- For custom inventory items, include complete PF2E system details by item type: weapon (bonus/damage/range/reload/runes), armor or shield (acBonus/dexCap and penalties/runes), plus physical basics (quantity/bulk/price/traits/usage/equipped).",
     "- loot: optional object { lootSheetType: \"Loot\"|\"Merchant\", hiddenWhenEmpty: boolean } for loot-sheet controls.",
     "- hazard: optional object { isComplex, disable, routine, reset, emitsSound (boolean|\"encounter\"), hardness, stealthBonus, stealthDetails } for hazard-sheet controls.",
     "- When actions or spells correspond to official PF2e compendium entries, preserve canonical names/slugs so import can link to existing records instead of fabricating replacements.",
@@ -191,12 +192,16 @@ function buildActorRequest(input: ActorPromptInput): string {
     parts.push(imageInstruction);
   }
 
-  if (input.includeSpellcasting) {
+  if (input.includeSpellcasting === true) {
     parts.push("Include spellcasting data that aligns with the reference text.");
+  } else if (input.includeSpellcasting === false) {
+    parts.push("Do not include spellcasting entries or spell lists in the output.");
   }
 
-  if (input.includeInventory) {
+  if (input.includeInventory === true) {
     parts.push("List an inventory section covering notable gear, treasure, and equipment carried.");
+  } else if (input.includeInventory === false) {
+    parts.push("Do not include an inventory section in the output.");
   }
 
   const contentSourceGuidance = buildContentSourceGuidance(input);

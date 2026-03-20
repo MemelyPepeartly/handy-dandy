@@ -369,8 +369,12 @@ async function promptWorkbenchRequest(): Promise<PromptWorkbenchRequest<EntityTy
     folderId: response.folderId.trim() || undefined,
     publication,
     img,
-    includeSpellcasting: type === "actor" && actorType === "npc" && response.includeSpellcasting ? true : undefined,
-    includeInventory: type === "actor" && actorType === "npc" && response.includeInventory ? true : undefined,
+    includeSpellcasting: type === "actor" && actorType === "npc"
+      ? Boolean(response.includeSpellcasting)
+      : undefined,
+    includeInventory: type === "actor" && actorType === "npc"
+      ? Boolean(response.includeInventory)
+      : undefined,
     includeOfficialContent,
     includeGeneratedContent,
     generateTokenImage: generateTokenImage ? true : undefined,

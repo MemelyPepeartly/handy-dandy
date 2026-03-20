@@ -423,6 +423,489 @@ export const itemSchema = {
   }
 } satisfies JSONSchemaType<ItemSchemaData>;
 
+const INVENTORY_GENERIC_ITEM_CATEGORIES = [
+  "ammo",
+  "equipment",
+  "backpack",
+  "book",
+  "consumable",
+  "treasure",
+  "feat",
+  "spell",
+  "wand",
+  "staff",
+  "other",
+] as const;
+
+const genericStringValueSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [],
+  properties: {
+    value: { type: "string", default: "" },
+  },
+} as const;
+
+const genericCurrencySchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [],
+  properties: {
+    pp: { type: "integer", minimum: 0, default: 0 },
+    gp: { type: "integer", minimum: 0, default: 0 },
+    sp: { type: "integer", minimum: 0, default: 0 },
+    cp: { type: "integer", minimum: 0, default: 0 },
+  },
+} as const;
+
+const genericTraitsSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [],
+  properties: {
+    value: {
+      type: "array",
+      default: [] as const,
+      items: { type: "string", minLength: 1 },
+    },
+    otherTags: {
+      type: "array",
+      default: [] as const,
+      items: { type: "string", minLength: 1 },
+    },
+    rarity: { type: "string", enum: RARITIES, default: "common" as const },
+    traditions: {
+      type: "array",
+      default: [] as const,
+      items: { type: "string", minLength: 1 },
+    },
+  },
+} as const;
+
+const genericPhysicalSystemSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [],
+  properties: {
+    quantity: { type: "integer", minimum: 1, default: 1 },
+    usage: {
+      type: "object",
+      additionalProperties: false,
+      required: [],
+      properties: {
+        value: { type: "string", default: "" },
+      },
+    },
+    bulk: {
+      type: "object",
+      additionalProperties: false,
+      required: [],
+      properties: {
+        value: { type: "number", minimum: 0, default: 0 },
+        heldOrStowed: { type: "number", minimum: 0, default: 0 },
+        capacity: { type: "integer", minimum: 0, default: 0 },
+        ignored: { type: "integer", minimum: 0, default: 0 },
+        per: { type: "integer", minimum: 1, default: 1 },
+      },
+    },
+    size: { type: "string", enum: ACTOR_SIZES, default: "med" as const },
+    price: {
+      type: "object",
+      additionalProperties: false,
+      required: [],
+      properties: {
+        value: genericCurrencySchema,
+        per: { type: "integer", minimum: 1, default: 1 },
+        sizeSensitive: { type: "boolean", default: false },
+      },
+    },
+    hp: {
+      type: "object",
+      additionalProperties: false,
+      required: [],
+      properties: {
+        value: { type: "integer", minimum: 0, default: 0 },
+        max: { type: "integer", minimum: 0, default: 0 },
+      },
+    },
+    hardness: { type: "integer", minimum: 0, default: 0 },
+    traits: genericTraitsSchema,
+    equipped: {
+      type: "object",
+      additionalProperties: false,
+      required: [],
+      properties: {
+        carryType: { type: "string", default: "worn" },
+        invested: { type: "boolean", nullable: true, default: null },
+        handsHeld: { type: "integer", minimum: 0, maximum: 2, nullable: true, default: null },
+        inSlot: { type: "boolean", nullable: true, default: null },
+      },
+    },
+    material: {
+      type: "object",
+      additionalProperties: false,
+      required: [],
+      properties: {
+        type: { type: "string", nullable: true, default: null },
+        grade: { type: "string", nullable: true, default: null },
+      },
+    },
+    identification: {
+      type: "object",
+      additionalProperties: false,
+      required: [],
+      properties: {
+        status: { type: "string", enum: ["identified", "unidentified"] as const, default: "identified" as const },
+        unidentified: {
+          type: "object",
+          additionalProperties: false,
+          required: [],
+          properties: {
+            name: { type: "string", default: "" },
+            img: { type: "string", default: "" },
+            data: {
+              type: "object",
+              additionalProperties: false,
+              required: [],
+              properties: {
+                description: {
+                  type: "object",
+                  additionalProperties: false,
+                  required: [],
+                  properties: {
+                    value: { type: "string", default: "" },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    baseItem: { type: "string", nullable: true, default: null },
+    containerId: { type: "string", nullable: true, default: null },
+    category: { type: "string", nullable: true, default: null },
+    subitems: {
+      type: "array",
+      default: [] as const,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: [],
+        properties: {},
+      },
+    },
+  },
+} as const;
+
+const weaponInventorySystemSchema = {
+  ...genericPhysicalSystemSchema,
+  properties: {
+    ...genericPhysicalSystemSchema.properties,
+    category: { type: "string", default: "simple" },
+    group: { type: "string", nullable: true, default: null },
+    bonus: {
+      type: "object",
+      additionalProperties: false,
+      required: [],
+      properties: {
+        value: { type: "integer", default: 0 },
+      },
+    },
+    damage: {
+      type: "object",
+      additionalProperties: false,
+      required: [],
+      properties: {
+        dice: { type: "integer", minimum: 0, default: 1 },
+        die: { type: "string", enum: ["d4", "d6", "d8", "d10", "d12"] as const, nullable: true, default: "d4" as const },
+        damageType: { type: "string", nullable: true, default: "bludgeoning" },
+        modifier: { type: "integer", default: 0 },
+        persistent: {
+          type: "object",
+          nullable: true,
+          default: null,
+          additionalProperties: false,
+          required: [],
+          properties: {
+            number: { type: "integer", minimum: 0, default: 0 },
+            faces: { type: "integer", enum: [4, 6, 8, 10, 12] as const, nullable: true, default: null },
+            type: { type: "string", nullable: true, default: null },
+          },
+        },
+      },
+    },
+    splashDamage: {
+      type: "object",
+      additionalProperties: false,
+      required: [],
+      properties: {
+        value: { type: "integer", minimum: 0, default: 0 },
+      },
+    },
+    range: { type: "integer", minimum: 0, nullable: true, default: null },
+    maxRange: { type: "integer", minimum: 0, nullable: true, default: null },
+    expend: { type: "integer", minimum: 0, nullable: true, default: null },
+    reload: {
+      type: "object",
+      additionalProperties: false,
+      required: [],
+      properties: {
+        value: { type: "string", nullable: true, default: "0" },
+      },
+    },
+    ammo: {
+      type: "object",
+      nullable: true,
+      default: null,
+      additionalProperties: false,
+      required: [],
+      properties: {
+        builtIn: { type: "boolean", default: false },
+        baseType: { type: "string", nullable: true, default: null },
+        capacity: { type: "integer", minimum: 0, nullable: true, default: null },
+      },
+    },
+    selectedAmmoId: { type: "string", nullable: true, default: null },
+    grade: { type: "string", nullable: true, default: null },
+    runes: {
+      type: "object",
+      additionalProperties: false,
+      required: [],
+      properties: {
+        potency: { type: "integer", minimum: 0, maximum: 4, default: 0 },
+        striking: { type: "integer", minimum: 0, maximum: 4, default: 0 },
+        property: {
+          type: "array",
+          default: [] as const,
+          items: { type: "string", minLength: 1 },
+        },
+      },
+    },
+    specific: {
+      type: "object",
+      nullable: true,
+      default: null,
+      additionalProperties: false,
+      required: [],
+      properties: {},
+    },
+  },
+} as const;
+
+const armorInventorySystemSchema = {
+  ...genericPhysicalSystemSchema,
+  properties: {
+    ...genericPhysicalSystemSchema.properties,
+    category: { type: "string", default: "light" },
+    group: { type: "string", nullable: true, default: null },
+    acBonus: { type: "integer", minimum: 0, default: 0 },
+    strength: { type: "integer", nullable: true, default: null },
+    dexCap: { type: "integer", minimum: 0, default: 5 },
+    checkPenalty: { type: "integer", default: 0 },
+    speedPenalty: { type: "integer", default: 0 },
+    grade: { type: "string", nullable: true, default: null },
+    runes: {
+      type: "object",
+      additionalProperties: false,
+      required: [],
+      properties: {
+        potency: { type: "integer", minimum: 0, maximum: 4, default: 0 },
+        resilient: { type: "integer", minimum: 0, maximum: 4, default: 0 },
+        property: {
+          type: "array",
+          default: [] as const,
+          items: { type: "string", minLength: 1 },
+        },
+      },
+    },
+    specific: {
+      type: "object",
+      nullable: true,
+      default: null,
+      additionalProperties: false,
+      required: [],
+      properties: {},
+    },
+  },
+} as const;
+
+const shieldInventorySystemSchema = {
+  ...genericPhysicalSystemSchema,
+  properties: {
+    ...genericPhysicalSystemSchema.properties,
+    baseItem: { type: "string", nullable: true, default: null },
+    acBonus: { type: "integer", minimum: 0, default: 2 },
+    speedPenalty: { type: "integer", default: 0 },
+    grade: { type: "string", nullable: true, default: null },
+    runes: {
+      type: "object",
+      additionalProperties: false,
+      required: [],
+      properties: {
+        reinforcing: { type: "integer", minimum: 0, maximum: 4, default: 0 },
+      },
+    },
+    specific: {
+      type: "object",
+      nullable: true,
+      default: null,
+      additionalProperties: false,
+      required: [],
+      properties: {},
+    },
+  },
+} as const;
+
+const actorInventoryBaseProperties = {
+  name: { type: "string", minLength: 1 },
+  slug: { type: "string", nullable: true, default: null },
+  quantity: { type: "integer", minimum: 1, nullable: true, default: 1 },
+  level: { type: "integer", minimum: 0, nullable: true, default: null },
+  description: { type: "string", nullable: true, default: null },
+  img: { type: "string", nullable: true, default: null },
+} as const;
+
+const actorInventoryEntryVariantSchemas = [
+  {
+    type: "object",
+    additionalProperties: false,
+    required: ["name", "itemType", "system"],
+    properties: {
+      ...actorInventoryBaseProperties,
+      itemType: { type: "string", enum: ["weapon"] as const, default: "weapon" as const },
+      system: {
+        ...weaponInventorySystemSchema,
+        default: {},
+      },
+    },
+  },
+  {
+    type: "object",
+    additionalProperties: false,
+    required: ["name", "itemType", "system"],
+    properties: {
+      ...actorInventoryBaseProperties,
+      itemType: { type: "string", enum: ["armor"] as const, default: "armor" as const },
+      system: {
+        ...armorInventorySystemSchema,
+        default: {},
+      },
+    },
+  },
+  {
+    type: "object",
+    additionalProperties: false,
+    required: ["name", "itemType", "system"],
+    properties: {
+      ...actorInventoryBaseProperties,
+      itemType: { type: "string", enum: ["shield"] as const, default: "shield" as const },
+      system: {
+        ...shieldInventorySystemSchema,
+        default: {},
+      },
+    },
+  },
+  {
+    type: "object",
+    additionalProperties: false,
+    required: ["name"],
+    properties: {
+      ...actorInventoryBaseProperties,
+      itemType: { type: "string", enum: INVENTORY_GENERIC_ITEM_CATEGORIES, nullable: true, default: null },
+      system: {
+        ...genericPhysicalSystemSchema,
+        nullable: true,
+        default: null,
+      },
+    },
+  },
+] as const;
+
+const actorSpellSystemSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [],
+  properties: {
+    time: genericStringValueSchema,
+    range: genericStringValueSchema,
+    target: genericStringValueSchema,
+    area: {
+      type: "object",
+      nullable: true,
+      default: null,
+      additionalProperties: false,
+      required: [],
+      properties: {
+        value: { type: "integer", minimum: 0, nullable: true, default: null },
+        type: { type: "string", nullable: true, default: null },
+      },
+    },
+    duration: {
+      type: "object",
+      additionalProperties: false,
+      required: [],
+      properties: {
+        value: { type: "string", default: "" },
+        sustained: { type: "boolean", default: false },
+      },
+    },
+    defense: {
+      type: "object",
+      nullable: true,
+      default: null,
+      additionalProperties: false,
+      required: [],
+      properties: {
+        passive: {
+          type: "object",
+          additionalProperties: false,
+          required: [],
+          properties: {
+            statistic: { type: "string", default: "" },
+          },
+        },
+        save: {
+          type: "object",
+          additionalProperties: false,
+          required: [],
+          properties: {
+            statistic: { type: "string", default: "" },
+            basic: { type: "boolean", default: false },
+          },
+        },
+      },
+    },
+    damage: {
+      type: "object",
+      nullable: true,
+      default: null,
+      additionalProperties: false,
+      required: [],
+      properties: {
+        formula: { type: "string", nullable: true, default: null },
+        type: { type: "string", nullable: true, default: null },
+        kind: { type: "string", nullable: true, default: null },
+      },
+    },
+    heightening: {
+      type: "object",
+      nullable: true,
+      default: null,
+      additionalProperties: false,
+      required: [],
+      properties: {
+        type: { type: "string", nullable: true, default: null },
+        interval: { type: "integer", minimum: 1, nullable: true, default: null },
+      },
+    },
+    traits: genericTraitsSchema,
+    cost: genericStringValueSchema,
+    requirements: { type: "string", nullable: true, default: null },
+    counteraction: { type: "boolean", default: false },
+  },
+} as const;
+
 export const actorSchema = {
   $id: "Actor",
   type: "object",
@@ -758,12 +1241,9 @@ export const actorSchema = {
                 description: { type: "string", nullable: true, default: null },
                 tradition: { type: "string", nullable: true, default: null },
                 system: {
-                  type: "object",
+                  ...actorSpellSystemSchema,
                   nullable: true,
                   default: null,
-                  additionalProperties: true,
-                  required: [],
-                  properties: {},
                 },
               }
             }
@@ -776,26 +1256,7 @@ export const actorSchema = {
       nullable: true,
       default: [] as const,
       items: {
-        type: "object",
-        additionalProperties: false,
-        required: ["name"],
-        properties: {
-          name: { type: "string", minLength: 1 },
-          itemType: { type: "string", enum: ITEM_CATEGORIES, nullable: true, default: null },
-          slug: { type: "string", nullable: true, default: null },
-          quantity: { type: "integer", minimum: 1, nullable: true, default: 1 },
-          level: { type: "integer", minimum: 0, nullable: true, default: null },
-          description: { type: "string", nullable: true, default: null },
-          img: { type: "string", nullable: true, default: null },
-          system: {
-            type: "object",
-            nullable: true,
-            default: null,
-            additionalProperties: true,
-            required: [],
-            properties: {},
-          },
-        },
+        anyOf: actorInventoryEntryVariantSchemas,
       },
     },
     loot: {

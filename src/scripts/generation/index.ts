@@ -291,6 +291,14 @@ export async function generateActor(
     canonical.actorType = input.actorType;
   }
 
+  if (input.includeSpellcasting === false) {
+    delete canonical.spellcasting;
+  }
+
+  if (input.includeInventory === false) {
+    delete canonical.inventory;
+  }
+
   if (input.generateTokenImage && canGenerateImages(openRouterClient)) {
     reportProgress(options, {
       step: "image",
