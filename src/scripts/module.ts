@@ -28,6 +28,7 @@ import type {
 } from "./schemas";
 import { generateWorkbenchEntry } from "./flows/prompt-workbench";
 import { runRuleElementGeneratorFlow } from "./flows/rule-element-generator-ui";
+import { runRuneStripperFlow } from "./flows/rune-stripper";
 import { ensureValid } from "./validation/ensure-valid";
 import { importAction } from "./mappers/import";
 import { initialiseMapMarkers } from "./map-markers/controller";
@@ -102,6 +103,7 @@ declare global {
       flows: {
         promptWorkbench: typeof generateWorkbenchEntry;
         ruleElementGenerator: typeof runRuleElementGeneratorFlow;
+        runeStripper: typeof runRuneStripperFlow;
       };
     };
   }
@@ -133,6 +135,7 @@ Hooks.once("init", async () => {
     "rule-element-generator-loading": `${CONSTANTS.TEMPLATE_PATH}/rule-element-generator-loading.hbs`,
     "rule-element-generator-result": `${CONSTANTS.TEMPLATE_PATH}/rule-element-generator-result.hbs`,
     "generation-recovery-dialog": `${CONSTANTS.TEMPLATE_PATH}/generation-recovery-dialog.hbs`,
+    "rune-stripper": `${CONSTANTS.TEMPLATE_PATH}/rune-stripper.hbs`,
   });
 });
 
@@ -166,6 +169,7 @@ Hooks.once("setup", () => {
     flows: {
       promptWorkbench: generateWorkbenchEntry,
       ruleElementGenerator: runRuleElementGeneratorFlow,
+      runeStripper: runRuneStripperFlow,
     },
   };
 

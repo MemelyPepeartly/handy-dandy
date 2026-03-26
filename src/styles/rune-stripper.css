@@ -1,0 +1,132 @@
+.handy-dandy-rune-stripper-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.handy-dandy-rune-stripper-dropzone {
+  border: 2px dashed var(--color-border-dark, #4a4a4a);
+  border-radius: 8px;
+  padding: 0.8rem;
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.handy-dandy-rune-stripper-dropzone.is-dragover {
+  border-color: var(--color-border-highlight, #ff8c00);
+  background: rgba(255, 140, 0, 0.14);
+}
+
+.handy-dandy-rune-stripper-dropzone h3 {
+  margin: 0 0 0.35rem;
+}
+
+.handy-dandy-rune-stripper-dropzone p {
+  margin: 0;
+}
+
+.handy-dandy-rune-stripper-payer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.handy-dandy-rune-stripper-payer label {
+  font-weight: 600;
+}
+
+.handy-dandy-rune-stripper-payer-funds {
+  color: var(--color-text-light-6, #b9b9b9);
+  margin-left: 0.25rem;
+}
+
+.handy-dandy-rune-stripper-queue {
+  overflow-x: auto;
+}
+
+.handy-dandy-rune-stripper-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.handy-dandy-rune-stripper-table th,
+.handy-dandy-rune-stripper-table td {
+  padding: 0.4rem 0.45rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  text-align: left;
+  vertical-align: top;
+}
+
+.handy-dandy-rune-stripper-weapon-name {
+  font-weight: 600;
+}
+
+.handy-dandy-rune-stripper-weapon-actor {
+  color: var(--color-text-light-6, #b9b9b9);
+  font-size: 0.85em;
+}
+
+.handy-dandy-rune-stripper-remove {
+  min-width: 2.1rem;
+  width: 2.1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.handy-dandy-rune-stripper-totals {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.35rem 0.75rem;
+  border: 1px solid var(--color-border-dark, #4a4a4a);
+  border-radius: 8px;
+  padding: 0.6rem 0.7rem;
+}
+
+.handy-dandy-rune-stripper-issues {
+  border: 1px solid rgba(200, 60, 60, 0.55);
+  border-radius: 8px;
+  background: rgba(120, 0, 0, 0.16);
+  padding: 0.65rem 0.7rem;
+}
+
+.handy-dandy-rune-stripper-issues h4 {
+  margin: 0 0 0.4rem;
+}
+
+.handy-dandy-rune-stripper-issues ul {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.handy-dandy-rune-stripper-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.handy-dandy-rune-stripper-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.handy-dandy-rune-stripper-confirm ul {
+  margin: 0.45rem 0;
+  padding-left: 1.15rem;
+}
+
+@media (max-width: 860px) {
+  .handy-dandy-rune-stripper-totals {
+    grid-template-columns: 1fr;
+  }
+
+  .handy-dandy-rune-stripper-actions {
+    justify-content: stretch;
+  }
+
+  .handy-dandy-rune-stripper-actions button {
+    flex: 1 1 100%;
+    justify-content: center;
+  }
+}

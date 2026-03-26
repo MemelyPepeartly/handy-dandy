@@ -23,7 +23,8 @@
     "styles/base.css",
     "styles/map-marker.css",
     "styles/prompt-workbench.css",
-    "styles/rule-element-generator.css"
+    "styles/rule-element-generator.css",
+    "styles/rune-stripper.css"
   ],
   "languages": [],
   "packs": [],

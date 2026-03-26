@@ -2,6 +2,7 @@ import { CONSTANTS } from "../constants";
 import { runPromptWorkbenchFlow } from "../flows/prompt-workbench-ui";
 import { runRuleElementGeneratorFlow } from "../flows/rule-element-generator-ui";
 import { runOpenRouterCreditsFlow } from "../flows/openrouter-credits-ui";
+import { runRuneStripperFlow } from "../flows/rune-stripper";
 
 interface ToolCardData {
   id: string;
@@ -80,6 +81,17 @@ export class ToolOverview extends FormApplication {
           buttonLabel: "Open Credits Snapshot",
           buttonIcon: "fas fa-wallet",
         },
+        {
+          id: "rune-stripper",
+          title: "Rune Stripper",
+          icon: "fas fa-gem",
+          description:
+            "Drop one or more weapons, calculate RAW rune transfer costs, then split runes into runestones on a generated loot actor while stripping the source weapons.",
+          location: "Scene Controls -> Handy Dandy Tools -> Rune Stripper",
+          buttonAction: "rune-stripper",
+          buttonLabel: "Open Rune Stripper",
+          buttonIcon: "fas fa-gem",
+        },
       ],
     } satisfies ToolOverviewData;
   }
@@ -99,6 +111,9 @@ export class ToolOverview extends FormApplication {
           break;
         case "openrouter-credits":
           this.#runOpenRouterCredits();
+          break;
+        case "rune-stripper":
+          this.#runRuneStripper();
           break;
         default:
           console.warn(`${CONSTANTS.MODULE_NAME} | Unknown tool overview action: ${action}`);
@@ -123,5 +138,9 @@ export class ToolOverview extends FormApplication {
 
   #runOpenRouterCredits(): void {
     void runOpenRouterCreditsFlow();
+  }
+
+  #runRuneStripper(): void {
+    void runRuneStripperFlow();
   }
 }

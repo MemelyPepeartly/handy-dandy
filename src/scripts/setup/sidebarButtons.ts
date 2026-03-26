@@ -1,6 +1,7 @@
 import { runPromptWorkbenchFlow } from "../flows/prompt-workbench-ui";
 import { runRuleElementGeneratorFlow } from "../flows/rule-element-generator-ui";
 import { runOpenRouterCreditsFlow } from "../flows/openrouter-credits-ui";
+import { runRuneStripperFlow } from "../flows/rune-stripper";
 import {
   MAP_MARKER_CONTROL_NAME,
   MAP_MARKER_PLACEMENT_TOOL_NAME,
@@ -253,6 +254,16 @@ export function insertSidebarButtons(controls: ControlCollection): void {
     button: true,
     onChange: () => {
       void runOpenRouterCreditsFlow();
+    },
+  });
+
+  compatibilityAddTool(handyGroup.tools, {
+    name: "rune-stripper",
+    title: "Rune Stripper",
+    icon: "fa-solid fa-gem",
+    button: true,
+    onChange: () => {
+      void runRuneStripperFlow();
     },
   });
 
