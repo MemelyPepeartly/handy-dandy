@@ -225,6 +225,11 @@ export async function generateItem(
       });
       canonical.img = generatedImage;
     } catch (error) {
+      reportProgress(options, {
+        step: "image",
+        message: "Transparent item icon generation failed; using fallback icon.",
+        percent: 85,
+      });
       console.warn("Handy Dandy | Item image generation failed; using fallback item image", error);
     }
   }
@@ -315,6 +320,11 @@ export async function generateActor(
       });
       canonical.img = generatedToken;
     } catch (error) {
+      reportProgress(options, {
+        step: "image",
+        message: "Transparent token generation failed; using fallback image.",
+        percent: 75,
+      });
       console.warn("Handy Dandy | Token image generation failed; using fallback actor image", error);
     }
   }

@@ -35,6 +35,27 @@ const IMAGE_CATEGORY_DIRECTORY: Record<NonNullable<GenerateTokenImageOptions["im
   actor: "actors",
   item: "items",
 };
+const DEFAULT_TRANSPARENCY_ENFORCEMENT = true;
+const DEFAULT_TRANSPARENCY_MAX_ATTEMPTS = 3;
+const MIN_TRANSPARENCY_MAX_ATTEMPTS = 1;
+const MAX_TRANSPARENCY_MAX_ATTEMPTS = 6;
+const REQUIRED_TRANSPARENCY_PROMPT = [
+  "MANDATORY OUTPUT REQUIREMENT:",
+  "- Return a PNG with a true transparent alpha channel background.",
+  "- Background pixels outside the subject must have alpha = 0 (fully transparent).",
+  "- Do not return white, black, gray, colored, textured, or gradient backdrops.",
+].join("\n");
+const TRANSPARENCY_RETRY_PROMPT = [
+  "RETRY REQUIREMENT:",
+  "- Previous image had an opaque background.",
+  "- Regenerate with a real transparent alpha channel only.",
+  "- Keep the same subject and composition; change only the background to transparent.",
+].join("\n");
+
+interface TransparentImagePolicy {
+  enforceTransparency: boolean;
+  maxAttempts: number;
+}
 
 interface FilePickerImplementation {
   createDirectory?: (
@@ -244,6 +265,112 @@ function getConfiguredImageRoot(): string {
   }
 }
 
+function clampInteger(value: unknown, minimum: number, maximum: number, fallback: number): number {
+  const numeric = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(numeric)) {
+    return fallback;
+  }
+
+  const rounded = Math.round(numeric);
+  return Math.max(minimum, Math.min(maximum, rounded));
+}
+
+function readTransparentImagePolicy(): TransparentImagePolicy {
+  const globalGame = (globalThis as {
+    game?: {
+      settings?: {
+        get?: (moduleId: string, key: string) => unknown;
+      };
+    };
+  }).game;
+  const readSetting = globalGame?.settings?.get;
+
+  if (typeof readSetting !== "function") {
+    return {
+      enforceTransparency: DEFAULT_TRANSPARENCY_ENFORCEMENT,
+      maxAttempts: DEFAULT_TRANSPARENCY_MAX_ATTEMPTS,
+    };
+  }
+
+  let enforceTransparency = DEFAULT_TRANSPARENCY_ENFORCEMENT;
+  let maxAttempts = DEFAULT_TRANSPARENCY_MAX_ATTEMPTS;
+
+  try {
+    const configured = readSetting(CONSTANTS.MODULE_ID, "EnforceTransparentGeneratedImages");
+    if (typeof configured === "boolean") {
+      enforceTransparency = configured;
+    }
+  } catch (_error) {
+    enforceTransparency = DEFAULT_TRANSPARENCY_ENFORCEMENT;
+  }
+
+  try {
+    const configured = readSetting(CONSTANTS.MODULE_ID, "TransparentImageGenerationMaxAttempts");
+    maxAttempts = clampInteger(
+      configured,
+      MIN_TRANSPARENCY_MAX_ATTEMPTS,
+      MAX_TRANSPARENCY_MAX_ATTEMPTS,
+      DEFAULT_TRANSPARENCY_MAX_ATTEMPTS,
+    );
+  } catch (_error) {
+    maxAttempts = DEFAULT_TRANSPARENCY_MAX_ATTEMPTS;
+  }
+
+  return {
+    enforceTransparency,
+    maxAttempts: enforceTransparency ? maxAttempts : 1,
+  };
+}
+
+function buildTransparentGenerationPrompt(basePrompt: string, attempt: number): string {
+  const normalized = basePrompt.trim();
+  if (attempt <= 1) {
+    return `${normalized}\n${REQUIRED_TRANSPARENCY_PROMPT}`;
+  }
+
+  return `${normalized}\n${REQUIRED_TRANSPARENCY_PROMPT}\n${TRANSPARENCY_RETRY_PROMPT}`;
+}
+
+async function imageHasAlphaTransparency(image: GeneratedImageResult): Promise<boolean | null> {
+  if (typeof document === "undefined" || typeof document.createElement !== "function") {
+    return null;
+  }
+
+  const source = `data:${image.mimeType};base64,${image.base64}`;
+  const loadedImage = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const element = new Image();
+    element.onload = () => resolve(element);
+    element.onerror = () => reject(new Error("Failed to decode generated image for transparency validation."));
+    element.src = source;
+  });
+
+  const width = loadedImage.naturalWidth || loadedImage.width;
+  const height = loadedImage.naturalHeight || loadedImage.height;
+  if (!width || !height) {
+    throw new Error("Generated image has invalid dimensions.");
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  if (!context) {
+    return null;
+  }
+
+  context.clearRect(0, 0, width, height);
+  context.drawImage(loadedImage, 0, 0, width, height);
+  const pixels = context.getImageData(0, 0, width, height).data;
+  for (let index = 3; index < pixels.length; index += 4) {
+    if (pixels[index] < 255) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 async function ensureDataDirectory(path: string): Promise<void> {
   const picker = getFilePickerImplementation();
 
@@ -432,6 +559,45 @@ export function buildItemImagePrompt(options: GenerateItemImageOptions): string 
   return parts.join("\n");
 }
 
+async function generateTransparentImageWithValidation(
+  generator: TokenImageGenerator,
+  prompt: string,
+  options: GenerateImageOptions,
+  category: NonNullable<GenerateTokenImageOptions["imageCategory"]>,
+): Promise<GeneratedImageResult> {
+  const policy = readTransparentImagePolicy();
+
+  for (let attempt = 1; attempt <= policy.maxAttempts; attempt += 1) {
+    const attemptPrompt = buildTransparentGenerationPrompt(prompt, attempt);
+    const image = await generator.generateImage(attemptPrompt, options);
+
+    if (!policy.enforceTransparency) {
+      return image;
+    }
+
+    const transparent = await imageHasAlphaTransparency(image);
+    if (transparent === true) {
+      return image;
+    }
+
+    if (transparent === null) {
+      throw new Error(
+        "Unable to verify alpha transparency in this environment. " +
+        "Disable strict transparent image enforcement in module settings to allow unverified outputs.",
+      );
+    }
+
+    console.warn(
+      `${CONSTANTS.MODULE_NAME} | Generated ${category} image attempt ${attempt}/${policy.maxAttempts} was opaque. Retrying.`,
+    );
+  }
+
+  throw new Error(
+    `Generated ${category} image remained opaque after ${policy.maxAttempts} attempt` +
+    `${policy.maxAttempts === 1 ? "" : "s"}.`,
+  );
+}
+
 async function storeGeneratedImage(
   image: GeneratedImageResult,
   fileNameBase: string,
@@ -476,13 +642,13 @@ export async function generateTransparentTokenImage(
 ): Promise<string> {
   const prompt = options.promptOverride?.trim() || buildTransparentTokenPrompt(options);
   const referenceImages = options.referenceImage ? [options.referenceImage] : undefined;
-  const image = await generator.generateImage(prompt, {
+  const image = await generateTransparentImageWithValidation(generator, prompt, {
     background: "transparent",
     size: "1024x1024",
     format: "png",
     quality: "high",
     referenceImages,
-  });
+  }, options.imageCategory ?? "actor");
 
   return storeGeneratedImage(
     image,
@@ -498,13 +664,13 @@ export async function generateItemImage(
 ): Promise<string> {
   const prompt = options.promptOverride?.trim() || buildItemImagePrompt(options);
   const referenceImages = options.referenceImage ? [options.referenceImage] : undefined;
-  const image = await generator.generateImage(prompt, {
+  const image = await generateTransparentImageWithValidation(generator, prompt, {
     background: "transparent",
     size: "1024x1024",
     format: "png",
     quality: "high",
     referenceImages,
-  });
+  }, "item");
 
   return storeGeneratedImage(
     image,

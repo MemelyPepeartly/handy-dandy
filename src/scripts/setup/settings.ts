@@ -149,6 +149,24 @@ export async function registerSettings(): Promise<void> {
     default: "handy-dandy",
   });
 
+  settings.register(CONSTANTS.MODULE_ID, "EnforceTransparentGeneratedImages", {
+    name: "Enforce Transparent Generated Images",
+    hint: "When enabled, generated token/item images must contain a real alpha channel. Opaque outputs are retried and then rejected.",
+    scope: "world",
+    config: true,
+    type: Boolean,
+    default: true,
+  });
+
+  settings.register(CONSTANTS.MODULE_ID, "TransparentImageGenerationMaxAttempts", {
+    name: "Transparent Image Max Attempts",
+    hint: "Maximum attempts to regenerate a token/item image when transparency enforcement is enabled (1-6).",
+    scope: "world",
+    config: true,
+    type: Number,
+    default: 3,
+  });
+
   settings.registerMenu(CONSTANTS.MODULE_ID, "toolGuide", {
     name: "Handy Dandy Tool Guide",
     label: "Open Tool Guide",

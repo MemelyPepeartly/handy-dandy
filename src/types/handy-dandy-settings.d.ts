@@ -20,6 +20,8 @@ declare module "fvtt-types/configuration" {
     "handy-dandy.OpenRouterWebSearchMaxResults": number;
 
     "handy-dandy.GeneratedImageDirectory": string;
+    "handy-dandy.EnforceTransparentGeneratedImages": boolean;
+    "handy-dandy.TransparentImageGenerationMaxAttempts": number;
     "handy-dandy.developerDumpInvalidJson": boolean;
     "handy-dandy.developerDumpAjvErrors": boolean;
   }
