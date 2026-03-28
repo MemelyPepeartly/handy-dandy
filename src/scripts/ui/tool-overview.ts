@@ -86,7 +86,7 @@ export class ToolOverview extends FormApplication {
           title: "Rune Stripper",
           icon: "fas fa-gem",
           description:
-            "Drop one or more weapons, calculate RAW rune transfer costs, then split runes into runestones on a generated loot actor while stripping the source weapons.",
+            "Drop one or more weapons/armor pieces, calculate RAW rune transfer costs, then split runes into runestones on a generated loot actor while stripping the source items.",
           location: "Scene Controls -> Handy Dandy Tools -> Rune Stripper",
           buttonAction: "rune-stripper",
           buttonLabel: "Open Rune Stripper",

@@ -1,12 +1,12 @@
 <form class="handy-dandy-rune-stripper-form">
   <section class="handy-dandy-rune-stripper-dropzone" data-rune-stripper-dropzone>
-    <h3>Drop Weapons Here</h3>
-    <p>Drag PF2E weapons from any actor inventory (character, NPC, party stash, loot, or merchant).</p>
-    <p class="notes">Only weapon runes are processed: potency, striking, and property runes.</p>
+    <h3>Drop Weapons or Armor Here</h3>
+    <p>Drag PF2E weapons/armor from any actor inventory (character, NPC, party stash, loot, or merchant).</p>
+    <p class="notes">Processed runes: weapon (potency/striking/property) and armor (potency/resilient/property).</p>
   </section>
 
   <section class="handy-dandy-rune-stripper-payer">
-    <label for="handy-dandy-rune-stripper-payer-select">Payer Character</label>
+    <label for="handy-dandy-rune-stripper-payer-select">Payer (Character or Party)</label>
     <select
       id="handy-dandy-rune-stripper-payer-select"
       data-action="payer-select"
@@ -31,7 +31,7 @@
       <table class="handy-dandy-rune-stripper-table">
         <thead>
           <tr>
-            <th>Weapon</th>
+            <th>Item</th>
             <th>Runes</th>
             <th>Transfer</th>
             <th>Runestones</th>
@@ -44,7 +44,7 @@
             <tr>
               <td>
                 <div class="handy-dandy-rune-stripper-weapon-name">{{weaponName}}</div>
-                <div class="handy-dandy-rune-stripper-weapon-actor">{{actorName}}</div>
+                <div class="handy-dandy-rune-stripper-weapon-actor">{{itemTypeLabel}} - {{actorName}}</div>
               </td>
               <td>
                 <div>{{runeSummary}}</div>
@@ -69,11 +69,11 @@
       </table>
     </section>
   {{else}}
-    <p class="notes">No weapons queued yet.</p>
+    <p class="notes">No items queued yet.</p>
   {{/if}}
 
   <section class="handy-dandy-rune-stripper-totals">
-    <div>Weapons: <strong>{{totals.weaponCount}}</strong></div>
+    <div>Items: <strong>{{totals.weaponCount}}</strong></div>
     <div>Runes: <strong>{{totals.runeCount}}</strong></div>
     <div>Transfer Cost (RAW 10%): <strong>{{totals.transferCostLabel}}</strong></div>
     <div>Runestone Material Cost: <strong>{{totals.runestoneCostLabel}}</strong></div>

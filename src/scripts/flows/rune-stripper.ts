@@ -3,6 +3,10 @@ import { waitForDialog } from "../foundry/dialog";
 
 const RUNE_STRIPPER_TEMPLATE = `${CONSTANTS.TEMPLATE_PATH}/rune-stripper.hbs`;
 const RUNE_COMPENDIUM_PACK_IDS = ["pf2e.equipment-srd", "pf2e.equipment"] as const;
+const SUMMARY_TEMPLATE_UUIDS = [
+  "Compendium.pf2e.equipment-srd.Item.B6B7tBWJSqOBz5zz",
+  "Compendium.pf2e.equipment.Item.B6B7tBWJSqOBz5zz",
+] as const;
 const RUNE_QUALIFIER_PREFIXES = new Set([
   "greater",
   "major",
@@ -15,7 +19,8 @@ const RUNE_QUALIFIER_PREFIXES = new Set([
 ]);
 
 type UnknownRecord = Record<string, unknown>;
-type RuneKind = "potency" | "striking" | "property";
+type RuneKind = "potency" | "striking" | "resilient" | "property";
+type RuneStripItemType = "weapon" | "armor";
 
 interface RuneCatalogEntry {
   key: string;
@@ -50,6 +55,8 @@ interface RuneSelection {
 
 interface WeaponSelection {
   entryKey: string;
+  itemType: RuneStripItemType;
+  itemTypeLabel: string;
   weaponUuid: string;
   weaponName: string;
   actorName: string;
@@ -70,6 +77,7 @@ interface PayerOption {
 
 interface RuneStripperViewEntry {
   entryKey: string;
+  itemTypeLabel: string;
   weaponName: string;
   actorName: string;
   runeSummary: string;
@@ -113,11 +121,13 @@ interface WeaponStripTarget {
   originalRunes: {
     potency: number;
     striking: number;
+    resilient: number;
     property: string[];
   };
 }
 
 let cachedRuneCatalogPromise: Promise<RuneCatalog | null> | null = null;
+let cachedSummaryTemplatePromise: Promise<UnknownRecord | null> | null = null;
 let runeStripperApp: RuneStripperApplication | null = null;
 
 function asRecord(value: unknown): UnknownRecord | null {
@@ -198,8 +208,17 @@ function buildRuneKeyFromName(name: string): string | null {
     return `weaponPotency${potencyMatch[1]}`;
   }
 
+  const armorPotencyMatch = /^Armor Potency\s*\(\s*\+([1-4])\s*\)$/i.exec(trimmed);
+  if (armorPotencyMatch) {
+    return `armorPotency${armorPotencyMatch[1]}`;
+  }
+
   if (/^Mythic Weapon Potency$/i.test(trimmed)) {
     return "weaponPotency4";
+  }
+
+  if (/^Mythic Armor Potency$/i.test(trimmed)) {
+    return "armorPotency4";
   }
 
   let basePart = trimmed;
@@ -390,6 +409,14 @@ function potencyKeyForValue(value: number): string | null {
   return `weaponPotency${value}`;
 }
 
+function armorPotencyKeyForValue(value: number): string | null {
+  if (value < 1 || value > 4) {
+    return null;
+  }
+
+  return `armorPotency${value}`;
+}
+
 function strikingKeyForValue(value: number): string | null {
   switch (value) {
     case 1:
@@ -400,6 +427,21 @@ function strikingKeyForValue(value: number): string | null {
       return "majorStriking";
     case 4:
       return "mythicStriking";
+    default:
+      return null;
+  }
+}
+
+function resilientKeyForValue(value: number): string | null {
+  switch (value) {
+    case 1:
+      return "resilient";
+    case 2:
+      return "greaterResilient";
+    case 3:
+      return "majorResilient";
+    case 4:
+      return "mythicResilient";
     default:
       return null;
   }
@@ -554,6 +596,30 @@ async function getRuneCatalog(): Promise<RuneCatalog | null> {
   return await cachedRuneCatalogPromise;
 }
 
+async function loadSummaryTemplateSource(): Promise<UnknownRecord | null> {
+  for (const uuid of SUMMARY_TEMPLATE_UUIDS) {
+    const document = await fromUuid(uuid as any);
+    if (!(document instanceof Item)) {
+      continue;
+    }
+
+    const source = asRecord(document.toObject());
+    if (source && getStringValue(source, "type") === "treasure") {
+      return source;
+    }
+  }
+
+  return null;
+}
+
+async function getSummaryTemplateSource(): Promise<UnknownRecord | null> {
+  if (!cachedSummaryTemplatePromise) {
+    cachedSummaryTemplatePromise = loadSummaryTemplateSource();
+  }
+
+  return await cachedSummaryTemplatePromise;
+}
+
 async function resolveDroppedItem(dropData: unknown): Promise<Item | null> {
   const record = asRecord(dropData);
   if (!record) {
@@ -594,7 +660,12 @@ async function resolveDroppedItem(dropData: unknown): Promise<Item | null> {
   return null;
 }
 
-function extractWeaponRuneState(item: Item): { potency: number; striking: number; property: string[] } {
+function extractItemRuneState(item: Item): {
+  potency: number;
+  striking: number;
+  resilient: number;
+  property: string[];
+} {
   const sourceRecord = asRecord((item as unknown as { _source?: unknown })._source);
   const sourceSystem = asRecord(sourceRecord?.["system"]);
   const sourceRunes = asRecord(sourceSystem?.["runes"]);
@@ -605,6 +676,7 @@ function extractWeaponRuneState(item: Item): { potency: number; striking: number
 
   const potency = Math.max(Math.floor(toNumber(runes["potency"]) ?? 0), 0);
   const striking = Math.max(Math.floor(toNumber(runes["striking"]) ?? 0), 0);
+  const resilient = Math.max(Math.floor(toNumber(runes["resilient"]) ?? 0), 0);
   const property = Array.isArray(runes["property"])
     ? runes["property"]
       .filter((entry): entry is string => typeof entry === "string")
@@ -612,7 +684,7 @@ function extractWeaponRuneState(item: Item): { potency: number; striking: number
       .filter((entry) => entry.length > 0)
     : [];
 
-  return { potency, striking, property };
+  return { potency, striking, resilient, property };
 }
 
 function isWeaponItem(item: Item | null | undefined): item is Item {
@@ -620,9 +692,23 @@ function isWeaponItem(item: Item | null | undefined): item is Item {
   return typeof type === "string" && type === "weapon";
 }
 
+function isArmorItem(item: Item | null | undefined): item is Item {
+  const type = (item as unknown as { type?: unknown } | null | undefined)?.type;
+  return typeof type === "string" && type === "armor";
+}
+
+function isRunnableStripItem(item: Item | null | undefined): item is Item {
+  return isWeaponItem(item) || isArmorItem(item);
+}
+
 function isCharacterActor(actor: Actor | null | undefined): actor is Actor {
   const type = (actor as unknown as { type?: unknown } | null | undefined)?.type;
   return typeof type === "string" && type === "character";
+}
+
+function isPartyActor(actor: Actor | null | undefined): actor is Actor {
+  const type = (actor as unknown as { type?: unknown } | null | undefined)?.type;
+  return typeof type === "string" && type === "party";
 }
 
 function computeTotals(entries: WeaponSelection[]): RuneTotals {
@@ -707,6 +793,110 @@ function buildRunestoneItemSources(entries: WeaponSelection[], catalog: RuneCata
   return sources;
 }
 
+function buildSummaryItemSource(
+  entries: WeaponSelection[],
+  totals: RuneTotals,
+  payerActor: Actor,
+  summaryTemplateSource: UnknownRecord | null,
+): UnknownRecord {
+  const source = summaryTemplateSource
+    ? deepClone(summaryTemplateSource)
+    : {
+      name: "Gold Pieces",
+      type: "treasure",
+      img: "systems/pf2e/icons/equipment/treasure/currency/gold-pieces.webp",
+      system: {
+        baseItem: null,
+        bulk: { value: 0 },
+        category: "art-object",
+        containerId: null,
+        description: { value: "" },
+        hardness: 0,
+        hp: { max: 0, value: 0 },
+        level: { value: 0 },
+        material: { grade: null, type: null },
+        price: { value: { gp: 0 } },
+        quantity: 1,
+        rules: [],
+        size: "med",
+        traits: { rarity: "common", value: [] },
+      },
+    };
+  delete source["_id"];
+
+  source["name"] = "Rune Strip Summary Ledger";
+  source["type"] = "treasure";
+  source["img"] = "icons/sundries/books/book-open-blue.webp";
+
+  const system = asRecord(source["system"]) ?? {};
+  source["system"] = system;
+  system["quantity"] = 1;
+  system["category"] = "art-object";
+
+  const bulk = asRecord(system["bulk"]) ?? {};
+  bulk["value"] = 0;
+  system["bulk"] = bulk;
+
+  const level = asRecord(system["level"]) ?? {};
+  level["value"] = 0;
+  system["level"] = level;
+
+  const price = asRecord(system["price"]) ?? {};
+  price["value"] = { gp: 0 };
+  system["price"] = price;
+
+  const tableRows = entries
+    .map((entry) => [
+      "<tr>",
+      `<td>${escapeHtml(entry.weaponName)}</td>`,
+      `<td>${escapeHtml(entry.itemTypeLabel)}</td>`,
+      `<td>${escapeHtml(entry.actorName)}</td>`,
+      `<td>${escapeHtml(entry.runeSummary)}</td>`,
+      `<td>${formatGp(entry.transferCostGp)}</td>`,
+      `<td>${formatGp(entry.runestoneCostGp)}</td>`,
+      `<td>${formatGp(entry.totalCostGp)}</td>`,
+      "</tr>",
+    ].join(""))
+    .join("");
+
+  const summaryHtml = [
+    "<p>This blank ledger summarizes the latest Rune Stripper split.</p>",
+    "<ul>",
+    `<li>Items processed: <strong>${totals.weaponCount}</strong></li>`,
+    `<li>Runes extracted: <strong>${totals.runeCount}</strong></li>`,
+    `<li>Payer: <strong>${escapeHtml(payerActor.name ?? "Unknown")}</strong></li>`,
+    `<li>Total charge: <strong>${formatGp(totals.grandTotalGp)}</strong></li>`,
+    "</ul>",
+    "<table>",
+    "<thead>",
+    "<tr><th>Item</th><th>Type</th><th>Owner</th><th>Runes</th><th>Transfer</th><th>Runestones</th><th>Total</th></tr>",
+    "</thead>",
+    "<tbody>",
+    tableRows,
+    "</tbody>",
+    "</table>",
+  ].join("");
+
+  const description = asRecord(system["description"]) ?? {};
+  description["value"] = summaryHtml;
+  system["description"] = description;
+
+  const flags = asRecord(source["flags"]) ?? {};
+  flags[CONSTANTS.MODULE_ID] = {
+    runeStripper: {
+      summary: true,
+      itemCount: totals.weaponCount,
+      runeCount: totals.runeCount,
+      transferCostGp: totals.transferCostGp,
+      runestoneCostGp: totals.runestoneCostGp,
+      grandTotalGp: totals.grandTotalGp,
+    },
+  };
+  source["flags"] = flags;
+
+  return source;
+}
+
 class RuneStripperApplication extends FormApplication {
   #entries: WeaponSelection[] = [];
   #payerActorId: string | null = null;
@@ -743,10 +933,10 @@ class RuneStripperApplication extends FormApplication {
 
     const blockingIssues: string[] = [];
     if (this.#entries.length === 0) {
-      blockingIssues.push("Add at least one weapon with transferable runes.");
+      blockingIssues.push("Add at least one weapon or armor item with transferable runes.");
     }
     if (payerOptions.length === 0) {
-      blockingIssues.push("Select a payer linked to a player character.");
+      blockingIssues.push("Select a payer linked to a player character or party sheet.");
     }
     const unresolved = this.#entries.flatMap((entry) => entry.unresolved);
     if (unresolved.length > 0) {
@@ -762,6 +952,7 @@ class RuneStripperApplication extends FormApplication {
     return {
       entries: this.#entries.map((entry) => ({
         entryKey: entry.entryKey,
+        itemTypeLabel: entry.itemTypeLabel,
         weaponName: entry.weaponName,
         actorName: entry.actorName,
         runeSummary: entry.runeSummary,
@@ -894,14 +1085,14 @@ class RuneStripperApplication extends FormApplication {
   }
 
   async #addWeapon(item: Item): Promise<void> {
-    if (!isWeaponItem(item)) {
-      ui.notifications?.warn(`${CONSTANTS.MODULE_NAME} | Only PF2E weapon items can be stripped.`);
+    if (!isRunnableStripItem(item)) {
+      ui.notifications?.warn(`${CONSTANTS.MODULE_NAME} | Only PF2E weapon or armor items can be stripped.`);
       return;
     }
 
     const weaponUuid = item.uuid ?? "";
     if (!weaponUuid) {
-      ui.notifications?.warn(`${CONSTANTS.MODULE_NAME} | The dropped weapon is missing a UUID.`);
+      ui.notifications?.warn(`${CONSTANTS.MODULE_NAME} | The dropped item is missing a UUID.`);
       return;
     }
 
@@ -912,7 +1103,9 @@ class RuneStripperApplication extends FormApplication {
 
     const selection = await this.#buildSelection(item);
     if (!selection) {
-      ui.notifications?.warn(`${CONSTANTS.MODULE_NAME} | ${item.name} has no transferable weapon runes.`);
+      ui.notifications?.warn(
+        `${CONSTANTS.MODULE_NAME} | ${item.name} has no transferable weapon/armor runes.`,
+      );
       return;
     }
 
@@ -926,7 +1119,7 @@ class RuneStripperApplication extends FormApplication {
 
     for (const entry of this.#entries) {
       const current = await fromUuid(entry.weaponUuid as any);
-      if (!(current instanceof Item) || !isWeaponItem(current)) {
+      if (!(current instanceof Item) || !isRunnableStripItem(current)) {
         removed.push(entry.weaponName);
         continue;
       }
@@ -945,7 +1138,7 @@ class RuneStripperApplication extends FormApplication {
       const preview = removed.slice(0, 5).join(", ");
       const suffix = removed.length > 5 ? ` (+${removed.length - 5} more)` : "";
       ui.notifications?.warn(
-        `${CONSTANTS.MODULE_NAME} | Removed unavailable or rune-less weapons: ${preview}${suffix}.`,
+        `${CONSTANTS.MODULE_NAME} | Removed unavailable or rune-less items: ${preview}${suffix}.`,
       );
     } else if (!options.silent) {
       ui.notifications?.info(`${CONSTANTS.MODULE_NAME} | Rune queue refreshed.`);
@@ -960,17 +1153,32 @@ class RuneStripperApplication extends FormApplication {
       return null;
     }
 
-    const runes = extractWeaponRuneState(item);
+    if (!isRunnableStripItem(item)) {
+      return null;
+    }
+
+    const itemType: RuneStripItemType = isArmorItem(item) ? "armor" : "weapon";
+    const itemTypeLabel = itemType === "armor" ? "Armor" : "Weapon";
+    const runes = extractItemRuneState(item);
     const requested: Array<{ kind: RuneKind; key: string; slug: string }> = [];
 
-    const potencyKey = potencyKeyForValue(runes.potency);
+    const potencyKey = itemType === "armor"
+      ? armorPotencyKeyForValue(runes.potency)
+      : potencyKeyForValue(runes.potency);
     if (potencyKey) {
       requested.push({ kind: "potency", key: potencyKey, slug: potencyKey });
     }
 
-    const strikingKey = strikingKeyForValue(runes.striking);
-    if (strikingKey) {
-      requested.push({ kind: "striking", key: strikingKey, slug: strikingKey });
+    if (itemType === "weapon") {
+      const strikingKey = strikingKeyForValue(runes.striking);
+      if (strikingKey) {
+        requested.push({ kind: "striking", key: strikingKey, slug: strikingKey });
+      }
+    } else {
+      const resilientKey = resilientKeyForValue(runes.resilient);
+      if (resilientKey) {
+        requested.push({ kind: "resilient", key: resilientKey, slug: resilientKey });
+      }
     }
 
     for (const propertySlug of runes.property) {
@@ -983,7 +1191,7 @@ class RuneStripperApplication extends FormApplication {
 
     const selectedRunes: RuneSelection[] = [];
     const unresolved: string[] = [];
-    const weaponName = item.name ?? "Unnamed Weapon";
+    const weaponName = item.name ?? "Unnamed Item";
 
     for (const request of requested) {
       const catalogEntry = catalog.runes.get(request.key);
@@ -1017,6 +1225,8 @@ class RuneStripperApplication extends FormApplication {
 
     return {
       entryKey: item.uuid,
+      itemType,
+      itemTypeLabel,
       weaponUuid: item.uuid,
       weaponName,
       actorName,
@@ -1052,25 +1262,48 @@ class RuneStripperApplication extends FormApplication {
         });
       }
 
-      if (options.length === 0) {
-        for (const actor of extractCollectionValues<Actor>(game.actors)) {
-          if (!isCharacterActor(actor) || !actor.id || seenActorIds.has(actor.id)) {
-            continue;
-          }
-          seenActorIds.add(actor.id);
-          options.push({
-            actorId: actor.id,
-            label: `${actor.name}`,
-            selected: false,
-          });
+      for (const actor of extractCollectionValues<Actor>(game.actors)) {
+        if (!isPartyActor(actor) || !actor.id || seenActorIds.has(actor.id)) {
+          continue;
         }
+        seenActorIds.add(actor.id);
+        options.push({
+          actorId: actor.id,
+          label: `Party -> ${actor.name}`,
+          selected: false,
+        });
+      }
+
+      for (const actor of extractCollectionValues<Actor>(game.actors)) {
+        if (!isCharacterActor(actor) || !actor.id || seenActorIds.has(actor.id)) {
+          continue;
+        }
+        seenActorIds.add(actor.id);
+        options.push({
+          actorId: actor.id,
+          label: `${actor.name}`,
+          selected: false,
+        });
       }
     } else {
       const character = game.user?.character;
       if (character instanceof Actor && isCharacterActor(character) && character.id) {
+        seenActorIds.add(character.id);
         options.push({
           actorId: character.id,
           label: character.name ?? "Character",
+          selected: false,
+        });
+      }
+
+      for (const actor of extractCollectionValues<Actor>(game.actors)) {
+        if (!isPartyActor(actor) || !actor.id || seenActorIds.has(actor.id) || !actor.isOwner) {
+          continue;
+        }
+        seenActorIds.add(actor.id);
+        options.push({
+          actorId: actor.id,
+          label: `Party -> ${actor.name}`,
           selected: false,
         });
       }
@@ -1115,7 +1348,7 @@ class RuneStripperApplication extends FormApplication {
 
     for (const entry of this.#entries) {
       const document = await fromUuid(entry.weaponUuid as any);
-      if (!(document instanceof Item) || !isWeaponItem(document)) {
+      if (!(document instanceof Item) || !isRunnableStripItem(document)) {
         missing.push(entry.weaponName);
         continue;
       }
@@ -1123,7 +1356,7 @@ class RuneStripperApplication extends FormApplication {
       targets.push({
         entry,
         document,
-        originalRunes: extractWeaponRuneState(document),
+        originalRunes: extractItemRuneState(document),
       });
     }
 
@@ -1135,11 +1368,19 @@ class RuneStripperApplication extends FormApplication {
 
     for (const target of targets) {
       try {
-        await target.document.update({
-          "system.runes.potency": target.originalRunes.potency,
-          "system.runes.striking": target.originalRunes.striking,
-          "system.runes.property": [...target.originalRunes.property],
-        } as any);
+        const restoreUpdate = target.entry.itemType === "armor"
+          ? {
+            "system.runes.potency": target.originalRunes.potency,
+            "system.runes.resilient": target.originalRunes.resilient,
+            "system.runes.property": [...target.originalRunes.property],
+          }
+          : {
+            "system.runes.potency": target.originalRunes.potency,
+            "system.runes.striking": target.originalRunes.striking,
+            "system.runes.property": [...target.originalRunes.property],
+          };
+
+        await target.document.update(restoreUpdate as any);
       } catch {
         failures.push(target.entry.weaponName);
       }
@@ -1172,7 +1413,7 @@ class RuneStripperApplication extends FormApplication {
     const totals = computeTotals(this.#entries);
     const confirmationContent = [
       `<div class="handy-dandy-rune-stripper-confirm">`,
-      `<p>Strip runes from <strong>${totals.weaponCount}</strong> weapon(s) and place them into runestones?</p>`,
+      `<p>Strip runes from <strong>${totals.weaponCount}</strong> item(s) and place them into runestones?</p>`,
       `<ul>`,
       `<li>Runes: <strong>${totals.runeCount}</strong></li>`,
       `<li>Transfer cost (RAW 10%): <strong>${formatGp(totals.transferCostGp)}</strong></li>`,
@@ -1260,7 +1501,7 @@ class RuneStripperApplication extends FormApplication {
       const preview = missing.slice(0, 5).join(", ");
       const suffix = missing.length > 5 ? ` (+${missing.length - 5} more)` : "";
       ui.notifications?.warn(
-        `${CONSTANTS.MODULE_NAME} | Some queued weapons are no longer available (${preview}${suffix}). ` +
+        `${CONSTANTS.MODULE_NAME} | Some queued items are no longer available (${preview}${suffix}). ` +
           `Refresh the queue and try again.`,
       );
       return;
@@ -1269,11 +1510,19 @@ class RuneStripperApplication extends FormApplication {
     const strippedTargets: WeaponStripTarget[] = [];
     for (const target of targets) {
       try {
-        await target.document.update({
-          "system.runes.potency": 0,
-          "system.runes.striking": 0,
-          "system.runes.property": [],
-        } as any);
+        const stripUpdate = target.entry.itemType === "armor"
+          ? {
+            "system.runes.potency": 0,
+            "system.runes.resilient": 0,
+            "system.runes.property": [],
+          }
+          : {
+            "system.runes.potency": 0,
+            "system.runes.striking": 0,
+            "system.runes.property": [],
+          };
+
+        await target.document.update(stripUpdate as any);
         strippedTargets.push(target);
       } catch {
         const rollbackFailures = await this.#restoreWeaponRunes(strippedTargets);
@@ -1285,6 +1534,10 @@ class RuneStripperApplication extends FormApplication {
         );
       }
     }
+
+    const summaryTemplateSource = await getSummaryTemplateSource();
+    const summarySource = buildSummaryItemSource(this.#entries, totals, payerActor, summaryTemplateSource);
+    const outputItemSources = [summarySource, ...runestoneSources];
 
     const timestamp = new Date().toISOString().replace("T", " ").replace("Z", " UTC");
     let lootActor: Actor | null = null;
@@ -1306,7 +1559,7 @@ class RuneStripperApplication extends FormApplication {
         throw new Error("Failed to create the output loot actor.");
       }
 
-      await lootActor.createEmbeddedDocuments("Item", runestoneSources as any[]);
+      await lootActor.createEmbeddedDocuments("Item", outputItemSources as any[]);
     } catch (error) {
       const rollbackFailures = await this.#restoreWeaponRunes(strippedTargets);
       if (lootActor) {
@@ -1336,7 +1589,7 @@ class RuneStripperApplication extends FormApplication {
     }
 
     ui.notifications?.info(
-      `${CONSTANTS.MODULE_NAME} | Stripped ${totals.runeCount} rune(s) from ${totals.weaponCount} weapon(s). ` +
+      `${CONSTANTS.MODULE_NAME} | Stripped ${totals.runeCount} rune(s) from ${totals.weaponCount} item(s). ` +
         `Charged ${formatGp(totals.grandTotalGp)} to ${payerActor.name}.`,
     );
 
