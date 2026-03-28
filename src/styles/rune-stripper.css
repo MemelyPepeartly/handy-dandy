@@ -30,11 +30,26 @@
   gap: 0.35rem;
 }
 
+.handy-dandy-rune-stripper-crafter {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
 .handy-dandy-rune-stripper-payer label {
   font-weight: 600;
 }
 
+.handy-dandy-rune-stripper-crafter label {
+  font-weight: 600;
+}
+
 .handy-dandy-rune-stripper-payer-funds {
+  color: var(--color-text-light-6, #b9b9b9);
+  margin-left: 0.25rem;
+}
+
+.handy-dandy-rune-stripper-crafter-stat {
   color: var(--color-text-light-6, #b9b9b9);
   margin-left: 0.25rem;
 }
@@ -71,6 +86,19 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+
+.handy-dandy-rune-stripper-roll {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.handy-dandy-rune-stripper-entry-actions {
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
 }
 
 .handy-dandy-rune-stripper-totals {

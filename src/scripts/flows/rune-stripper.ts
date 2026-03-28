@@ -17,10 +17,41 @@ const RUNE_QUALIFIER_PREFIXES = new Set([
   "mythic",
   "true",
 ]);
+const LEVEL_BASED_DCS = new Map<number, number>([
+  [-1, 13],
+  [0, 14],
+  [1, 15],
+  [2, 16],
+  [3, 18],
+  [4, 19],
+  [5, 20],
+  [6, 22],
+  [7, 23],
+  [8, 24],
+  [9, 26],
+  [10, 27],
+  [11, 28],
+  [12, 30],
+  [13, 31],
+  [14, 32],
+  [15, 34],
+  [16, 35],
+  [17, 36],
+  [18, 38],
+  [19, 39],
+  [20, 40],
+  [21, 42],
+  [22, 44],
+  [23, 46],
+  [24, 48],
+  [25, 50],
+]);
+const PROFICIENCY_RANK_BONUS = [0, 2, 4, 6, 8] as const;
 
 type UnknownRecord = Record<string, unknown>;
 type RuneKind = "potency" | "striking" | "resilient" | "property";
 type RuneStripItemType = "weapon" | "armor";
+type CraftingOutcome = "criticalSuccess" | "success" | "failure" | "criticalFailure";
 
 interface RuneCatalogEntry {
   key: string;
@@ -47,8 +78,15 @@ interface RuneSelection {
   key: string;
   slug: string;
   name: string;
+  level: number;
+  transferDc: number;
   priceGp: number;
   transferCostGp: number;
+  attempts: number;
+  failureCount: number;
+  criticalFailureCount: number;
+  lastOutcome: CraftingOutcome | null;
+  lastRollTotal: number | null;
   uuid: string;
   img: string;
 }
@@ -75,6 +113,12 @@ interface PayerOption {
   selected: boolean;
 }
 
+interface CrafterOption {
+  actorId: string;
+  label: string;
+  selected: boolean;
+}
+
 interface RuneStripperViewEntry {
   entryKey: string;
   itemTypeLabel: string;
@@ -85,6 +129,10 @@ interface RuneStripperViewEntry {
   transferCostLabel: string;
   runestoneCostLabel: string;
   totalCostLabel: string;
+  craftingDcLabel: string;
+  craftingProgressLabel: string;
+  craftingStatusLabel: string;
+  hasRollButton: boolean;
 }
 
 interface RuneStripperViewData {
@@ -94,11 +142,21 @@ interface RuneStripperViewData {
   hasPayerOptions: boolean;
   selectedPayerName: string;
   selectedPayerFundsLabel: string;
+  crafterOptions: CrafterOption[];
+  hasCrafterOptions: boolean;
+  selectedCrafterName: string;
+  selectedCrafterModifierLabel: string;
+  selectedCrafterAssuranceLabel: string;
+  selectedCrafterFeatSummary: string;
+  craftingRulesSummary: string;
   totals: {
     weaponCount: number;
     runeCount: number;
+    minimumDays: number;
+    retryDays: number;
     transferCostLabel: string;
     runestoneCostLabel: string;
+    lostMaterialsLabel: string;
     grandTotalLabel: string;
   };
   blockingIssues: string[];
@@ -110,9 +168,24 @@ interface RuneStripperViewData {
 interface RuneTotals {
   weaponCount: number;
   runeCount: number;
+  minimumDays: number;
+  retryDays: number;
   transferCostGp: number;
   runestoneCostGp: number;
+  lostMaterialsGp: number;
   grandTotalGp: number;
+}
+
+interface CrafterInsight {
+  actor: Actor | null;
+  skill: unknown;
+  rank: number;
+  modifier: number | null;
+  hasCraftingSkill: boolean;
+  hasMagicalCrafting: boolean;
+  hasAssuranceCrafting: boolean;
+  assuranceTotal: number | null;
+  relevantCraftingFeats: string[];
 }
 
 interface WeaponStripTarget {
@@ -711,17 +784,306 @@ function isPartyActor(actor: Actor | null | undefined): actor is Actor {
   return typeof type === "string" && type === "party";
 }
 
+function getPwolEnabled(): boolean {
+  const variantRules = (game as unknown as {
+    pf2e?: { settings?: { variants?: { pwol?: { enabled?: unknown } } } };
+  }).pf2e?.settings?.variants;
+  return variantRules?.pwol?.enabled === true;
+}
+
+function calculateLevelDc(level: number): number {
+  const normalized = Number.isFinite(level) ? Math.trunc(level) : 0;
+  const base = LEVEL_BASED_DCS.get(normalized) ?? 14;
+  return getPwolEnabled() ? base - Math.max(normalized, 0) : base;
+}
+
+function getActorLevel(actor: Actor | null): number {
+  if (!(actor instanceof Actor)) {
+    return 0;
+  }
+
+  const system = asRecord((actor as unknown as { system?: unknown }).system);
+  const details = asRecord(system?.["details"]);
+  const levelField = details?.["level"];
+  const level = toNumber(asRecord(levelField)?.["value"] ?? levelField) ?? 0;
+  return Math.max(Math.trunc(level), 0);
+}
+
+function getItemLevel(item: Item): number {
+  const sourceRecord = asRecord((item as unknown as { _source?: unknown })._source);
+  const sourceSystem = asRecord(sourceRecord?.["system"]);
+  const sourceLevel = sourceSystem?.["level"];
+
+  const liveSystem = asRecord((item as unknown as { system?: unknown }).system);
+  const liveLevel = liveSystem?.["level"];
+
+  const level = toNumber(asRecord(sourceLevel)?.["value"] ?? sourceLevel ?? asRecord(liveLevel)?.["value"] ?? liveLevel) ?? 0;
+  return Math.max(Math.trunc(level), -1);
+}
+
+function getItemSlug(item: Item): string {
+  const directSlug = (item as unknown as { slug?: unknown }).slug;
+  if (typeof directSlug === "string" && directSlug.trim().length > 0) {
+    return directSlug.trim();
+  }
+
+  const sourceRecord = asRecord((item as unknown as { _source?: unknown })._source);
+  const sourceSystem = asRecord(sourceRecord?.["system"]);
+  const sourceSlug = sourceSystem?.["slug"];
+  if (typeof sourceSlug === "string" && sourceSlug.trim().length > 0) {
+    return sourceSlug.trim();
+  }
+
+  const liveSystem = asRecord((item as unknown as { system?: unknown }).system);
+  const liveSlug = liveSystem?.["slug"];
+  return typeof liveSlug === "string" && liveSlug.trim().length > 0 ? liveSlug.trim() : "";
+}
+
+function getItemRulesSelection(item: Item, selectionKey: string): string | null {
+  const sourceFlags = asRecord(asRecord((item as unknown as { _source?: unknown })._source)?.["flags"]);
+  const liveFlags = asRecord((item as unknown as { flags?: unknown }).flags);
+
+  for (const flags of [sourceFlags, liveFlags]) {
+    const pf2eFlags = asRecord(flags?.["pf2e"]);
+    const systemFlags = asRecord(flags?.["system"]);
+    const rulesSelections = asRecord(pf2eFlags?.["rulesSelections"]) ?? asRecord(systemFlags?.["rulesSelections"]);
+    const value = rulesSelections?.[selectionKey];
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+
+  return null;
+}
+
+function getFeatItems(actor: Actor | null): Item[] {
+  if (!(actor instanceof Actor)) {
+    return [];
+  }
+
+  const itemTypes = (actor as unknown as { itemTypes?: { feat?: unknown } }).itemTypes;
+  if (Array.isArray(itemTypes?.feat)) {
+    return itemTypes.feat.filter((entry): entry is Item => entry instanceof Item);
+  }
+
+  return extractCollectionValues<Item>((actor as unknown as { items?: unknown }).items).filter((item) => {
+    const itemType = (item as unknown as { type?: unknown }).type;
+    return itemType === "feat";
+  });
+}
+
+function getCraftingSkill(actor: Actor | null): unknown {
+  if (!(actor instanceof Actor)) {
+    return null;
+  }
+
+  const skills = asRecord((actor as unknown as { skills?: unknown }).skills);
+  if (skills?.["crafting"]) {
+    return skills["crafting"];
+  }
+  if (skills?.["cra"]) {
+    return skills["cra"];
+  }
+
+  const systemSkills = asRecord(asRecord((actor as unknown as { system?: unknown }).system)?.["skills"]);
+  if (systemSkills?.["crafting"]) {
+    return systemSkills["crafting"];
+  }
+  if (systemSkills?.["cra"]) {
+    return systemSkills["cra"];
+  }
+
+  return null;
+}
+
+function getCraftingRank(actor: Actor | null, skill: unknown): number {
+  const rankFromSkill = toNumber(asRecord(skill)?.["rank"]);
+  if (typeof rankFromSkill === "number") {
+    return Math.clamp(Math.trunc(rankFromSkill), 0, 4);
+  }
+
+  const systemSkills = asRecord(asRecord((actor as unknown as { system?: unknown }).system)?.["skills"]);
+  const rankFromSystem = toNumber(
+    asRecord(systemSkills?.["crafting"])?.["rank"] ??
+      asRecord(systemSkills?.["cra"])?.["rank"],
+  );
+  return typeof rankFromSystem === "number" ? Math.clamp(Math.trunc(rankFromSystem), 0, 4) : 0;
+}
+
+function getCraftingModifier(skill: unknown): number | null {
+  const skillRecord = asRecord(skill);
+  if (!skillRecord) {
+    return null;
+  }
+
+  const check = asRecord(skillRecord["check"]);
+  const mod = toNumber(check?.["mod"] ?? skillRecord["mod"] ?? skillRecord["totalModifier"]);
+  return typeof mod === "number" ? Math.trunc(mod) : null;
+}
+
+function getAssuranceTotal(actor: Actor | null, rank: number): number | null {
+  if (rank <= 0) {
+    return null;
+  }
+
+  const proficiencyBonus = PROFICIENCY_RANK_BONUS[Math.clamp(rank, 0, 4)];
+  const level = getPwolEnabled() ? 0 : getActorLevel(actor);
+  return 10 + proficiencyBonus + level;
+}
+
+function isAssuranceForCrafting(feat: Item): boolean {
+  const slug = getItemSlug(feat).toLowerCase();
+  if (slug === "assurance-crafting") {
+    return true;
+  }
+  if (slug !== "assurance") {
+    return false;
+  }
+
+  const selection = (getItemRulesSelection(feat, "assurance") ?? "").toLowerCase();
+  return selection === "crafting" || selection === "cra" || selection.includes("craft");
+}
+
+function isRelevantCraftingFeat(feat: Item): boolean {
+  if (isAssuranceForCrafting(feat)) {
+    return true;
+  }
+
+  const slug = getItemSlug(feat).toLowerCase();
+  if (slug.includes("craft")) {
+    return true;
+  }
+
+  const name = feat.name?.toLowerCase().trim() ?? "";
+  return name.includes("craft");
+}
+
+function getCrafterInsight(actor: Actor | null): CrafterInsight {
+  if (!(actor instanceof Actor) || !isCharacterActor(actor)) {
+    return {
+      actor: null,
+      skill: null,
+      rank: 0,
+      modifier: null,
+      hasCraftingSkill: false,
+      hasMagicalCrafting: false,
+      hasAssuranceCrafting: false,
+      assuranceTotal: null,
+      relevantCraftingFeats: [],
+    };
+  }
+
+  const skill = getCraftingSkill(actor);
+  const rank = getCraftingRank(actor, skill);
+  const modifier = getCraftingModifier(skill);
+  const feats = getFeatItems(actor);
+  const hasMagicalCrafting = feats.some((feat) => getItemSlug(feat).toLowerCase() === "magical-crafting");
+  const hasAssuranceCrafting = feats.some((feat) => isAssuranceForCrafting(feat));
+  const relevantCraftingFeats = feats
+    .filter((feat) => isRelevantCraftingFeat(feat))
+    .map((feat) => feat.name?.trim() ?? "Unnamed feat")
+    .sort((a, b) => a.localeCompare(b));
+
+  const hasCraftingSkill = rank > 0 && skill !== null;
+
+  return {
+    actor,
+    skill,
+    rank,
+    modifier,
+    hasCraftingSkill,
+    hasMagicalCrafting,
+    hasAssuranceCrafting,
+    assuranceTotal: hasAssuranceCrafting && hasCraftingSkill ? getAssuranceTotal(actor, rank) : null,
+    relevantCraftingFeats,
+  };
+}
+
+function degreeToCraftingOutcome(degree: number | null): CraftingOutcome | null {
+  const normalized = typeof degree === "number" ? Math.trunc(degree) : null;
+  switch (normalized) {
+    case 3:
+      return "criticalSuccess";
+    case 2:
+      return "success";
+    case 1:
+      return "failure";
+    case 0:
+      return "criticalFailure";
+    default:
+      return null;
+  }
+}
+
+function craftingOutcomeFromTotal(total: number, dc: number): CraftingOutcome {
+  if (total >= dc + 10) {
+    return "criticalSuccess";
+  }
+  if (total >= dc) {
+    return "success";
+  }
+  if (total <= dc - 10) {
+    return "criticalFailure";
+  }
+  return "failure";
+}
+
+function isSuccessfulOutcome(outcome: CraftingOutcome | null): boolean {
+  return outcome === "success" || outcome === "criticalSuccess";
+}
+
+function isFailureOutcome(outcome: CraftingOutcome | null): boolean {
+  return outcome === "failure" || outcome === "criticalFailure";
+}
+
+function isAssuranceAutoSuccess(rune: RuneSelection, crafterInsight: CrafterInsight): boolean {
+  return (
+    crafterInsight.hasCraftingSkill &&
+    crafterInsight.hasAssuranceCrafting &&
+    typeof crafterInsight.assuranceTotal === "number" &&
+    crafterInsight.assuranceTotal >= rune.transferDc
+  );
+}
+
+function isRuneSuccessful(rune: RuneSelection, crafterInsight: CrafterInsight): boolean {
+  return isSuccessfulOutcome(rune.lastOutcome) || isAssuranceAutoSuccess(rune, crafterInsight);
+}
+
+function isRunePending(rune: RuneSelection, crafterInsight: CrafterInsight): boolean {
+  return !isRuneSuccessful(rune, crafterInsight);
+}
+
 function computeTotals(entries: WeaponSelection[]): RuneTotals {
   const transferCostGp = roundGp(entries.reduce((sum, entry) => sum + entry.transferCostGp, 0));
   const runestoneCostGp = roundGp(entries.reduce((sum, entry) => sum + entry.runestoneCostGp, 0));
   const runeCount = entries.reduce((sum, entry) => sum + entry.runeCount, 0);
+  const retryDays = entries.reduce(
+    (sum, entry) =>
+      sum +
+      entry.runes.reduce((runeSum, rune) => runeSum + rune.failureCount + rune.criticalFailureCount, 0),
+    0,
+  );
+  const lostMaterialsGp = roundGp(
+    entries.reduce(
+      (sum, entry) =>
+        sum +
+        entry.runes.reduce(
+          (runeSum, rune) => runeSum + rune.transferCostGp * rune.criticalFailureCount * 0.1,
+          0,
+        ),
+      0,
+    ),
+  );
 
   return {
     weaponCount: entries.length,
     runeCount,
+    minimumDays: runeCount,
+    retryDays,
     transferCostGp,
     runestoneCostGp,
-    grandTotalGp: roundGp(transferCostGp + runestoneCostGp),
+    lostMaterialsGp,
+    grandTotalGp: roundGp(transferCostGp + runestoneCostGp + lostMaterialsGp),
   };
 }
 
@@ -797,6 +1159,7 @@ function buildSummaryItemSource(
   entries: WeaponSelection[],
   totals: RuneTotals,
   payerActor: Actor,
+  crafterActor: Actor | null,
   summaryTemplateSource: UnknownRecord | null,
 ): UnknownRecord {
   const source = summaryTemplateSource
@@ -865,7 +1228,11 @@ function buildSummaryItemSource(
     `<li>Items processed: <strong>${totals.weaponCount}</strong></li>`,
     `<li>Runes extracted: <strong>${totals.runeCount}</strong></li>`,
     `<li>Payer: <strong>${escapeHtml(payerActor.name ?? "Unknown")}</strong></li>`,
+    `<li>Crafter: <strong>${escapeHtml(crafterActor?.name ?? "Unknown")}</strong></li>`,
+    `<li>Base transfer time: <strong>${totals.minimumDays}</strong> day(s)</li>`,
+    `<li>Retry time from failed checks: <strong>${totals.retryDays}</strong> day(s)</li>`,
     `<li>Total charge: <strong>${formatGp(totals.grandTotalGp)}</strong></li>`,
+    `<li>Critical failure material loss: <strong>${formatGp(totals.lostMaterialsGp)}</strong></li>`,
     "</ul>",
     "<table>",
     "<thead>",
@@ -887,8 +1254,11 @@ function buildSummaryItemSource(
       summary: true,
       itemCount: totals.weaponCount,
       runeCount: totals.runeCount,
+      minimumDays: totals.minimumDays,
+      retryDays: totals.retryDays,
       transferCostGp: totals.transferCostGp,
       runestoneCostGp: totals.runestoneCostGp,
+      lostMaterialsGp: totals.lostMaterialsGp,
       grandTotalGp: totals.grandTotalGp,
     },
   };
@@ -900,6 +1270,7 @@ function buildSummaryItemSource(
 class RuneStripperApplication extends FormApplication {
   #entries: WeaponSelection[] = [];
   #payerActorId: string | null = null;
+  #crafterActorId: string | null = null;
   #busy = false;
 
   constructor(options?: Partial<FormApplicationOptions>) {
@@ -925,11 +1296,89 @@ class RuneStripperApplication extends FormApplication {
     const selectedPayer = this.#getSelectedPayerActor();
     const availableCopper = this.#getPayerAvailableCopper(selectedPayer);
     const totalCopper = gpToCopper(totals.grandTotalGp);
+    const crafterOptions = this.#resolveCrafterOptions();
+    const selectedCrafter = this.#getSelectedCrafterActor();
+    const crafterInsight = getCrafterInsight(selectedCrafter);
 
     const selectedPayerName = selectedPayer?.name ?? "None";
     const selectedPayerFundsLabel = availableCopper === null
       ? "Unavailable"
       : formatGp(availableCopper / 100);
+    const selectedCrafterName = crafterInsight.actor?.name ?? "None";
+    const selectedCrafterModifierLabel = !crafterInsight.actor || !crafterInsight.hasCraftingSkill
+      ? "Unavailable"
+      : crafterInsight.modifier === null
+      ? "Unavailable"
+      : `${crafterInsight.modifier >= 0 ? "+" : ""}${crafterInsight.modifier}`;
+    const selectedCrafterAssuranceLabel = crafterInsight.assuranceTotal === null
+      ? "Not available"
+      : `${crafterInsight.assuranceTotal}`;
+    const selectedCrafterFeatSummary = crafterInsight.relevantCraftingFeats.length > 0
+      ? crafterInsight.relevantCraftingFeats.join(", ")
+      : "None detected";
+    const craftingRulesSummary =
+      "Transfer Rune uses Crafting (1 day per rune, DC by source item level, transfer cost 10% of rune Price). " +
+      "Critical failures add retry time and lose 10% of transfer materials.";
+
+    const entryViews = this.#entries.map((entry) => {
+      const dcValues = Array.from(new Set(entry.runes.map((rune) => rune.transferDc))).sort((a, b) => a - b);
+      const craftingDcLabel = dcValues.length === 0
+        ? "n/a"
+        : dcValues.length === 1
+        ? `DC ${dcValues[0]}`
+        : `DC ${dcValues[0]}-${dcValues[dcValues.length - 1]}`;
+
+      const successCount = entry.runes.filter((rune) => isRuneSuccessful(rune, crafterInsight)).length;
+      const pendingRunes = entry.runes.filter((rune) => isRunePending(rune, crafterInsight));
+      const pendingCount = pendingRunes.length;
+      const pendingFailures = pendingRunes.filter((rune) => isFailureOutcome(rune.lastOutcome)).length;
+      const pendingCriticalFailures = pendingRunes.filter((rune) => rune.lastOutcome === "criticalFailure").length;
+      const assuranceAutoCount = entry.runes.filter((rune) =>
+        isAssuranceAutoSuccess(rune, crafterInsight) && !isSuccessfulOutcome(rune.lastOutcome)
+      ).length;
+
+      let craftingStatusLabel = "Ready";
+      if (pendingCount > 0) {
+        if (!crafterInsight.actor) {
+          craftingStatusLabel = "Select crafter";
+        } else if (!crafterInsight.hasCraftingSkill) {
+          craftingStatusLabel = "Crafter must be trained in Crafting";
+        } else if (!crafterInsight.hasMagicalCrafting) {
+          craftingStatusLabel = "Magical Crafting required";
+        } else if (pendingCriticalFailures > 0) {
+          craftingStatusLabel = `${pendingCriticalFailures} critical failure(s) need retry`;
+        } else if (pendingFailures > 0) {
+          craftingStatusLabel = `${pendingFailures} failure(s) need retry`;
+        } else if (assuranceAutoCount > 0) {
+          craftingStatusLabel = `${assuranceAutoCount} auto-success, ${pendingCount} pending`;
+        } else {
+          craftingStatusLabel = `${pendingCount} check(s) pending`;
+        }
+      } else if (assuranceAutoCount > 0) {
+        craftingStatusLabel = `${assuranceAutoCount} auto-success via Assurance`;
+      }
+
+      return {
+        entryKey: entry.entryKey,
+        itemTypeLabel: entry.itemTypeLabel,
+        weaponName: entry.weaponName,
+        actorName: entry.actorName,
+        runeSummary: entry.runeSummary,
+        runeCount: entry.runeCount,
+        transferCostLabel: formatGp(entry.transferCostGp),
+        runestoneCostLabel: formatGp(entry.runestoneCostGp),
+        totalCostLabel: formatGp(entry.totalCostGp),
+        craftingDcLabel,
+        craftingProgressLabel: `${successCount}/${entry.runeCount} resolved`,
+        craftingStatusLabel,
+        hasRollButton:
+          !this.#busy &&
+          !!crafterInsight.actor &&
+          crafterInsight.hasCraftingSkill &&
+          crafterInsight.hasMagicalCrafting &&
+          pendingCount > 0,
+      };
+    });
 
     const blockingIssues: string[] = [];
     if (this.#entries.length === 0) {
@@ -942,6 +1391,28 @@ class RuneStripperApplication extends FormApplication {
     if (unresolved.length > 0) {
       blockingIssues.push(...unresolved);
     }
+    if (this.#entries.length > 0) {
+      if (crafterOptions.length === 0) {
+        blockingIssues.push("Select a crafter character with Crafting and Magical Crafting.");
+      } else if (!crafterInsight.actor) {
+        blockingIssues.push("Select a crafter character for Transfer Rune checks.");
+      } else if (!crafterInsight.hasCraftingSkill) {
+        blockingIssues.push("Selected crafter is not trained in Crafting.");
+      } else if (!crafterInsight.hasMagicalCrafting) {
+        blockingIssues.push("Selected crafter needs the Magical Crafting feat to transfer magic runes.");
+      } else {
+        const pendingRuneCount = this.#entries.reduce(
+          (sum, entry) => sum + entry.runes.filter((rune) => isRunePending(rune, crafterInsight)).length,
+          0,
+        );
+        if (pendingRuneCount > 0) {
+          blockingIssues.push(
+            `${pendingRuneCount} rune transfer check(s) still need results. ` +
+              `Use each item's roll button (Assurance auto-successes are already counted).`,
+          );
+        }
+      }
+    }
     if (availableCopper !== null && availableCopper < totalCopper) {
       blockingIssues.push(
         `Selected payer has insufficient funds (${formatGp(availableCopper / 100)} available; ` +
@@ -950,27 +1421,27 @@ class RuneStripperApplication extends FormApplication {
     }
 
     return {
-      entries: this.#entries.map((entry) => ({
-        entryKey: entry.entryKey,
-        itemTypeLabel: entry.itemTypeLabel,
-        weaponName: entry.weaponName,
-        actorName: entry.actorName,
-        runeSummary: entry.runeSummary,
-        runeCount: entry.runeCount,
-        transferCostLabel: formatGp(entry.transferCostGp),
-        runestoneCostLabel: formatGp(entry.runestoneCostGp),
-        totalCostLabel: formatGp(entry.totalCostGp),
-      })),
+      entries: entryViews,
       hasEntries: this.#entries.length > 0,
       payerOptions,
       hasPayerOptions: payerOptions.length > 0,
       selectedPayerName,
       selectedPayerFundsLabel,
+      crafterOptions,
+      hasCrafterOptions: crafterOptions.length > 0,
+      selectedCrafterName,
+      selectedCrafterModifierLabel,
+      selectedCrafterAssuranceLabel,
+      selectedCrafterFeatSummary,
+      craftingRulesSummary,
       totals: {
         weaponCount: totals.weaponCount,
         runeCount: totals.runeCount,
+        minimumDays: totals.minimumDays,
+        retryDays: totals.retryDays,
         transferCostLabel: formatGp(totals.transferCostGp),
         runestoneCostLabel: formatGp(totals.runestoneCostGp),
+        lostMaterialsLabel: formatGp(totals.lostMaterialsGp),
         grandTotalLabel: formatGp(totals.grandTotalGp),
       },
       blockingIssues,
@@ -1042,9 +1513,25 @@ class RuneStripperApplication extends FormApplication {
       void this.#confirmAndExecute();
     });
 
+    html.find<HTMLButtonElement>("button[data-action='roll-crafting']").on("click", (event) => {
+      event.preventDefault();
+      const button = event.currentTarget;
+      const entryKey = button.dataset.entryKey?.trim();
+      if (!entryKey) {
+        return;
+      }
+      void this.#rollCraftingForEntry(entryKey);
+    });
+
     html.find<HTMLSelectElement>("select[data-action='payer-select']").on("change", (event) => {
       const selected = (event.currentTarget as HTMLSelectElement).value.trim();
       this.#payerActorId = selected || null;
+      this.render();
+    });
+
+    html.find<HTMLSelectElement>("select[data-action='crafter-select']").on("change", (event) => {
+      const selected = (event.currentTarget as HTMLSelectElement).value.trim();
+      this.#crafterActorId = selected || null;
       this.render();
     });
   }
@@ -1130,6 +1617,7 @@ class RuneStripperApplication extends FormApplication {
         continue;
       }
 
+      this.#mergeCraftingProgress(entry, rebuilt);
       refreshed.push(rebuilt);
     }
 
@@ -1192,6 +1680,8 @@ class RuneStripperApplication extends FormApplication {
     const selectedRunes: RuneSelection[] = [];
     const unresolved: string[] = [];
     const weaponName = item.name ?? "Unnamed Item";
+    const itemLevel = getItemLevel(item);
+    const transferDc = calculateLevelDc(itemLevel);
 
     for (const request of requested) {
       const catalogEntry = catalog.runes.get(request.key);
@@ -1207,8 +1697,15 @@ class RuneStripperApplication extends FormApplication {
         key: request.key,
         slug: request.slug,
         name: catalogEntry.name,
+        level: catalogEntry.level,
+        transferDc,
         priceGp: roundGp(catalogEntry.priceGp),
         transferCostGp: roundGp(catalogEntry.priceGp * 0.1),
+        attempts: 0,
+        failureCount: 0,
+        criticalFailureCount: 0,
+        lastOutcome: null,
+        lastRollTotal: null,
         uuid: catalogEntry.uuid,
         img: catalogEntry.img,
       });
@@ -1324,12 +1821,98 @@ class RuneStripperApplication extends FormApplication {
     }));
   }
 
+  #resolveCrafterOptions(): CrafterOption[] {
+    const options: CrafterOption[] = [];
+    const seenActorIds = new Set<string>();
+
+    if (game.user?.isGM) {
+      const users = extractCollectionValues<User>(game.users);
+      for (const user of users) {
+        const character = user.character;
+        if (!(character instanceof Actor) || !isCharacterActor(character) || !character.id) {
+          continue;
+        }
+        if (seenActorIds.has(character.id)) {
+          continue;
+        }
+        seenActorIds.add(character.id);
+        options.push({
+          actorId: character.id,
+          label: `${user.name} -> ${character.name}`,
+          selected: false,
+        });
+      }
+
+      for (const actor of extractCollectionValues<Actor>(game.actors)) {
+        if (!isCharacterActor(actor) || !actor.id || seenActorIds.has(actor.id)) {
+          continue;
+        }
+        seenActorIds.add(actor.id);
+        options.push({
+          actorId: actor.id,
+          label: actor.name ?? "Character",
+          selected: false,
+        });
+      }
+    } else {
+      const preferredCharacter = game.user?.character;
+      if (preferredCharacter instanceof Actor && isCharacterActor(preferredCharacter) && preferredCharacter.id) {
+        seenActorIds.add(preferredCharacter.id);
+        options.push({
+          actorId: preferredCharacter.id,
+          label: preferredCharacter.name ?? "Character",
+          selected: false,
+        });
+      }
+
+      for (const actor of extractCollectionValues<Actor>(game.actors)) {
+        if (!isCharacterActor(actor) || !actor.id || seenActorIds.has(actor.id) || !actor.isOwner) {
+          continue;
+        }
+        seenActorIds.add(actor.id);
+        options.push({
+          actorId: actor.id,
+          label: actor.name ?? "Character",
+          selected: false,
+        });
+      }
+    }
+
+    if (options.length === 0) {
+      this.#crafterActorId = null;
+      return options;
+    }
+
+    const preferredActorId = game.user?.character?.id ?? null;
+    const hasCurrentSelection = !!this.#crafterActorId && options.some((option) => option.actorId === this.#crafterActorId);
+    if (!hasCurrentSelection) {
+      this.#crafterActorId =
+        (preferredActorId && options.some((option) => option.actorId === preferredActorId))
+          ? preferredActorId
+          : options[0].actorId;
+    }
+
+    return options.map((option) => ({
+      ...option,
+      selected: option.actorId === this.#crafterActorId,
+    }));
+  }
+
   #getSelectedPayerActor(): Actor | null {
     if (!this.#payerActorId) {
       return null;
     }
 
     return (game.actors?.get(this.#payerActorId) as Actor | null | undefined) ?? null;
+  }
+
+  #getSelectedCrafterActor(): Actor | null {
+    if (!this.#crafterActorId) {
+      return null;
+    }
+
+    const actor = (game.actors?.get(this.#crafterActorId) as Actor | null | undefined) ?? null;
+    return actor && isCharacterActor(actor) ? actor : null;
   }
 
   #getPayerAvailableCopper(actor: Actor | null): number | null {
@@ -1340,6 +1923,115 @@ class RuneStripperApplication extends FormApplication {
     const inventory = (actor as unknown as { inventory?: { currency?: { copperValue?: unknown } } }).inventory;
     const copper = toNumber(inventory?.currency?.copperValue);
     return typeof copper === "number" ? Math.max(Math.floor(copper), 0) : null;
+  }
+
+  #mergeCraftingProgress(previous: WeaponSelection, rebuilt: WeaponSelection): void {
+    const previousByRuneKey = new Map<string, RuneSelection>();
+    for (const rune of previous.runes) {
+      previousByRuneKey.set(`${rune.kind}:${rune.key}`, rune);
+    }
+
+    for (const rune of rebuilt.runes) {
+      const prior = previousByRuneKey.get(`${rune.kind}:${rune.key}`);
+      if (!prior) {
+        continue;
+      }
+
+      rune.attempts = prior.attempts;
+      rune.failureCount = prior.failureCount;
+      rune.criticalFailureCount = prior.criticalFailureCount;
+      rune.lastOutcome = prior.lastOutcome;
+      rune.lastRollTotal = prior.lastRollTotal;
+    }
+  }
+
+  async #rollCraftingForEntry(entryKey: string): Promise<void> {
+    if (this.#busy) {
+      return;
+    }
+
+    const entry = this.#entries.find((candidate) => candidate.entryKey === entryKey);
+    if (!entry) {
+      return;
+    }
+
+    const crafterInsight = getCrafterInsight(this.#getSelectedCrafterActor());
+    if (!crafterInsight.actor) {
+      ui.notifications?.warn(`${CONSTANTS.MODULE_NAME} | Select a crafter before rolling checks.`);
+      return;
+    }
+    if (!crafterInsight.hasCraftingSkill) {
+      ui.notifications?.warn(`${CONSTANTS.MODULE_NAME} | Crafter must be trained in Crafting.`);
+      return;
+    }
+    if (!crafterInsight.hasMagicalCrafting) {
+      ui.notifications?.warn(
+        `${CONSTANTS.MODULE_NAME} | ${crafterInsight.actor.name} needs Magical Crafting to transfer runes.`,
+      );
+      return;
+    }
+
+    const pendingRunes = entry.runes.filter((rune) => isRunePending(rune, crafterInsight));
+    if (pendingRunes.length === 0) {
+      ui.notifications?.info(`${CONSTANTS.MODULE_NAME} | ${entry.weaponName} already has resolved transfer checks.`);
+      return;
+    }
+
+    for (const rune of pendingRunes) {
+      const result = await this.#rollCraftingCheck(entry, rune, crafterInsight.actor);
+      if (!result) {
+        break;
+      }
+
+      rune.attempts += 1;
+      rune.lastOutcome = result.outcome;
+      rune.lastRollTotal = result.total;
+
+      if (result.outcome === "failure") {
+        rune.failureCount += 1;
+      } else if (result.outcome === "criticalFailure") {
+        rune.criticalFailureCount += 1;
+      }
+    }
+
+    this.render();
+  }
+
+  async #rollCraftingCheck(
+    entry: WeaponSelection,
+    rune: RuneSelection,
+    crafter: Actor,
+  ): Promise<{ outcome: CraftingOutcome; total: number | null } | null> {
+    const skill = getCraftingSkill(crafter);
+    const check = asRecord(asRecord(skill)?.["check"]);
+    const roll = check?.["roll"];
+    if (typeof roll !== "function") {
+      ui.notifications?.warn(
+        `${CONSTANTS.MODULE_NAME} | Could not resolve a PF2E Crafting roll handler for ${crafter.name}.`,
+      );
+      return null;
+    }
+
+    const rollResult = await (roll as (args: unknown) => Promise<unknown>).call(check, {
+      action: "craft",
+      slug: "crafting",
+      title: `Transfer Rune: ${rune.name} (${entry.weaponName})`,
+      dc: { value: rune.transferDc, visible: true },
+      extraRollOptions: ["action:craft", "activity:transfer-rune", `${CONSTANTS.MODULE_ID}:rune-stripper`],
+    });
+    if (!rollResult) {
+      return null;
+    }
+
+    const rollRecord = asRecord(rollResult);
+    const total = toNumber(rollRecord?.["total"]);
+    const degree = toNumber(asRecord(rollRecord?.["options"])?.["degreeOfSuccess"]);
+    const degreeOutcome = degreeToCraftingOutcome(degree);
+
+    return {
+      outcome: degreeOutcome ?? craftingOutcomeFromTotal(total ?? 0, rune.transferDc),
+      total,
+    };
   }
 
   async #resolveStripTargets(): Promise<{ targets: WeaponStripTarget[]; missing: string[] }> {
@@ -1405,6 +2097,33 @@ class RuneStripperApplication extends FormApplication {
       return;
     }
 
+    const crafterInsight = getCrafterInsight(this.#getSelectedCrafterActor());
+    if (!crafterInsight.actor) {
+      ui.notifications?.warn(`${CONSTANTS.MODULE_NAME} | Select a crafter before confirming.`);
+      return;
+    }
+    if (!crafterInsight.hasCraftingSkill) {
+      ui.notifications?.warn(`${CONSTANTS.MODULE_NAME} | Selected crafter is not trained in Crafting.`);
+      return;
+    }
+    if (!crafterInsight.hasMagicalCrafting) {
+      ui.notifications?.warn(
+        `${CONSTANTS.MODULE_NAME} | ${crafterInsight.actor.name} needs Magical Crafting to transfer runes.`,
+      );
+      return;
+    }
+
+    const pendingRuneCount = this.#entries.reduce(
+      (sum, entry) => sum + entry.runes.filter((rune) => isRunePending(rune, crafterInsight)).length,
+      0,
+    );
+    if (pendingRuneCount > 0) {
+      ui.notifications?.warn(
+        `${CONSTANTS.MODULE_NAME} | ${pendingRuneCount} rune transfer checks are still unresolved.`,
+      );
+      return;
+    }
+
     const catalog = await getRuneCatalog();
     if (!catalog) {
       return;
@@ -1416,8 +2135,12 @@ class RuneStripperApplication extends FormApplication {
       `<p>Strip runes from <strong>${totals.weaponCount}</strong> item(s) and place them into runestones?</p>`,
       `<ul>`,
       `<li>Runes: <strong>${totals.runeCount}</strong></li>`,
+      `<li>Crafter: <strong>${escapeHtml(crafterInsight.actor.name ?? "Unknown")}</strong></li>`,
+      `<li>Base transfer time: <strong>${totals.minimumDays}</strong> day(s)</li>`,
+      `<li>Retry time from failed checks: <strong>${totals.retryDays}</strong> day(s)</li>`,
       `<li>Transfer cost (RAW 10%): <strong>${formatGp(totals.transferCostGp)}</strong></li>`,
       `<li>Runestone material cost: <strong>${formatGp(totals.runestoneCostGp)}</strong></li>`,
+      `<li>Critical failure material loss: <strong>${formatGp(totals.lostMaterialsGp)}</strong></li>`,
       `<li>Total charge: <strong>${formatGp(totals.grandTotalGp)}</strong></li>`,
       `</ul>`,
       `<p class="notes">Payer: <strong>${escapeHtml(payerActor.name ?? "Unknown")}</strong></p>`,
@@ -1454,7 +2177,7 @@ class RuneStripperApplication extends FormApplication {
     this.#busy = true;
     this.render();
     try {
-      await this.#executeStrip(payerActor, catalog);
+      await this.#executeStrip(payerActor, catalog, crafterInsight.actor);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       ui.notifications?.error(`${CONSTANTS.MODULE_NAME} | Rune stripping failed: ${message}`);
@@ -1465,7 +2188,7 @@ class RuneStripperApplication extends FormApplication {
     }
   }
 
-  async #executeStrip(payerActor: Actor, catalog: RuneCatalog): Promise<void> {
+  async #executeStrip(payerActor: Actor, catalog: RuneCatalog, crafterActor: Actor): Promise<void> {
     const totals = computeTotals(this.#entries);
     const totalCostCp = gpToCopper(totals.grandTotalGp);
 
@@ -1536,7 +2259,13 @@ class RuneStripperApplication extends FormApplication {
     }
 
     const summaryTemplateSource = await getSummaryTemplateSource();
-    const summarySource = buildSummaryItemSource(this.#entries, totals, payerActor, summaryTemplateSource);
+    const summarySource = buildSummaryItemSource(
+      this.#entries,
+      totals,
+      payerActor,
+      crafterActor,
+      summaryTemplateSource,
+    );
     const outputItemSources = [summarySource, ...runestoneSources];
 
     const timestamp = new Date().toISOString().replace("T", " ").replace("Z", " UTC");
@@ -1590,7 +2319,8 @@ class RuneStripperApplication extends FormApplication {
 
     ui.notifications?.info(
       `${CONSTANTS.MODULE_NAME} | Stripped ${totals.runeCount} rune(s) from ${totals.weaponCount} item(s). ` +
-        `Charged ${formatGp(totals.grandTotalGp)} to ${payerActor.name}.`,
+        `Charged ${formatGp(totals.grandTotalGp)} to ${payerActor.name}. ` +
+        `Crafter: ${crafterActor.name}.`,
     );
 
     lootActor.sheet?.render(true);

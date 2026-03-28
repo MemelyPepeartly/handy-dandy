@@ -26,6 +26,30 @@
     </p>
   </section>
 
+  <section class="handy-dandy-rune-stripper-crafter">
+    <label for="handy-dandy-rune-stripper-crafter-select">Crafter (Character)</label>
+    <select
+      id="handy-dandy-rune-stripper-crafter-select"
+      data-action="crafter-select"
+      {{#unless hasCrafterOptions}}disabled{{/unless}}
+    >
+      {{#if hasCrafterOptions}}
+        {{#each crafterOptions}}
+          <option value="{{actorId}}" {{#if selected}}selected{{/if}}>{{label}}</option>
+        {{/each}}
+      {{else}}
+        <option value="">No crafter character available</option>
+      {{/if}}
+    </select>
+    <p class="notes">
+      Crafter: <strong>{{selectedCrafterName}}</strong>
+      <span class="handy-dandy-rune-stripper-crafter-stat">(Crafting Mod: {{selectedCrafterModifierLabel}})</span>
+      <span class="handy-dandy-rune-stripper-crafter-stat">(Assurance: {{selectedCrafterAssuranceLabel}})</span>
+    </p>
+    <p class="notes">Detected crafting feats: {{selectedCrafterFeatSummary}}</p>
+    <p class="notes">{{craftingRulesSummary}}</p>
+  </section>
+
   {{#if hasEntries}}
     <section class="handy-dandy-rune-stripper-queue">
       <table class="handy-dandy-rune-stripper-table">
@@ -33,10 +57,13 @@
           <tr>
             <th>Item</th>
             <th>Runes</th>
+            <th>Craft DC</th>
+            <th>Progress</th>
+            <th>Status</th>
             <th>Transfer</th>
             <th>Runestones</th>
             <th>Total</th>
-            <th></th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -50,10 +77,23 @@
                 <div>{{runeSummary}}</div>
                 <div class="notes">{{runeCount}} rune(s)</div>
               </td>
+              <td>{{craftingDcLabel}}</td>
+              <td>{{craftingProgressLabel}}</td>
+              <td>{{craftingStatusLabel}}</td>
               <td>{{transferCostLabel}}</td>
               <td>{{runestoneCostLabel}}</td>
               <td><strong>{{totalCostLabel}}</strong></td>
-              <td>
+              <td class="handy-dandy-rune-stripper-entry-actions">
+                {{#if hasRollButton}}
+                  <button
+                    type="button"
+                    class="handy-dandy-rune-stripper-roll"
+                    data-action="roll-crafting"
+                    data-entry-key="{{entryKey}}"
+                  >
+                    <i class="fas fa-dice-d20"></i> Roll
+                  </button>
+                {{/if}}
                 <button
                   type="button"
                   class="handy-dandy-rune-stripper-remove"
@@ -75,8 +115,11 @@
   <section class="handy-dandy-rune-stripper-totals">
     <div>Items: <strong>{{totals.weaponCount}}</strong></div>
     <div>Runes: <strong>{{totals.runeCount}}</strong></div>
+    <div>Base Time: <strong>{{totals.minimumDays}} day(s)</strong></div>
+    <div>Retry Time: <strong>{{totals.retryDays}} day(s)</strong></div>
     <div>Transfer Cost (RAW 10%): <strong>{{totals.transferCostLabel}}</strong></div>
     <div>Runestone Material Cost: <strong>{{totals.runestoneCostLabel}}</strong></div>
+    <div>Critical Failure Loss: <strong>{{totals.lostMaterialsLabel}}</strong></div>
     <div>Grand Total: <strong>{{totals.grandTotalLabel}}</strong></div>
   </section>
 
