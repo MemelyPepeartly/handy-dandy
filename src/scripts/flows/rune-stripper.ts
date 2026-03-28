@@ -7,6 +7,7 @@ const SUMMARY_TEMPLATE_UUIDS = [
   "Compendium.pf2e.equipment-srd.Item.B6B7tBWJSqOBz5zz",
   "Compendium.pf2e.equipment.Item.B6B7tBWJSqOBz5zz",
 ] as const;
+const SUMMARY_LEDGER_IMAGE = "systems/pf2e/icons/equipment/adventuring-gear/scholarly-journal.webp";
 const RUNE_QUALIFIER_PREFIXES = new Set([
   "greater",
   "major",
@@ -1189,7 +1190,7 @@ function buildSummaryItemSource(
 
   source["name"] = "Rune Strip Summary Ledger";
   source["type"] = "treasure";
-  source["img"] = "icons/sundries/books/book-open-blue.webp";
+  source["img"] = SUMMARY_LEDGER_IMAGE;
 
   const system = asRecord(source["system"]) ?? {};
   source["system"] = system;
@@ -1283,7 +1284,8 @@ class RuneStripperApplication extends FormApplication {
       title: "Handy Dandy | Rune Stripper",
       template: RUNE_STRIPPER_TEMPLATE,
       width: 940,
-      height: "auto",
+      height: 760,
+      resizable: true,
       closeOnSubmit: false,
       submitOnChange: false,
       classes: ["handy-dandy", "rune-stripper"],

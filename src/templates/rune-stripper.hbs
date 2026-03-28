@@ -2,7 +2,9 @@
   <section class="handy-dandy-rune-stripper-dropzone" data-rune-stripper-dropzone>
     <h3>Drop Weapons or Armor Here</h3>
     <p>Drag PF2E weapons/armor from any actor inventory (character, NPC, party stash, loot, or merchant).</p>
-    <p class="notes">Processed runes: weapon (potency/striking/property) and armor (potency/resilient/property).</p>
+    <p class="handy-dandy-rune-stripper-note">
+      Processed runes: weapon (potency/striking/property) and armor (potency/resilient/property).
+    </p>
   </section>
 
   <section class="handy-dandy-rune-stripper-payer">
@@ -20,7 +22,7 @@
         <option value="">No linked player character available</option>
       {{/if}}
     </select>
-    <p class="notes">
+    <p class="handy-dandy-rune-stripper-note">
       Selected payer: <strong>{{selectedPayerName}}</strong>
       <span class="handy-dandy-rune-stripper-payer-funds">(Available: {{selectedPayerFundsLabel}})</span>
     </p>
@@ -41,13 +43,13 @@
         <option value="">No crafter character available</option>
       {{/if}}
     </select>
-    <p class="notes">
+    <p class="handy-dandy-rune-stripper-note">
       Crafter: <strong>{{selectedCrafterName}}</strong>
       <span class="handy-dandy-rune-stripper-crafter-stat">(Crafting Mod: {{selectedCrafterModifierLabel}})</span>
       <span class="handy-dandy-rune-stripper-crafter-stat">(Assurance: {{selectedCrafterAssuranceLabel}})</span>
     </p>
-    <p class="notes">Detected crafting feats: {{selectedCrafterFeatSummary}}</p>
-    <p class="notes">{{craftingRulesSummary}}</p>
+    <p class="handy-dandy-rune-stripper-note">Detected crafting feats: {{selectedCrafterFeatSummary}}</p>
+    <p class="handy-dandy-rune-stripper-note">{{craftingRulesSummary}}</p>
   </section>
 
   {{#if hasEntries}}
@@ -75,7 +77,7 @@
               </td>
               <td>
                 <div>{{runeSummary}}</div>
-                <div class="notes">{{runeCount}} rune(s)</div>
+                <div class="handy-dandy-rune-stripper-note">{{runeCount}} rune(s)</div>
               </td>
               <td>{{craftingDcLabel}}</td>
               <td>{{craftingProgressLabel}}</td>
@@ -109,7 +111,7 @@
       </table>
     </section>
   {{else}}
-    <p class="notes">No items queued yet.</p>
+    <p class="handy-dandy-rune-stripper-note">No items queued yet.</p>
   {{/if}}
 
   <section class="handy-dandy-rune-stripper-totals">
