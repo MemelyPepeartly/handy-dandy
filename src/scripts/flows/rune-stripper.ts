@@ -196,12 +196,19 @@ interface CrafterInsight {
 interface WeaponStripTarget {
   entry: WeaponSelection;
   document: Item;
+  originalQuantity: number;
   originalRunes: {
     potency: number;
     striking: number;
     resilient: number;
     property: string[];
   };
+}
+
+interface ExecutedStripTarget {
+  target: WeaponStripTarget;
+  mode: "full" | "partial";
+  splitItemUuid?: string;
 }
 
 let cachedRuneCatalogPromise: Promise<RuneCatalog | null> | null = null;
@@ -1505,31 +1512,48 @@ class RuneStripperApplication extends FormApplication {
       event.preventDefault();
     });
 
-    const dropZone = root.querySelector<HTMLElement>("[data-rune-stripper-dropzone]");
-    if (dropZone) {
+    const registerDropTarget = (target: HTMLElement): void => {
       const setDropActive = (active: boolean): void => {
-        dropZone.classList.toggle("is-dragover", active);
+        target.classList.toggle("is-dragover", active);
       };
 
-      dropZone.addEventListener("dragenter", (event) => {
+      target.addEventListener("dragenter", (event) => {
         event.preventDefault();
         setDropActive(true);
       });
 
-      dropZone.addEventListener("dragover", (event) => {
+      target.addEventListener("dragover", (event) => {
         event.preventDefault();
         setDropActive(true);
       });
 
-      dropZone.addEventListener("dragleave", () => {
+      target.addEventListener("dragleave", (event) => {
+        const currentTarget = event.currentTarget;
+        if (!(currentTarget instanceof HTMLElement)) {
+          setDropActive(false);
+          return;
+        }
+        const related = event.relatedTarget;
+        if (related instanceof Node && currentTarget.contains(related)) {
+          return;
+        }
         setDropActive(false);
       });
 
-      dropZone.addEventListener("drop", (event) => {
+      target.addEventListener("drop", (event) => {
         event.preventDefault();
         setDropActive(false);
         void this.#handleDrop(event);
       });
+    };
+
+    const dropZone = root.querySelector<HTMLElement>("[data-rune-stripper-dropzone]");
+    if (dropZone) {
+      registerDropTarget(dropZone);
+    }
+
+    for (const target of root.querySelectorAll<HTMLElement>("[data-rune-stripper-drop-target]")) {
+      registerDropTarget(target);
     }
 
     html.find<HTMLButtonElement>("button[data-action='remove-entry']").on("click", (event) => {
@@ -1614,10 +1638,93 @@ class RuneStripperApplication extends FormApplication {
       return;
     }
 
-    await this.#addWeapon(item);
+    if (!isRunnableStripItem(item)) {
+      ui.notifications?.warn(`${CONSTANTS.MODULE_NAME} | Only PF2E weapon or armor items can be stripped.`);
+      return;
+    }
+
+    const maxQuantity = getItemQuantity(item);
+    const quantity = await this.#promptDropQuantity(item, maxQuantity);
+    if (quantity === null) {
+      return;
+    }
+
+    await this.#addWeapon(item, quantity);
   }
 
-  async #addWeapon(item: Item): Promise<void> {
+  async #promptDropQuantity(item: Item, maxQuantity: number): Promise<number | null> {
+    if (maxQuantity <= 1) {
+      return 1;
+    }
+
+    const inputId = `handy-dandy-rune-stripper-quantity-${foundry.utils.randomID()}`;
+    const content = [
+      `<form class="standard-form">`,
+      `<p>Select how many <strong>${escapeHtml(item.name ?? "item")}</strong> entries to strip.</p>`,
+      `<div class="form-group">`,
+      `<label for="${inputId}">Quantity</label>`,
+      `<input id="${inputId}" type="range" name="quantity" min="1" max="${maxQuantity}" step="1" value="${maxQuantity}" />`,
+      `</div>`,
+      `<div class="form-group">`,
+      `<label for="${inputId}-number">Exact Quantity</label>`,
+      `<input id="${inputId}-number" type="number" name="quantityNumber" min="1" max="${maxQuantity}" step="1" value="${maxQuantity}" />`,
+      `<p class="hint">Available in stack: ${maxQuantity}</p>`,
+      `</div>`,
+      `</form>`,
+    ].join("");
+
+    const quantity = await waitForDialog<number>({
+      title: `${CONSTANTS.MODULE_NAME} | Select Quantity`,
+      content,
+      width: 420,
+      buttons: [
+        {
+          action: "confirm",
+          icon: '<i class="fas fa-check"></i>',
+          label: "Add to Queue",
+          default: true,
+          callback: ({ form }) => {
+            const raw = form?.querySelector<HTMLInputElement>("input[name='quantity']")?.value
+              ?? form?.querySelector<HTMLInputElement>("input[name='quantityNumber']")?.value
+              ?? "";
+            const parsed = Math.floor(Number(raw));
+            return Math.clamp(Number.isFinite(parsed) ? parsed : maxQuantity, 1, maxQuantity);
+          },
+        },
+        {
+          action: "cancel",
+          icon: '<i class="fas fa-times"></i>',
+          label: "Cancel",
+          callback: () => null,
+        },
+      ],
+      render: (root) => {
+        const rangeInput = root.querySelector<HTMLInputElement>("input[name='quantity']");
+        const numberInput = root.querySelector<HTMLInputElement>("input[name='quantityNumber']");
+        if (!rangeInput || !numberInput) {
+          return;
+        }
+
+        const syncFromRange = (): void => {
+          const value = Math.clamp(Math.floor(Number(rangeInput.value) || maxQuantity), 1, maxQuantity);
+          numberInput.value = String(value);
+        };
+        const syncFromNumber = (): void => {
+          const value = Math.clamp(Math.floor(Number(numberInput.value) || maxQuantity), 1, maxQuantity);
+          rangeInput.value = String(value);
+          numberInput.value = String(value);
+        };
+
+        rangeInput.addEventListener("input", syncFromRange);
+        numberInput.addEventListener("input", syncFromNumber);
+      },
+      closeResult: null,
+    });
+
+    return typeof quantity === "number" ? Math.clamp(Math.floor(quantity), 1, maxQuantity) : null;
+  }
+
+  async #addWeapon(item: Item, requestedQuantity?: number): Promise<void> {
     if (!isRunnableStripItem(item)) {
       ui.notifications?.warn(`${CONSTANTS.MODULE_NAME} | Only PF2E weapon or armor items can be stripped.`);
       return;
@@ -1629,12 +1736,7 @@ class RuneStripperApplication extends FormApplication {
       return;
     }
 
-    if (this.#entries.some((entry) => entry.weaponUuid === weaponUuid)) {
-      ui.notifications?.info(`${CONSTANTS.MODULE_NAME} | ${item.name} is already in the queue.`);
-      return;
-    }
-
-    const selection = await this.#buildSelection(item);
+    const selection = await this.#buildSelection(item, requestedQuantity);
     if (!selection) {
       ui.notifications?.warn(
         `${CONSTANTS.MODULE_NAME} | ${item.name} has no transferable weapon/armor runes.`,
@@ -1642,7 +1744,13 @@ class RuneStripperApplication extends FormApplication {
       return;
     }
 
-    this.#entries.push(selection);
+    const existingIndex = this.#entries.findIndex((entry) => entry.weaponUuid === weaponUuid);
+    if (existingIndex >= 0) {
+      this.#mergeCraftingProgress(this.#entries[existingIndex], selection);
+      this.#entries[existingIndex] = selection;
+    } else {
+      this.#entries.push(selection);
+    }
     this.render();
   }
 
@@ -1657,7 +1765,7 @@ class RuneStripperApplication extends FormApplication {
         continue;
       }
 
-      const rebuilt = await this.#buildSelection(current);
+      const rebuilt = await this.#buildSelection(current, entry.itemQuantity);
       if (!rebuilt) {
         removed.push(entry.weaponName);
         continue;
@@ -1681,7 +1789,7 @@ class RuneStripperApplication extends FormApplication {
     this.render();
   }
 
-  async #buildSelection(item: Item): Promise<WeaponSelection | null> {
+  async #buildSelection(item: Item, requestedQuantity?: number): Promise<WeaponSelection | null> {
     const catalog = await getRuneCatalog();
     if (!catalog) {
       return null;
@@ -1726,7 +1834,8 @@ class RuneStripperApplication extends FormApplication {
     const selectedRunes: RuneSelection[] = [];
     const unresolved: string[] = [];
     const weaponName = item.name ?? "Unnamed Item";
-    const itemQuantity = getItemQuantity(item);
+    const maxItemQuantity = getItemQuantity(item);
+    const itemQuantity = Math.clamp(Math.floor(requestedQuantity ?? maxItemQuantity), 1, maxItemQuantity);
     const itemLevel = getItemLevel(item);
     const transferDc = calculateLevelDc(itemLevel);
 
@@ -2106,6 +2215,7 @@ class RuneStripperApplication extends FormApplication {
       targets.push({
         entry,
         document,
+        originalQuantity: getItemQuantity(document),
         originalRunes: extractItemRuneState(document),
       });
     }
@@ -2113,22 +2223,35 @@ class RuneStripperApplication extends FormApplication {
     return { targets, missing };
   }
 
-  async #restoreWeaponRunes(targets: WeaponStripTarget[]): Promise<string[]> {
+  async #rollbackExecutedStrips(executedTargets: ExecutedStripTarget[]): Promise<string[]> {
     const failures: string[] = [];
 
-    for (const target of targets) {
+    for (const executed of [...executedTargets].reverse()) {
+      const { target } = executed;
       try {
-        const restoreUpdate = target.entry.itemType === "armor"
-          ? {
-            "system.runes.potency": target.originalRunes.potency,
-            "system.runes.resilient": target.originalRunes.resilient,
-            "system.runes.property": [...target.originalRunes.property],
+        if (executed.mode === "partial") {
+          if (executed.splitItemUuid) {
+            const splitItem = await fromUuid(executed.splitItemUuid as any);
+            if (splitItem instanceof Item) {
+              await splitItem.delete();
+            }
           }
-          : {
-            "system.runes.potency": target.originalRunes.potency,
-            "system.runes.striking": target.originalRunes.striking,
-            "system.runes.property": [...target.originalRunes.property],
-          };
+
+          await target.document.update({ "system.quantity": target.originalQuantity } as any);
+          continue;
+        }
+
+        const restoreUpdate = target.entry.itemType === "armor"
+            ? {
+              "system.runes.potency": target.originalRunes.potency,
+              "system.runes.resilient": target.originalRunes.resilient,
+              "system.runes.property": [...target.originalRunes.property],
+            }
+            : {
+              "system.runes.potency": target.originalRunes.potency,
+              "system.runes.striking": target.originalRunes.striking,
+              "system.runes.property": [...target.originalRunes.property],
+            };
 
         await target.document.update(restoreUpdate as any);
       } catch {
@@ -2289,9 +2412,70 @@ class RuneStripperApplication extends FormApplication {
       return;
     }
 
-    const strippedTargets: WeaponStripTarget[] = [];
+    const quantityMismatch = targets.filter((target) => target.entry.itemQuantity > target.originalQuantity);
+    if (quantityMismatch.length > 0) {
+      const preview = quantityMismatch.map((target) => target.entry.weaponName).slice(0, 5).join(", ");
+      const suffix = quantityMismatch.length > 5 ? ` (+${quantityMismatch.length - 5} more)` : "";
+      ui.notifications?.warn(
+        `${CONSTANTS.MODULE_NAME} | Requested quantity exceeds current stack size for: ${preview}${suffix}. ` +
+          `Refresh the queue and try again.`,
+      );
+      return;
+    }
+
+    const executedTargets: ExecutedStripTarget[] = [];
     for (const target of targets) {
       try {
+        if (target.entry.itemQuantity < target.originalQuantity) {
+          const strippedSource = asRecord(target.document.toObject());
+          if (!strippedSource) {
+            throw new Error(`Unable to clone "${target.entry.weaponName}" for partial strip.`);
+          }
+          delete strippedSource["_id"];
+          const system = asRecord(strippedSource["system"]) ?? {};
+          strippedSource["system"] = system;
+          system["quantity"] = target.entry.itemQuantity;
+          if (target.entry.itemType === "armor") {
+            system["runes"] = {
+              potency: 0,
+              resilient: 0,
+              property: [],
+            };
+          } else {
+            system["runes"] = {
+              potency: 0,
+              striking: 0,
+              property: [],
+            };
+          }
+
+          const targetActor = target.document.actor;
+          let createdSplit: unknown;
+          if (targetActor) {
+            const createdDocuments = await targetActor.createEmbeddedDocuments("Item", [strippedSource as any]);
+            createdSplit = Array.isArray(createdDocuments) ? createdDocuments[0] : null;
+          } else {
+            createdSplit = await Item.create(strippedSource as any);
+          }
+          if (!(createdSplit instanceof Item)) {
+            throw new Error(`Failed to create stripped split item for "${target.entry.weaponName}".`);
+          }
+
+          try {
+            await target.document.update({ "system.quantity": target.originalQuantity - target.entry.itemQuantity } as any);
+          } catch (error) {
+            await createdSplit.delete().catch(() => undefined);
+            throw error;
+          }
+
+          executedTargets.push({
+            target,
+            mode: "partial",
+            splitItemUuid: createdSplit.uuid ?? undefined,
+          });
+          continue;
+        }
+
         const stripUpdate = target.entry.itemType === "armor"
           ? {
             "system.runes.potency": 0,
@@ -2305,9 +2489,9 @@ class RuneStripperApplication extends FormApplication {
           };
 
         await target.document.update(stripUpdate as any);
-        strippedTargets.push(target);
+        executedTargets.push({ target, mode: "full" });
       } catch {
-        const rollbackFailures = await this.#restoreWeaponRunes(strippedTargets);
+        const rollbackFailures = await this.#rollbackExecutedStrips(executedTargets);
         const rollbackMessage = rollbackFailures.length > 0
           ? ` Rollback failed for: ${rollbackFailures.join(", ")}.`
           : "";
@@ -2349,7 +2533,7 @@ class RuneStripperApplication extends FormApplication {
 
       await lootActor.createEmbeddedDocuments("Item", outputItemSources as any[]);
     } catch (error) {
-      const rollbackFailures = await this.#restoreWeaponRunes(strippedTargets);
+      const rollbackFailures = await this.#rollbackExecutedStrips(executedTargets);
       if (lootActor) {
         await lootActor.delete().catch(() => undefined);
       }
@@ -2364,7 +2548,7 @@ class RuneStripperApplication extends FormApplication {
 
     const charged = await payerInventory.removeCoins({ cp: totalCostCp }, { byValue: true });
     if (!charged) {
-      const rollbackFailures = await this.#restoreWeaponRunes(strippedTargets);
+      const rollbackFailures = await this.#rollbackExecutedStrips(executedTargets);
       await lootActor.delete();
       const rollbackMessage = rollbackFailures.length > 0
         ? ` Rune restoration failed for: ${rollbackFailures.join(", ")}.`
