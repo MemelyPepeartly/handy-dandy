@@ -106,6 +106,12 @@
   font-weight: 600;
 }
 
+.handy-dandy-rune-stripper-qty {
+  font-weight: 500;
+  color: var(--color-text-light-6, #b9b9b9);
+  font-size: 0.9em;
+}
+
 .handy-dandy-rune-stripper-weapon-actor {
   color: var(--color-text-light-6, #b9b9b9);
   font-size: 0.85em;
