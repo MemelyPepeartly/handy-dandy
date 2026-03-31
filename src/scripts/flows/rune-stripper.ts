@@ -833,6 +833,11 @@ function getItemLevel(item: Item): number {
   return Math.max(Math.trunc(level), -1);
 }
 
+function getTransferRuneDc(itemLevel: number, runeLevel: number): number {
+  const effectiveLevel = Math.max(Math.trunc(itemLevel), Math.trunc(runeLevel));
+  return calculateLevelDc(effectiveLevel);
+}
+
 function getItemQuantity(item: Item): number {
   const sourceRecord = asRecord((item as unknown as { _source?: unknown })._source);
   const sourceSystem = asRecord(sourceRecord?.["system"]);
@@ -1358,7 +1363,7 @@ class RuneStripperApplication extends FormApplication {
       ? crafterInsight.relevantCraftingFeats.join(", ")
       : "None detected";
     const craftingRulesSummary =
-      "Transfer Rune uses Crafting (1 day per rune, DC by source item level, transfer cost 10% of rune Price). " +
+      "Transfer Rune uses Crafting (1 day per rune, DC by effective item level for each rune, transfer cost 10% of rune Price). " +
       "Critical failures add retry time and lose 10% of transfer materials.";
 
     const entryViews = this.#entries.map((entry) => {
@@ -1837,7 +1842,6 @@ class RuneStripperApplication extends FormApplication {
     const maxItemQuantity = getItemQuantity(item);
     const itemQuantity = Math.clamp(Math.floor(requestedQuantity ?? maxItemQuantity), 1, maxItemQuantity);
     const itemLevel = getItemLevel(item);
-    const transferDc = calculateLevelDc(itemLevel);
 
     for (const request of requested) {
       const catalogEntry = catalog.runes.get(request.key);
@@ -1854,7 +1858,7 @@ class RuneStripperApplication extends FormApplication {
         slug: request.slug,
         name: catalogEntry.name,
         level: catalogEntry.level,
-        transferDc,
+        transferDc: getTransferRuneDc(itemLevel, catalogEntry.level),
         copies: itemQuantity,
         successfulCopies: 0,
         priceGp: roundGp(catalogEntry.priceGp),
