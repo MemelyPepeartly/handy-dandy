@@ -833,9 +833,8 @@ function getItemLevel(item: Item): number {
   return Math.max(Math.trunc(level), -1);
 }
 
-function getTransferRuneDc(itemLevel: number, runeLevel: number): number {
-  const effectiveLevel = Math.max(Math.trunc(itemLevel), Math.trunc(runeLevel));
-  return calculateLevelDc(effectiveLevel);
+function getTransferRuneDc(runeLevel: number): number {
+  return calculateLevelDc(Math.trunc(runeLevel));
 }
 
 function getItemQuantity(item: Item): number {
@@ -1363,7 +1362,7 @@ class RuneStripperApplication extends FormApplication {
       ? crafterInsight.relevantCraftingFeats.join(", ")
       : "None detected";
     const craftingRulesSummary =
-      "Transfer Rune uses Crafting (1 day per rune, DC by effective item level for each rune, transfer cost 10% of rune Price). " +
+      "Transfer Rune uses Crafting (1 day per rune, DC by transferred rune level, transfer cost 10% of rune Price). " +
       "Critical failures add retry time and lose 10% of transfer materials.";
 
     const entryViews = this.#entries.map((entry) => {
@@ -1841,7 +1840,6 @@ class RuneStripperApplication extends FormApplication {
     const weaponName = item.name ?? "Unnamed Item";
     const maxItemQuantity = getItemQuantity(item);
     const itemQuantity = Math.clamp(Math.floor(requestedQuantity ?? maxItemQuantity), 1, maxItemQuantity);
-    const itemLevel = getItemLevel(item);
 
     for (const request of requested) {
       const catalogEntry = catalog.runes.get(request.key);
@@ -1858,7 +1856,7 @@ class RuneStripperApplication extends FormApplication {
         slug: request.slug,
         name: catalogEntry.name,
         level: catalogEntry.level,
-        transferDc: getTransferRuneDc(itemLevel, catalogEntry.level),
+        transferDc: getTransferRuneDc(catalogEntry.level),
         copies: itemQuantity,
         successfulCopies: 0,
         priceGp: roundGp(catalogEntry.priceGp),
@@ -2183,12 +2181,23 @@ class RuneStripperApplication extends FormApplication {
       return null;
     }
 
+    const attemptNumber = Math.max(Math.trunc(rune.attempts) + 1, 1);
+    const runeTransferNote = `${escapeHtml(rune.name)} from ${escapeHtml(entry.weaponName)} ` +
+      `(copy ${attemptNumber}/${Math.max(rune.copies, 1)})`;
+
     const rollResult = await (roll as (args: unknown) => Promise<unknown>).call(check, {
       action: "craft",
       slug: "crafting",
       title: `Transfer Rune: ${rune.name} (${entry.weaponName})`,
       dc: { value: rune.transferDc, visible: true },
       extraRollOptions: ["action:craft", "activity:transfer-rune", `${CONSTANTS.MODULE_ID}:rune-stripper`],
+      extraRollNotes: [
+        {
+          selector: "crafting",
+          title: "Rune Transfer Target",
+          text: runeTransferNote,
+        },
+      ],
     });
     if (!rollResult) {
       return null;
