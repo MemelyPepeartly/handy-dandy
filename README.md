@@ -1,9 +1,16 @@
 # Handy Dandy
 
-Handy Dandy is a utility module for **Foundry VTT** with GM tooling and AI-assisted workflows.
-It is written in TypeScript and built with Webpack.
+Handy Dandy is the original monolithic source module for the Handy Dandy Foundry VTT toolset.
+It still contains the full feature surface, but the codebase is now being split into dedicated repos:
 
-## Features
+- `handy-dandy-core`: shared runtime and toolbar shell
+- `handy-dandy-conjur`: OpenRouter and AI generation features
+- `handy-dandy-tools`: non-AI utility tools such as Rune Stripper and Map Notes
+
+This repo remains the compatibility/reference source while that split is completed.
+New feature work should usually land in the split repos instead of expanding this monolith.
+
+## Current Feature Surface
 
 - **Prompt Workbench**: Generate PF2e action, item, and actor JSON with import-ready workflows.
 - **Map Notes controls**: Drop and manage map markers directly from scene controls.
@@ -20,7 +27,8 @@ Pre-built releases are available on the project page. To install manually, copy 
 To build locally:
 
 ```bash
-npm install
+npm ci
+npx tsc --noEmit
 npm run build
 ```
 
@@ -44,13 +52,11 @@ Model dropdown choices are loaded from OpenRouter during startup; restart Foundr
 2. Open Prompt Workbench from Handy Dandy Tools.
 3. AI features use the current user's OpenRouter-connected account.
 
-## Developer Helpers
+## Split Repos
 
-GMs and users with developer mode enabled gain access to `game.handyDandy.dev`:
-
-- `generateAction(input, options?)`: Runs the generation pipeline and logs payloads.
-- `validate(type, payload, options?)`: Runs schema validation/repair (can disable OpenRouter fallback with `useOpenRouter: false`).
-- `importAction(json, options?)`: Runs import sanity checks and import workflow.
+- `handy-dandy-core`: shared runtime and scene-controls registry.
+- `handy-dandy-conjur`: OpenRouter integration, Prompt Workbench, rule element generation, remix flows, and AI image generation.
+- `handy-dandy-tools`: Rune Stripper, Map Notes, token HUD preview, and other utility tools.
 
 ## Documentation
 
