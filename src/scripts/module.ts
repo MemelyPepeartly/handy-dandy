@@ -194,7 +194,12 @@ Hooks.once("ready", async () => {
 });
 
 // ---------- SCENE-CONTROL GROUP --------------------------------------------
-Hooks.on("getSceneControlButtons", (controls: ControlCollection) => {
+const registerSceneControlButtonsHook = Hooks.on as (
+  hook: string,
+  fn: (controls: ControlCollection) => void,
+) => number;
+
+registerSceneControlButtonsHook("getSceneControlButtons", (controls: ControlCollection) => {
   // GM-only tool-palette
   if (!game.user?.isGM) return;
 

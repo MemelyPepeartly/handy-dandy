@@ -5,13 +5,18 @@ declare global {
       ready: boolean;
     }
   }
+
+  interface ReadyGame {
+    handyDandy?: Game["handyDandy"];
+  }
+
+  let game: ReadyGame;
+  let canvas: Canvas;
 }
 
 // Instead of creating a ReadyGame interface that conflicts with existing types,
 // we'll create our own interface for use with type assertions
-interface AssumeGameReady {
-  ready: true;
-}
+interface AssumeGameReady extends ReadyGame {}
 
 // This ensures this file is treated as a module
 export { AssumeGameReady };

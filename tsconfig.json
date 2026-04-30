@@ -6,7 +6,8 @@
     "module": "esnext",
     "moduleResolution": "bundler",
     "types": ["fvtt-types"],
-    "strict": true
+    "strict": true,
+    "skipLibCheck": true
   },
   "include": ["src/scripts/**/*", "src/types/**/*"]
 }

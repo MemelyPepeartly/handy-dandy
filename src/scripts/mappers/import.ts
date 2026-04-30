@@ -299,8 +299,8 @@ export type ImportOptions = {
   createNew?: boolean;
 };
 
-type ItemCompendium = CompendiumCollection<CompendiumCollection.Metadata & { type: "Item" }>;
-type ActorCompendium = CompendiumCollection<CompendiumCollection.Metadata & { type: "Actor" }>;
+type ItemCompendium = CompendiumCollection<"Item">;
+type ActorCompendium = CompendiumCollection<"Actor">;
 
 type FoundryActionSource = {
   name: string;
@@ -741,7 +741,7 @@ function normalizeSenseRange(value: unknown): number | null {
 }
 
 function resolveActiveSystemId(): string | undefined {
-  const system = (game as Game | undefined)?.system as
+  const system = (game as ReadyGame | undefined)?.system as
     | { id?: unknown; data?: { id?: unknown } }
     | undefined;
   if (!system) {
@@ -1184,7 +1184,7 @@ function resolveCoreVersion(): string {
 }
 
 function resolveSystemVersion(): string {
-  const gameInstance = (globalThis as { game?: Game }).game;
+  const gameInstance = (globalThis as { game?: ReadyGame }).game;
   const system = gameInstance?.system as { version?: unknown } | undefined;
   if (system && typeof system.version === "string") {
     return system.version;
@@ -1193,7 +1193,7 @@ function resolveSystemVersion(): string {
 }
 
 function resolveWorldId(): string {
-  const gameInstance = (globalThis as { game?: Game }).game;
+  const gameInstance = (globalThis as { game?: ReadyGame }).game;
   const world = gameInstance?.world as
     | { id?: unknown; data?: { id?: unknown; name?: unknown } }
     | undefined;
@@ -1215,7 +1215,7 @@ function resolveWorldId(): string {
 }
 
 function resolveCurrentUserId(): string | null {
-  const gameInstance = (globalThis as { game?: Game }).game;
+  const gameInstance = (globalThis as { game?: ReadyGame }).game;
   const current = gameInstance?.userId ?? (gameInstance?.user ? gameInstance.user.id : null);
   return typeof current === "string" && current ? current : null;
 }
@@ -1310,7 +1310,7 @@ async function findActorPackDocument(pack: ActorCompendium, slug: string): Promi
 }
 
 function findWorldItem(slug: string): Item | undefined {
-  const collection = (game as Game).items as unknown;
+  const collection = (game as ReadyGame).items as unknown;
   if (!collection) {
     return undefined;
   }
@@ -1353,7 +1353,7 @@ function findWorldItem(slug: string): Item | undefined {
 }
 
 function findWorldActor(slug: string): Actor | undefined {
-  const collection = (game as Game).actors as unknown;
+  const collection = (game as ReadyGame).actors as unknown;
   if (!collection) {
     return undefined;
   }
@@ -1396,7 +1396,7 @@ function findWorldActor(slug: string): Actor | undefined {
 }
 
 function findActorById(actorId: string): Actor | undefined {
-  const collection = (game as Game).actors as unknown;
+  const collection = (game as ReadyGame).actors as unknown;
   if (!collection) {
     return undefined;
   }
@@ -1419,7 +1419,7 @@ function findEmbeddedItemOnActor(actor: Actor, itemId: string): Item | undefined
 }
 
 function findEmbeddedItemById(itemId: string): Item | undefined {
-  const actors = collectEmbeddedDocuments<Actor>((game as Game).actors as unknown);
+  const actors = collectEmbeddedDocuments<Actor>((game as ReadyGame).actors as unknown);
   for (const actor of actors) {
     const embedded = findEmbeddedItemOnActor(actor, itemId);
     if (embedded) {

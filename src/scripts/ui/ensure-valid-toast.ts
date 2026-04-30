@@ -55,7 +55,7 @@ export function showEnsureValidRetryToast<T extends EntityType>(
   }
 
   setTimeout(() => {
-    const container = ui.notifications?.element?.[0];
+    const container = document.querySelector<HTMLElement>("#notifications");
     if (!container) return;
     const button = container.querySelector<HTMLButtonElement>(`button.handy-dandy-retry[data-retry-id="${id}"]`);
     if (!button) return;

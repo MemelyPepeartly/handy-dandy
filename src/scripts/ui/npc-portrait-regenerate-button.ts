@@ -101,7 +101,9 @@ async function regenerateNpcPortrait(actor: Actor, button: JQuery<HTMLElement>):
 }
 
 export function registerNpcPortraitRegenerateButton(): void {
-  Hooks.on("renderActorSheetPF2e", (app: ActorSheet, html: JQuery<HTMLElement>) => {
+  (Hooks.on as (hook: string, fn: (app: ActorSheet, html: JQuery<HTMLElement>) => void) => number)(
+    "renderActorSheetPF2e",
+    (app: ActorSheet, html: JQuery<HTMLElement>) => {
     const actor = app.actor;
     if (!(actor instanceof Actor)) return;
     if ((actor.type as unknown as string) !== "npc") return;
@@ -145,5 +147,6 @@ export function registerNpcPortraitRegenerateButton(): void {
     });
 
     imageContainer.append(button);
-  });
+    },
+  );
 }

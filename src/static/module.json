@@ -10,8 +10,9 @@
     }
   ],
   "compatibility": {
-    "minimum": "13",
-    "verified": "13"
+    "minimum": "14.360",
+    "verified": "14.360",
+    "maximum": "14"
   },
   "url": "https://github.com/MemelyPepeartly/Handy-Dandy",
   "manifest": "https://github.com/MemelyPepeartly/Handy-Dandy/releases/download/latest/module.json",

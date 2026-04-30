@@ -6,7 +6,9 @@ const BUTTON_LABEL = "Remix Sections" as const;
 const BUTTON_TITLE = "Open section remix planner for this NPC" as const;
 
 export function registerNpcRemixSectionButtons(): void {
-  Hooks.on("renderActorSheetPF2e", (app: ActorSheet, html: JQuery<HTMLElement>) => {
+  (Hooks.on as (hook: string, fn: (app: ActorSheet, html: JQuery<HTMLElement>) => void) => number)(
+    "renderActorSheetPF2e",
+    (app: ActorSheet, html: JQuery<HTMLElement>) => {
     const actor = app.actor;
     if (!(actor instanceof Actor)) return;
     if ((actor.type as unknown as string) !== "npc") return;
@@ -37,5 +39,6 @@ export function registerNpcRemixSectionButtons(): void {
       event.preventDefault();
       void runNpcMainSheetRemixFlow(actor);
     });
-  });
+    },
+  );
 }

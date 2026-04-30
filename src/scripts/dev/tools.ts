@@ -68,7 +68,7 @@ const safeGetBooleanSetting = <
   N extends ClientSettings.Namespace,
   K extends ClientSettings.KeyFor<N>,
 >(
-  settings: Game["settings"] | undefined,
+  settings: ReadyGame["settings"] | undefined,
   namespace: N,
   key: K,
 ): boolean | null => {
@@ -108,7 +108,7 @@ const readDeveloperApiFlag = (developer: unknown): boolean => {
   return values.some((flag) => flag === true);
 };
 
-const readDeveloperModuleFlag = (modules: Game["modules"] | undefined): boolean => {
+const readDeveloperModuleFlag = (modules: ReadyGame["modules"] | undefined): boolean => {
   if (!modules || typeof modules.get !== "function") {
     return false;
   }
@@ -162,7 +162,7 @@ const assertDeveloperAccess = (deps: DevNamespaceDependencies, operation: string
 };
 
 export function canUseDeveloperTools(): boolean {
-  const gameInstance = (globalThis as { game?: Game }).game;
+  const gameInstance = (globalThis as { game?: ReadyGame }).game;
   if (!gameInstance) {
     return false;
   }

@@ -1,4 +1,6 @@
-type AnyCompendium = CompendiumCollection<CompendiumCollection.Metadata>;
+type AnyCompendium = CompendiumCollection<
+  "Actor" | "Cards" | "Item" | "JournalEntry" | "Macro" | "Playlist" | "RollTable" | "Scene" | "Adventure"
+>;
 
 export type OfficialItemKind = "spell" | "action" | "item" | "effect" | "condition";
 
@@ -139,7 +141,7 @@ function extractPacks(collection: unknown): AnyCompendium[] {
 }
 
 function getAllPacks(): AnyCompendium[] {
-  const currentGame = (globalThis as { game?: Game }).game;
+  const currentGame = (globalThis as { game?: ReadyGame }).game;
   return extractPacks(currentGame?.packs);
 }
 

@@ -17,7 +17,7 @@
   "devDependencies": {
     "copy-webpack-plugin": "^13.0.0",
     "fork-ts-checker-webpack-plugin": "^9.0.0",
-    "fvtt-types": "npm:@league-of-foundry-developers/foundry-vtt-types@^12.331.5",
+    "fvtt-types": "npm:@league-of-foundry-developers/foundry-vtt-types@^13.345.1",
     "ts-loader": "^9.5.2",
     "typescript": "^5.4.0",
     "webpack": "^5.99.9",

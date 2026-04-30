@@ -20,10 +20,19 @@ type HybridControlArray = SceneControls.Control[] & Record<string, ControlWithTo
 export type ControlCollection = SceneControls.Control[] | Record<string, ControlWithToolCollection>;
 
 type ControlWithToolCollection = Omit<SceneControls.Control, "tools"> & {
+  layer?: string;
   tools: ToolCollection;
   onChange?: (...args: unknown[]) => void;
   onToolChange?: (...args: unknown[]) => void;
 };
+
+function getControlOrder(collection: ControlCollection): number {
+  return Array.isArray(collection) ? collection.length : Object.keys(collection).length;
+}
+
+function getToolOrder(collection: ToolCollection): number {
+  return Array.isArray(collection) ? collection.length : Object.keys(collection).length;
+}
 
 function useObjectToolCollections(): boolean {
   const releaseGeneration = Number(game.release?.generation ?? 0);
@@ -74,7 +83,8 @@ function resolveToggleActive(args: unknown[], fallback = false, toolName?: strin
   }
 
   if (toolName) {
-    const tools = ui.controls?.control?.tools;
+    const controlsState = ui.controls as { control?: { tools?: ToolCollection } } | null | undefined;
+    const tools = controlsState?.control?.tools;
     if (Array.isArray(tools)) {
       const match = tools.find((candidate) => candidate?.name === toolName);
       if (typeof match?.active === "boolean") {
@@ -159,6 +169,7 @@ export function insertSidebarButtons(controls: ControlCollection): void {
 
   const mapNotesGroup: ControlWithToolCollection = {
     name: MAP_MARKER_CONTROL_NAME,
+    order: getControlOrder(controls),
     title: "Map Notes",
     icon: "fa-solid fa-map-location-dot",
     layer: MAP_MARKER_LAYER_NAME,
@@ -180,6 +191,7 @@ export function insertSidebarButtons(controls: ControlCollection): void {
 
   compatibilityAddTool(mapNotesGroup.tools, {
     name: MAP_MARKER_PLACEMENT_TOOL_NAME,
+    order: getToolOrder(mapNotesGroup.tools),
     title: "Placement Mode",
     icon: "fa-solid fa-location-dot",
     onChange: () => {
@@ -189,6 +201,7 @@ export function insertSidebarButtons(controls: ControlCollection): void {
 
   compatibilityAddTool(mapNotesGroup.tools, {
     name: MAP_MARKER_SELECT_TOOL_NAME,
+    order: getToolOrder(mapNotesGroup.tools),
     title: "Select Mode",
     icon: "fa-solid fa-object-group",
     onChange: () => {
@@ -200,6 +213,7 @@ export function insertSidebarButtons(controls: ControlCollection): void {
 
   const handyGroup: ControlWithToolCollection = {
     name: "handy-dandy",
+    order: getControlOrder(controls),
     title: "Handy Dandy Tools",
     icon: "fa-solid fa-screwdriver-wrench",
     layer: "interface",
@@ -212,6 +226,7 @@ export function insertSidebarButtons(controls: ControlCollection): void {
 
   compatibilityAddTool(handyGroup.tools, {
     name: "tool-guide",
+    order: getToolOrder(handyGroup.tools),
     title: "Tool Guide",
     icon: "fa-solid fa-compass",
     toggle: true,
@@ -229,6 +244,7 @@ export function insertSidebarButtons(controls: ControlCollection): void {
 
   compatibilityAddTool(handyGroup.tools, {
     name: "prompt-workbench",
+    order: getToolOrder(handyGroup.tools),
     title: "Prompt Workbench",
     icon: "fa-solid fa-hat-wizard",
     button: true,
@@ -239,6 +255,7 @@ export function insertSidebarButtons(controls: ControlCollection): void {
 
   compatibilityAddTool(handyGroup.tools, {
     name: "rule-element-generator",
+    order: getToolOrder(handyGroup.tools),
     title: "Rule Element Generator",
     icon: "fa-solid fa-gears",
     button: true,
@@ -249,6 +266,7 @@ export function insertSidebarButtons(controls: ControlCollection): void {
 
   compatibilityAddTool(handyGroup.tools, {
     name: "openrouter-credits",
+    order: getToolOrder(handyGroup.tools),
     title: "OpenRouter Credits",
     icon: "fa-solid fa-wallet",
     button: true,
@@ -259,6 +277,7 @@ export function insertSidebarButtons(controls: ControlCollection): void {
 
   compatibilityAddTool(handyGroup.tools, {
     name: "rune-stripper",
+    order: getToolOrder(handyGroup.tools),
     title: "Rune Stripper",
     icon: "fa-solid fa-gem",
     button: true,

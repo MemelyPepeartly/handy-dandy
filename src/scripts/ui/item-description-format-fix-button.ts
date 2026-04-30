@@ -393,7 +393,9 @@ function buildDescriptionRemixPrompt(item: Item, currentDescription: string, ins
 }
 
 export function registerItemDescriptionFormatFixButton(): void {
-  Hooks.on("renderItemSheetPF2e", (app: ItemSheet, html: JQuery<HTMLElement>) => {
+  (Hooks.on as (hook: string, fn: (app: ItemSheet, html: JQuery<HTMLElement>) => void) => number)(
+    "renderItemSheetPF2e",
+    (app: ItemSheet, html: JQuery<HTMLElement>) => {
     const item = app.item ?? app.document;
     if (!(item instanceof Item)) return;
 
@@ -529,6 +531,7 @@ export function registerItemDescriptionFormatFixButton(): void {
     } else {
       windowHeader.append(button);
     }
-  });
+    },
+  );
 }
 

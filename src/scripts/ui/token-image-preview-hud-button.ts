@@ -9,7 +9,7 @@ type TokenHUDData = {
 };
 
 type TokenHUDLike = {
-  object?: Token.Object | null;
+  object?: Token | null;
 };
 
 function resolveHudRootElement(html: unknown): HTMLElement | null {
@@ -29,7 +29,7 @@ function resolveHudRootElement(html: unknown): HTMLElement | null {
   return candidate instanceof HTMLElement ? candidate : null;
 }
 
-function resolveHudToken(app: unknown, data: unknown): Token.Object | null {
+function resolveHudToken(app: unknown, data: unknown): Token | null {
   const tokenFromHud = (app as TokenHUDLike | undefined)?.object;
   if (tokenFromHud) {
     return tokenFromHud;
@@ -46,7 +46,7 @@ function resolveHudToken(app: unknown, data: unknown): Token.Object | null {
   return placeables.find((token) => token.id === tokenId) ?? null;
 }
 
-function resolveTokenImagePath(token: Token.Object): string | null {
+function resolveTokenImagePath(token: Token): string | null {
   const tokenDocument = token.document as TokenDocument & {
     texture?: {
       src?: unknown;
@@ -62,7 +62,7 @@ function resolveTokenImagePath(token: Token.Object): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
-function resolveTokenDisplayName(token: Token.Object): string {
+function resolveTokenDisplayName(token: Token): string {
   const actorName = token.actor?.name?.trim();
   if (actorName) {
     return actorName;
@@ -76,7 +76,7 @@ function resolveTokenDisplayName(token: Token.Object): string {
   return "Token";
 }
 
-function createPreviewButton(token: Token.Object): HTMLButtonElement {
+function createPreviewButton(token: Token): HTMLButtonElement {
   const button = document.createElement("button");
   button.type = "button";
   button.classList.add("control-icon", BUTTON_CLASS);
@@ -97,11 +97,17 @@ function createPreviewButton(token: Token.Object): HTMLButtonElement {
     }
 
     const title = `${resolveTokenDisplayName(token)} | Current Token Image`;
-    new ImagePopout(imagePath, {
-      title,
-      shareable: false,
+    const imagePopout = foundry.applications?.apps?.ImagePopout;
+    if (!imagePopout) {
+      ui.notifications?.warn(`${CONSTANTS.MODULE_NAME} | Image preview is unavailable in this Foundry build.`);
+      return;
+    }
+
+    new imagePopout({
+      src: imagePath,
+      window: { title },
       uuid: token.document.uuid,
-    }).render(true);
+    }).render({ force: true });
   });
 
   return button;

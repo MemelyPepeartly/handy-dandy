@@ -1,6 +1,8 @@
 import { CONSTANTS } from "../constants";
 import { waitForDialog } from "../foundry/dialog";
 
+import appv1 = foundry.appv1;
+
 const RUNE_STRIPPER_TEMPLATE = `${CONSTANTS.TEMPLATE_PATH}/rune-stripper.hbs`;
 const RUNE_COMPENDIUM_PACK_IDS = ["pf2e.equipment-srd", "pf2e.equipment"] as const;
 const SUMMARY_TEMPLATE_UUIDS = [
@@ -1311,17 +1313,17 @@ function buildSummaryItemSource(
   return source;
 }
 
-class RuneStripperApplication extends FormApplication {
+class RuneStripperApplication extends appv1.api.FormApplication {
   #entries: WeaponSelection[] = [];
   #payerActorId: string | null = null;
   #crafterActorId: string | null = null;
   #busy = false;
 
-  constructor(options?: Partial<FormApplicationOptions>) {
+  constructor(options?: Partial<appv1.api.FormApplication.Options>) {
     super(undefined, options);
   }
 
-  static override get defaultOptions(): FormApplicationOptions {
+  static override get defaultOptions(): appv1.api.FormApplication.Options {
     return foundry.utils.mergeObject(super.defaultOptions, {
       id: "handy-dandy-rune-stripper",
       title: "Handy Dandy | Rune Stripper",

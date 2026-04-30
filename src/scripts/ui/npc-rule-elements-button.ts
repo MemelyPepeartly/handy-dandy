@@ -180,7 +180,7 @@ async function ensureRuleContainer(actor: Actor): Promise<Item> {
 
   const created = await actor.createEmbeddedDocuments(
     "Item",
-    [source as unknown as Record<string, unknown>],
+    [source as any],
   ) as unknown as Item[];
   const [item] = created;
   if (!(item instanceof Item)) {
@@ -328,7 +328,9 @@ async function resolveRuleElementTargetItem(actor: Actor, targetKey: string): Pr
 }
 
 export function registerNpcRuleElementsButton(): void {
-  Hooks.on("renderActorSheetPF2e", (app: ActorSheet, html: JQuery<HTMLElement>) => {
+  (Hooks.on as (hook: string, fn: (app: ActorSheet, html: JQuery<HTMLElement>) => void) => number)(
+    "renderActorSheetPF2e",
+    (app: ActorSheet, html: JQuery<HTMLElement>) => {
     const actor = app.actor;
     if (!(actor instanceof Actor)) {
       return;
@@ -396,6 +398,7 @@ export function registerNpcRuleElementsButton(): void {
     } else {
       windowHeader.append(button);
     }
-  });
+    },
+  );
 }
 

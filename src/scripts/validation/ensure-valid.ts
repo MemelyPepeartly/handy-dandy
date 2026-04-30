@@ -172,7 +172,7 @@ function stringifyForConsole(value: unknown): string {
 }
 
 function readBooleanSetting(settingKey: "developerDumpInvalidJson" | "developerDumpAjvErrors"): boolean {
-  const settings = (globalThis as { game?: { settings?: Game["settings"] } }).game?.settings;
+  const settings = (globalThis as { game?: { settings?: ReadyGame["settings"] } }).game?.settings;
   if (!settings || typeof settings.get !== "function") {
     return false;
   }

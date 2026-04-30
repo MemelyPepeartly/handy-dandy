@@ -6,7 +6,9 @@ const BUTTON_LABEL = "Remix" as const;
 const BUTTON_TITLE = "Open Handy Dandy item remix" as const;
 
 export function registerItemRemixButton(): void {
-  Hooks.on("renderItemSheetPF2e", (app: ItemSheet, html: JQuery<HTMLElement>) => {
+  (Hooks.on as (hook: string, fn: (app: ItemSheet, html: JQuery<HTMLElement>) => void) => number)(
+    "renderItemSheetPF2e",
+    (app: ItemSheet, html: JQuery<HTMLElement>) => {
     const item = app.item ?? app.document;
     if (!(item instanceof Item)) return;
 
@@ -37,5 +39,6 @@ export function registerItemRemixButton(): void {
       event.preventDefault();
       void runItemRemixFlow(item);
     });
-  });
+    },
+  );
 }

@@ -7,8 +7,8 @@ import { ToolOverview } from "../ui/tool-overview";
 import { OpenRouterAccountSettings } from "./openrouter-account";
 import { OpenRouterModelManagerSettings } from "./openrouter-model-manager";
 
-// Foundry V13 supports "user" scope. The installed type package still targets
-// V12, so we cast to keep strict TypeScript while using runtime-correct scope.
+// Foundry V14 supports "user" scope. The installed type package still lags the
+// runtime shape, so we cast to keep strict TypeScript while using runtime-correct scope.
 const USER_SCOPE = "user" as unknown as "client";
 
 export async function registerSettings(): Promise<void> {

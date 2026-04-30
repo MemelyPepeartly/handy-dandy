@@ -7,6 +7,8 @@ import {
   type OpenRouterModelCapabilities,
 } from "../openrouter/model-catalog";
 
+import appv1 = foundry.appv1;
+
 interface ModelOptionViewData {
   value: string;
   label: string;
@@ -97,14 +99,14 @@ function formatLoadedAt(timestamp: number): string {
   return new Date(timestamp).toLocaleString();
 }
 
-export class OpenRouterModelManagerSettings extends FormApplication {
+export class OpenRouterModelManagerSettings extends appv1.api.FormApplication {
   #isRefreshing = false;
 
-  constructor(options?: Partial<FormApplicationOptions>) {
+  constructor(options?: Partial<appv1.api.FormApplication.Options>) {
     super(undefined, options);
   }
 
-  static override get defaultOptions(): FormApplicationOptions {
+  static override get defaultOptions(): appv1.api.FormApplication.Options {
     return foundry.utils.mergeObject(super.defaultOptions, {
       id: "handy-dandy-openrouter-model-manager",
       title: "OpenRouter Model Manager",

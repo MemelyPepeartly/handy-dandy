@@ -44,34 +44,17 @@ function showItemImagePreview(item: Item): void {
 
   const title = `${item.name?.trim() || "Item"} | Current Image`;
   const uuid = item.uuid;
-  const appImagePopout = (globalThis as {
-    foundry?: {
-      applications?: {
-        apps?: {
-          ImagePopout?: new (options: {
-            src: string;
-            window: { title: string };
-            uuid?: string;
-          }) => { render: (options: { force: boolean }) => unknown };
-        };
-      };
-    };
-  }).foundry?.applications?.apps?.ImagePopout;
-
-  if (appImagePopout) {
-    new appImagePopout({
-      src: source,
-      window: { title },
-      uuid,
-    }).render({ force: true });
+  const appImagePopout = foundry.applications?.apps?.ImagePopout;
+  if (!appImagePopout) {
+    ui.notifications?.warn(`${CONSTANTS.MODULE_NAME} | Image preview is unavailable in this Foundry build.`);
     return;
   }
 
-  new ImagePopout(source, {
-    title,
+  new appImagePopout({
+    src: source,
+    window: { title },
     uuid,
-    shareable: true,
-  }).render(true);
+  }).render({ force: true });
 }
 
 function ensureImageButtonStack(imageElement: JQuery<HTMLElement>): JQuery<HTMLElement> {
@@ -95,7 +78,9 @@ function resolveItemDescription(item: Item): string | null {
 }
 
 export function registerItemImageGenerateButton(): void {
-  Hooks.on("renderItemSheetPF2e", (app: ItemSheet, html: JQuery<HTMLElement>) => {
+  (Hooks.on as (hook: string, fn: (app: ItemSheet, html: JQuery<HTMLElement>) => void) => number)(
+    "renderItemSheetPF2e",
+    (app: ItemSheet, html: JQuery<HTMLElement>) => {
     const item = app.item ?? app.document;
     if (!(item instanceof Item)) return;
 
@@ -192,5 +177,6 @@ export function registerItemImageGenerateButton(): void {
     });
 
     stack.append(button);
-  });
+    },
+  );
 }

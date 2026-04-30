@@ -2,6 +2,8 @@ import { CONSTANTS } from "../constants";
 import { initializeOpenRouterClientFromSettings } from "../openrouter/runtime";
 import { canUseDesktopOpenRouterOAuth, connectWithOpenRouter } from "../openrouter/oauth";
 
+import appv1 = foundry.appv1;
+
 interface OpenRouterAccountViewData {
   isConnected: boolean;
   keyPreview: string;
@@ -79,14 +81,14 @@ const isLocalInsecureOrigin = (): boolean => {
   }
 };
 
-export class OpenRouterAccountSettings extends FormApplication {
+export class OpenRouterAccountSettings extends appv1.api.FormApplication {
   #isBusy = false;
 
-  constructor(options?: Partial<FormApplicationOptions>) {
+  constructor(options?: Partial<appv1.api.FormApplication.Options>) {
     super(undefined, options);
   }
 
-  static override get defaultOptions(): FormApplicationOptions {
+  static override get defaultOptions(): appv1.api.FormApplication.Options {
     return foundry.utils.mergeObject(super.defaultOptions, {
       id: "handy-dandy-openrouter-account",
       title: "OpenRouter Account",
